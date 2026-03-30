@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dark Botanical — Claude Code</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,600;1,400;1,600&family=IBM+Plex+Sans:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f0f0f;--text:#e8e4df;--text-sec:#9a9590;
+  --warm:#d4a574;--pink:#e8b4b8;--gold:#c9b896;
+}
+html,body{height:100%;font-family:'IBM Plex Sans',sans-serif;font-weight:300;background:var(--bg);color:var(--text);overflow:hidden}
+
+/* ── Scroll-snap container ── */
+.deck{width:100vw;height:100vh;overflow-y:auto;scroll-snap-type:y mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.slide{position:relative;width:100vw;height:100vh;min-height:100vh;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;overflow:hidden}
+
+/* ── Orbs — blurred gradient circles ── */
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.32;pointer-events:none;transition:opacity .8s}
+.orb--warm{width:clamp(220px,40vw,520px);height:clamp(220px,40vw,520px);background:radial-gradient(circle,var(--warm),transparent 70%)}
+.orb--pink{width:clamp(180px,30vw,420px);height:clamp(180px,30vw,420px);background:radial-gradient(circle,var(--pink),transparent 70%)}
+.orb--gold{width:clamp(140px,22vw,320px);height:clamp(140px,22vw,320px);background:radial-gradient(circle,var(--gold),transparent 70%)}
+
+/* Orb positions per slide */
+.slide:nth-child(1) .orb--warm{top:-8%;right:-6%}
+.slide:nth-child(1) .orb--pink{bottom:-5%;left:-4%}
+.slide:nth-child(1) .orb--gold{top:30%;right:12%}
+
+.slide:nth-child(2) .orb--warm{top:10%;left:-10%}
+.slide:nth-child(2) .orb--pink{bottom:-8%;right:-6%}
+.slide:nth-child(2) .orb--gold{top:-5%;right:20%}
+
+.slide:nth-child(3) .orb--warm{bottom:-6%;right:-8%}
+.slide:nth-child(3) .orb--pink{top:-6%;left:10%}
+.slide:nth-child(3) .orb--gold{bottom:20%;left:-5%}
+
+/* ── Thin vertical accent lines ── */
+.line{position:absolute;width:1px;background:linear-gradient(to bottom,transparent,var(--warm) 40%,var(--gold) 60%,transparent);opacity:.16;pointer-events:none}
+.line--l{height:60vh;left:12%;top:20%}
+.line--r{height:45vh;right:18%;top:28%}
+.line--c{height:50vh;left:50%;top:25%;opacity:.08}
+
+/* ── Content blocks ── */
+.content{position:relative;z-index:1;text-align:center;max-width:clamp(320px,65vw,780px);padding:2rem}
+.content::before{content:'';display:block;width:40px;height:1px;background:var(--warm);margin:0 auto 2rem}
+
+h1{font-family:'Cormorant',serif;font-weight:600;font-size:clamp(2.8rem,6vw,5.5rem);letter-spacing:.02em;line-height:1.1;color:var(--text);margin-bottom:.5em}
+h2{font-family:'Cormorant',serif;font-weight:600;font-size:clamp(2rem,4.2vw,3.6rem);letter-spacing:.02em;line-height:1.15;color:var(--text);margin-bottom:.8em}
+.subtitle{font-family:'Cormorant',serif;font-weight:400;font-style:italic;font-size:clamp(1.1rem,2.4vw,1.8rem);color:var(--gold);margin-bottom:2rem;letter-spacing:.04em}
+.body-text{font-size:clamp(.88rem,1.3vw,1.05rem);color:var(--text-sec);line-height:1.75;max-width:520px;margin:0 auto 2.4rem}
+
+/* ── Slide 1: Title ── */
+.tag{display:inline-block;font-size:.7rem;font-weight:400;letter-spacing:.18em;text-transform:uppercase;color:var(--warm);border:1px solid rgba(212,165,116,.25);padding:.45em 1.4em;border-radius:2px}
+.signature{margin-top:2.4rem;font-family:'Cormorant',serif;font-style:italic;font-size:clamp(.85rem,1.2vw,1rem);color:var(--text-sec);opacity:.5}
+
+/* ── Slide 2: Features grid ── */
+.features{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(1.2rem,2.5vw,2.2rem);text-align:left;margin-bottom:2rem;max-width:640px;margin-left:auto;margin-right:auto}
+@media(max-width:540px){.features{grid-template-columns:1fr}}
+.feat{padding:clamp(1rem,2vw,1.6rem);border-left:1px solid rgba(212,165,116,.2);transition:border-color .4s}
+.feat:hover{border-color:var(--warm)}
+.feat-title{font-family:'Cormorant',serif;font-weight:600;font-style:italic;font-size:clamp(1.05rem,1.6vw,1.3rem);color:var(--warm);margin-bottom:.5em;letter-spacing:.01em}
+.feat-desc{font-size:clamp(.82rem,1.1vw,.95rem);color:var(--text-sec);line-height:1.65}
+
+/* ── Slide 3: Closing ── */
+.cmd-box{display:inline-block;background:rgba(255,255,255,.04);border:1px solid rgba(212,165,116,.15);border-radius:4px;padding:.8em 2em;margin-bottom:2rem;font-family:'IBM Plex Sans',monospace;font-weight:400;font-size:clamp(.85rem,1.2vw,1.05rem);color:var(--gold);letter-spacing:.04em}
+.cmd-box span{color:var(--text-sec)}
+.closing-note{font-family:'Cormorant',serif;font-style:italic;font-weight:400;font-size:clamp(.95rem,1.5vw,1.15rem);color:var(--text-sec);line-height:1.7;max-width:440px;margin:0 auto 1.6rem;opacity:.75}
+
+/* ── Reveal animation ── */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.23,1,.32,1),transform .9s cubic-bezier(.23,1,.32,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal:nth-child(2){transition-delay:.12s}
+.reveal:nth-child(3){transition-delay:.24s}
+.reveal:nth-child(4){transition-delay:.36s}
+.reveal:nth-child(5){transition-delay:.48s}
+.reveal:nth-child(6){transition-delay:.6s}
+
+/* ── Progress bar ── */
+.progress{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--warm),var(--gold));z-index:100;width:0;transition:width .35s ease}
+
+/* ── Nav dots ── */
+.nav-dots{position:fixed;right:clamp(12px,2vw,28px);top:50%;transform:translateY(-50%);z-index:100;display:flex;flex-direction:column;gap:14px}
+.nav-dot{width:8px;height:8px;border-radius:50%;border:1px solid rgba(212,165,116,.35);background:transparent;cursor:pointer;transition:background .3s,border-color .3s,transform .3s;padding:0}
+.nav-dot:hover{border-color:var(--warm);transform:scale(1.3)}
+.nav-dot.active{background:var(--warm);border-color:var(--warm)}
+
+/* ── Reduced motion ── */
+@media(prefers-reduced-motion:reduce){
+  .orb{filter:blur(60px);transition:none}
+  .reveal{transition:none;opacity:1;transform:none}
+  .deck{scroll-behavior:auto}
+  .progress{transition:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress" id="progress"></div>
+
+<!-- Nav dots -->
+<nav class="nav-dots" id="navDots">
+  <button class="nav-dot active" data-slide="0" aria-label="Slide 1"></button>
+  <button class="nav-dot" data-slide="1" aria-label="Slide 2"></button>
+  <button class="nav-dot" data-slide="2" aria-label="Slide 3"></button>
+</nav>
+
+<div class="deck" id="deck">
+
+  <!-- ═══ Slide 1 — Title ═══ -->
+  <section class="slide">
+    <div class="orb orb--warm"></div>
+    <div class="orb orb--pink"></div>
+    <div class="orb orb--gold"></div>
+    <div class="line line--l"></div>
+    <div class="line line--r"></div>
+    <div class="content">
+      <h1 class="reveal">Claude Code</h1>
+      <p class="subtitle reveal">AI 驱动的编程助手</p>
+      <p class="body-text reveal">将自然语言转化为精确代码，以优雅的方式重新定义开发者与终端的交互体验。</p>
+      <span class="tag reveal">Dark Botanical</span>
+      <p class="signature reveal">— style 04 —</p>
+    </div>
+  </section>
+
+  <!-- ═══ Slide 2 — Features ═══ -->
+  <section class="slide">
+    <div class="orb orb--warm"></div>
+    <div class="orb orb--pink"></div>
+    <div class="orb orb--gold"></div>
+    <div class="line line--r"></div>
+    <div class="line line--c"></div>
+    <div class="content">
+      <h2 class="reveal">核心能力</h2>
+      <p class="subtitle reveal">Capabilities</p>
+      <div class="features reveal">
+        <div class="feat">
+          <div class="feat-title">自然语言编程</div>
+          <p class="feat-desc">用日常语言描述需求，自动生成高质量、可维护的代码实现。</p>
+        </div>
+        <div class="feat">
+          <div class="feat-title">智能代码审查</div>
+          <p class="feat-desc">深度分析代码结构，发现潜在问题并提供优化建议与重构方案。</p>
+        </div>
+        <div class="feat">
+          <div class="feat-title">全栈项目理解</div>
+          <p class="feat-desc">跨文件索引与语义分析，精准理解复杂项目的架构与上下文关系。</p>
+        </div>
+        <div class="feat">
+          <div class="feat-title">终端原生集成</div>
+          <p class="feat-desc">直接在命令行中运行，无缝融入现有开发工作流与工具链。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Slide 3 — Closing ═══ -->
+  <section class="slide">
+    <div class="orb orb--warm"></div>
+    <div class="orb orb--pink"></div>
+    <div class="orb orb--gold"></div>
+    <div class="line line--l"></div>
+    <div class="line line--c"></div>
+    <div class="content">
+      <h2 class="reveal">开始使用</h2>
+      <p class="subtitle reveal">Get Started</p>
+      <div class="cmd-box reveal"><span>$</span> npm install -g @anthropic-ai/claude-code</div>
+      <p class="closing-note reveal">在终端中输入 claude 即可启动，<br>让优雅的代码自然生长。</p>
+      <span class="tag reveal">claude</span>
+      <p class="signature reveal">— crafted with botanical elegance —</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = deck.querySelectorAll('.slide');
+  const total = slides.length;
+  const progress = document.getElementById('progress');
+  const dots = document.querySelectorAll('.nav-dot');
+  let current = 0;
+  let isScrolling = false;
+
+  /* ── IntersectionObserver for .reveal ── */
+  const revealObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting) e.target.classList.add('visible');
+    });
+  },{threshold:0.15,root:deck});
+  document.querySelectorAll('.reveal').forEach(function(el){revealObs.observe(el)});
+
+  /* ── Update UI helpers ── */
+  function updateProgress(){
+    var pct = (current / (total - 1)) * 100;
+    progress.style.width = pct + '%';
+  }
+  function updateDots(){
+    dots.forEach(function(d,i){
+      d.classList.toggle('active', i === current);
+    });
+  }
+  function goTo(idx){
+    if(idx < 0 || idx >= total) return;
+    current = idx;
+    slides[current].scrollIntoView({behavior:'smooth'});
+    updateProgress();
+    updateDots();
+  }
+
+  /* ── Scroll-based index sync ── */
+  var scrollTimer;
+  deck.addEventListener('scroll',function(){
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function(){
+      var best = 0, bestDist = Infinity;
+      slides.forEach(function(s,i){
+        var d = Math.abs(s.getBoundingClientRect().top);
+        if(d < bestDist){bestDist = d; best = i;}
+      });
+      current = best;
+      updateProgress();
+      updateDots();
+    },80);
+  });
+
+  /* ── Nav dot clicks ── */
+  dots.forEach(function(dot){
+    dot.addEventListener('click',function(){
+      goTo(parseInt(dot.dataset.slide));
+    });
+  });
+
+  /* ── Keyboard navigation ── */
+  document.addEventListener('keydown',function(e){
+    if(e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown'){
+      e.preventDefault(); goTo(current + 1);
+    } else if(e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp'){
+      e.preventDefault(); goTo(current - 1);
+    } else if(e.key === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(e.key === 'End'){
+      e.preventDefault(); goTo(total - 1);
+    }
+  });
+
+  /* ── Wheel navigation (debounced) ── */
+  deck.addEventListener('wheel',function(e){
+    if(isScrolling) return;
+    var delta = e.deltaY;
+    if(Math.abs(delta) < 30) return;
+    e.preventDefault();
+    isScrolling = true;
+    if(delta > 0) goTo(current + 1);
+    else goTo(current - 1);
+    setTimeout(function(){isScrolling = false},900);
+  },{passive:false});
+
+  /* ── Touch navigation ── */
+  var touchStartY = 0;
+  deck.addEventListener('touchstart',function(e){
+    touchStartY = e.touches[0].clientY;
+  },{passive:true});
+  deck.addEventListener('touchend',function(e){
+    var dy = touchStartY - e.changedTouches[0].clientY;
+    if(Math.abs(dy) < 50) return;
+    if(dy > 0) goTo(current + 1);
+    else goTo(current - 1);
+  },{passive:true});
+
+  /* ── Initial state ── */
+  updateProgress();
+  updateDots();
+})();
+</script>
+</body>
+</html>

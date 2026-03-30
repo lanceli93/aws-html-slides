@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Electric Studio - Claude Code</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg-dark:#0a0a0a;--bg-white:#ffffff;--accent:#4361ee;
+    --text-dark:#0a0a0a;--text-light:#ffffff;
+    --ease-out:cubic-bezier(.16,1,.3,1);
+  }
+  body{font-family:'Manrope',sans-serif;background:var(--bg-dark)}
+
+  /* === VIEWPORT FITTING === */
+  html,body{height:100%;overflow-x:hidden}
+  html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+
+  .slide{
+    height:100vh;height:100dvh;overflow:hidden;
+    display:grid;grid-template-rows:1fr 1fr;
+    position:relative;scroll-snap-align:start;
+  }
+
+  /* === PANELS === */
+  .panel{
+    display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;
+    padding:clamp(16px,3vw,48px);
+  }
+  .panel--white{background:var(--bg-white)}
+  .panel--blue{background:var(--accent)}
+  .panel--blue::before{
+    content:'';position:absolute;top:0;left:0;right:0;
+    height:clamp(3px,.5vh,6px);background:var(--bg-dark);
+  }
+  .panel--dark{background:var(--bg-dark);border-top:1px solid rgba(255,255,255,.08)}
+
+  /* === BRAND MARKS === */
+  .brand{
+    position:absolute;font-weight:800;
+    font-size:clamp(.55rem,.8vw,.9rem);letter-spacing:.15em;text-transform:uppercase;
+  }
+  .brand-tl{top:clamp(12px,2vh,24px);left:clamp(16px,2.5vw,32px)}
+  .brand-tr{top:clamp(12px,2vh,24px);right:clamp(16px,2.5vw,32px)}
+  .brand-bl{bottom:clamp(12px,2vh,24px);left:clamp(16px,2.5vw,32px)}
+  .brand-br{bottom:clamp(12px,2vh,24px);right:clamp(16px,2.5vw,32px)}
+  .c-dark{color:var(--text-dark)}.c-light{color:var(--text-light)}
+  .c-muted{color:rgba(255,255,255,.35)}.c-accent{color:var(--accent)}
+
+  /* === TYPOGRAPHY === */
+  .hero-title{
+    font-weight:800;font-size:clamp(2.5rem,7vw,7rem);
+    color:var(--text-dark);line-height:.95;letter-spacing:-.03em;
+  }
+  .section-label{
+    font-weight:500;font-size:clamp(.7rem,1.2vw,1rem);
+    color:var(--accent);letter-spacing:.12em;text-transform:uppercase;
+    margin-bottom:clamp(4px,1vh,12px);
+  }
+  .section-title{
+    font-weight:800;font-size:clamp(2rem,5vw,4.5rem);
+    line-height:.95;letter-spacing:-.03em;
+  }
+  .subtitle{
+    font-weight:400;font-size:clamp(.9rem,2.2vw,1.8rem);
+    color:var(--text-light);letter-spacing:.04em;
+  }
+  .tagline{
+    display:block;font-weight:500;
+    font-size:clamp(.7rem,1.1vw,1rem);
+    color:rgba(255,255,255,.5);margin-top:clamp(8px,1.5vh,16px);
+  }
+
+  /* === REVEAL ANIMATIONS === */
+  .reveal{
+    opacity:0;transform:translateY(clamp(12px,3vh,30px));
+    transition:opacity .7s var(--ease-out),transform .7s var(--ease-out);
+  }
+  .slide.visible .reveal{opacity:1;transform:translateY(0)}
+  .slide.visible .reveal:nth-child(1){transition-delay:.1s}
+  .slide.visible .reveal:nth-child(2){transition-delay:.2s}
+  .slide.visible .reveal:nth-child(3){transition-delay:.3s}
+  .slide.visible .reveal:nth-child(4){transition-delay:.4s}
+  .slide.visible .reveal:nth-child(5){transition-delay:.5s}
+  .slide.visible .reveal:nth-child(6){transition-delay:.6s}
+
+  /* Staggered feature cards */
+  .slide.visible .feature-card:nth-child(1){transition-delay:.2s}
+  .slide.visible .feature-card:nth-child(2){transition-delay:.3s}
+  .slide.visible .feature-card:nth-child(3){transition-delay:.4s}
+  .slide.visible .feature-card:nth-child(4){transition-delay:.5s}
+
+  /* === SLIDE 2: FEATURES === */
+  .features-grid{
+    display:grid;grid-template-columns:1fr 1fr;
+    gap:clamp(12px,2.5vw,32px);width:100%;max-width:900px;
+  }
+  @media(max-width:600px){.features-grid{grid-template-columns:1fr}}
+  .feature-card{
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);
+    border-radius:clamp(8px,1vw,14px);padding:clamp(14px,2vw,28px);
+    opacity:0;transform:translateY(20px);
+    transition:opacity .6s var(--ease-out),transform .6s var(--ease-out),background .3s ease;
+  }
+  .slide.visible .feature-card{opacity:1;transform:translateY(0)}
+  .feature-card:hover{background:rgba(255,255,255,.12)}
+  .feature-icon{font-size:clamp(1.3rem,2.5vw,2rem);margin-bottom:clamp(6px,1vh,12px);display:block}
+  .feature-title{font-weight:800;font-size:clamp(.85rem,1.4vw,1.2rem);color:var(--text-light);margin-bottom:clamp(2px,.4vh,6px)}
+  .feature-desc{font-weight:400;font-size:clamp(.65rem,1vw,.9rem);color:rgba(255,255,255,.55);line-height:1.5}
+
+  /* === SLIDE 3: INSTALL === */
+  .install-block{
+    background:var(--bg-dark);border-radius:clamp(8px,1vw,14px);
+    padding:clamp(16px,3vw,36px) clamp(20px,4vw,48px);text-align:center;
+  }
+  .install-label{
+    font-weight:500;font-size:clamp(.65rem,1vw,.9rem);
+    color:rgba(255,255,255,.45);letter-spacing:.1em;text-transform:uppercase;
+    margin-bottom:clamp(8px,1.5vh,14px);
+  }
+  .install-cmd{
+    font-weight:800;font-size:clamp(.9rem,2.2vw,1.8rem);
+    color:var(--accent);letter-spacing:.02em;user-select:all;
+  }
+  .install-hint{
+    font-weight:400;font-size:clamp(.6rem,.8vw,.8rem);
+    color:rgba(255,255,255,.3);margin-top:clamp(8px,1.5vh,14px);
+  }
+
+  /* === PROGRESS BAR === */
+  .progress-bar{
+    position:fixed;top:0;left:0;height:clamp(2px,.4vh,4px);
+    background:var(--accent);z-index:100;transition:width .3s ease;
+  }
+
+  /* === NAV DOTS === */
+  .nav-dots{
+    position:fixed;right:clamp(12px,2vw,24px);top:50%;
+    transform:translateY(-50%);z-index:100;
+    display:flex;flex-direction:column;gap:clamp(6px,1vh,12px);
+  }
+  .nav-dot{
+    width:clamp(8px,1vw,12px);height:clamp(8px,1vw,12px);
+    border-radius:50%;border:2px solid rgba(255,255,255,.3);
+    background:transparent;cursor:pointer;padding:0;
+    transition:background .3s,border-color .3s,transform .3s;
+  }
+  .nav-dot:hover{border-color:var(--accent);transform:scale(1.3)}
+  .nav-dot.active{background:var(--accent);border-color:var(--accent)}
+
+  /* === REDUCED MOTION === */
+  @media(prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.2s!important}
+    html{scroll-behavior:auto}
+    .reveal,.feature-card{opacity:1;transform:none}
+  }
+
+  /* === SHORT VIEWPORTS === */
+  @media(max-height:700px){
+    :root{--slide-pad:clamp(.5rem,2vw,1.5rem)}
+    .hero-title{font-size:clamp(2rem,5vw,4rem)}
+    .section-title{font-size:clamp(1.5rem,4vw,3rem)}
+  }
+  @media(max-height:500px){
+    .nav-dots{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<nav class="nav-dots" id="navDots" aria-label="Slide navigation">
+  <button class="nav-dot active" aria-label="Slide 1"></button>
+  <button class="nav-dot" aria-label="Slide 2"></button>
+  <button class="nav-dot" aria-label="Slide 3"></button>
+</nav>
+
+<!-- ═══════════════ SLIDE 1: TITLE ═══════════════ -->
+<section class="slide" aria-label="Title">
+  <div class="panel panel--white">
+    <span class="brand brand-tl c-dark">Electric</span>
+    <span class="brand brand-tr c-dark">Studio</span>
+    <h1 class="hero-title reveal">Claude Code</h1>
+  </div>
+  <div class="panel panel--blue">
+    <span class="brand brand-bl c-light">2026</span>
+    <span class="brand brand-br c-light">Anthropic</span>
+    <div style="text-align:center">
+      <p class="subtitle reveal">AI 驱动的编程助手</p>
+      <span class="tagline reveal">"Bold tools for bold builders."</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SLIDE 2: FEATURES ═══════════════ -->
+<section class="slide" aria-label="Features">
+  <div class="panel panel--dark" style="flex-direction:column;gap:clamp(4px,1vh,10px);border-top:none">
+    <span class="brand brand-tl c-muted">Electric</span>
+    <span class="brand brand-tr c-accent">02</span>
+    <p class="section-label reveal">Capabilities</p>
+    <h2 class="section-title reveal" style="color:var(--text-light)">核心能力</h2>
+  </div>
+  <div class="panel panel--dark" style="align-items:flex-start;padding-top:clamp(16px,3vh,40px)">
+    <span class="brand brand-bl c-muted">Features</span>
+    <span class="brand brand-br c-muted">Anthropic</span>
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">&#x2192;</span>
+        <p class="feature-title">自然语言编程</p>
+        <p class="feature-desc">用中文或英文描述需求，直接生成、修改代码</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x25A0;</span>
+        <p class="feature-title">全局代码理解</p>
+        <p class="feature-desc">自动分析整个代码库，理解上下文与依赖关系</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x2215;</span>
+        <p class="feature-title">终端深度集成</p>
+        <p class="feature-desc">执行 Git、测试、构建等完整开发工作流</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">&#x25CB;</span>
+        <p class="feature-title">安全可控</p>
+        <p class="feature-desc">权限沙箱机制，每步操作均可审查确认</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ SLIDE 3: CLOSING ═══════════════ -->
+<section class="slide" aria-label="Get started">
+  <div class="panel panel--white" style="flex-direction:column;gap:clamp(6px,1vh,16px)">
+    <span class="brand brand-tl c-dark">Electric</span>
+    <span class="brand brand-tr c-accent">03</span>
+    <p class="section-label reveal">Get Started</p>
+    <h2 class="section-title reveal" style="color:var(--text-dark)">开始使用</h2>
+  </div>
+  <div class="panel panel--blue" style="flex-direction:column;gap:clamp(12px,2vh,24px)">
+    <span class="brand brand-bl c-light">2026</span>
+    <span class="brand brand-br c-light">Anthropic</span>
+    <div class="install-block reveal">
+      <p class="install-label">Install via npm</p>
+      <p class="install-cmd">npm i -g @anthropic-ai/claude-code</p>
+      <p class="install-hint">Requires Node.js 18+ &middot; macOS, Linux, WSL</p>
+    </div>
+    <span class="tagline reveal" style="text-align:center">"Bold tools for bold builders."</span>
+  </div>
+</section>
+
+<script>
+(function(){
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.nav-dot');
+  const bar = document.getElementById('progressBar');
+  let current = 0, scrolling = false;
+
+  /* Intersection Observer: add .visible to slides */
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      e.target.classList.toggle('visible', e.isIntersecting);
+      if (e.isIntersecting) {
+        current = [...slides].indexOf(e.target);
+        updateUI();
+      }
+    });
+  }, { threshold: 0.5 });
+  slides.forEach(s => obs.observe(s));
+
+  function updateUI() {
+    bar.style.width = ((current + 1) / slides.length * 100) + '%';
+    dots.forEach((d, i) => d.classList.toggle('active', i === current));
+  }
+
+  function go(i) {
+    if (i < 0 || i >= slides.length) return;
+    current = i;
+    slides[i].scrollIntoView({ behavior: 'smooth' });
+    updateUI();
+  }
+
+  /* Nav dots */
+  dots.forEach((d, i) => d.addEventListener('click', () => go(i)));
+
+  /* Keyboard */
+  document.addEventListener('keydown', e => {
+    if (['ArrowDown','ArrowRight',' ','PageDown'].includes(e.key)) { e.preventDefault(); go(current + 1); }
+    else if (['ArrowUp','ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); go(current - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); go(0); }
+    else if (e.key === 'End') { e.preventDefault(); go(slides.length - 1); }
+  });
+
+  /* Wheel (debounced) */
+  let wt = null;
+  document.addEventListener('wheel', e => {
+    if (wt) return;
+    wt = setTimeout(() => wt = null, 800);
+    if (e.deltaY > 30) go(current + 1);
+    else if (e.deltaY < -30) go(current - 1);
+  }, { passive: true });
+
+  /* Touch */
+  let ty = 0;
+  document.addEventListener('touchstart', e => { ty = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const d = ty - e.changedTouches[0].clientY;
+    if (Math.abs(d) > 50) go(current + (d > 0 ? 1 : -1));
+  }, { passive: true });
+
+  updateUI();
+})();
+</script>
+</body>
+</html>

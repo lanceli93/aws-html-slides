@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>re:Invent Keynote - Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500&family=Urbanist:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* === RE:INVENT KEYNOTE THEME === */
+        :root {
+            --bg-primary: #0A0A0A;
+            --accent-purple: #8B5CF6;
+            --accent-pink: #D946EF;
+            --accent-orange: #FF9900;
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.55);
+            --glow-purple: rgba(139, 92, 246, 0.4);
+            --card-bg: rgba(139, 92, 246, 0.07);
+            --card-border: rgba(139, 92, 246, 0.2);
+            --font-display: 'Urbanist', sans-serif;
+            --font-body: 'Albert Sans', sans-serif;
+            --title-size: clamp(2.4rem, 7vw, 5.5rem);
+            --h2-size: clamp(1.5rem, 4vw, 3.2rem);
+            --h3-size: clamp(1rem, 2vw, 1.6rem);
+            --subtitle-size: clamp(0.9rem, 2vw, 1.4rem);
+            --body-size: clamp(0.8rem, 1.6vw, 1.25rem);
+            --small-size: clamp(0.7rem, 1.2vw, 1rem);
+            --slide-padding: clamp(2rem, 5vw, 5rem);
+            --content-gap: clamp(0.8rem, 2vw, 1.8rem);
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.7s;
+        }
+
+        /* === BASE === */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font-body); background: var(--bg-primary); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
+        html, body { height: 100%; overflow-x: hidden; scrollbar-width: none; }
+        html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+        html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+        .slide {
+            width: 100vw; height: 100vh; height: 100dvh;
+            overflow: hidden; scroll-snap-align: start;
+            display: flex; flex-direction: column; position: relative;
+        }
+        .slide-content {
+            flex: 1; display: flex; flex-direction: column; justify-content: center;
+            max-height: 100%; overflow: hidden;
+            padding: var(--slide-padding);
+            padding-bottom: clamp(2.5rem, 4vw, 3.5rem);
+            position: relative; z-index: 1;
+        }
+
+        /* === VIEWPORT BREAKPOINTS === */
+        @media (max-height: 700px) {
+            :root { --slide-padding: clamp(1rem, 3vw, 2rem); --title-size: clamp(1.6rem, 5vw, 3rem); --h2-size: clamp(1.1rem, 3vw, 1.8rem); }
+        }
+        @media (max-height: 600px) {
+            :root { --slide-padding: clamp(0.75rem, 2.5vw, 1.5rem); --title-size: clamp(1.3rem, 4vw, 2.2rem); --body-size: clamp(0.65rem, 1.1vw, 0.9rem); }
+            .nav-dots, .floating-orb { display: none; }
+        }
+        @media (max-width: 600px) {
+            :root { --title-size: clamp(1.5rem, 8vw, 2.8rem); }
+            .content-layout { grid-template-columns: 1fr !important; }
+            .features-grid { grid-template-columns: 1fr !important; }
+            .stats-row { flex-wrap: wrap; }
+            .stat-item { flex: 0 0 50%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+            html { scroll-behavior: auto; }
+        }
+
+        /* === FLOATING GRADIENT ORBS (slides 2/3) === */
+        .floating-orb {
+            position: absolute; border-radius: 50%;
+            pointer-events: none; z-index: 0;
+        }
+        .orb-purple { background: radial-gradient(circle, rgba(139,92,246,0.35) 0%, rgba(139,92,246,0) 70%); }
+        .orb-pink { background: radial-gradient(circle, rgba(217,70,239,0.3) 0%, rgba(217,70,239,0) 70%); }
+        .orb-blue { background: radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0) 70%); }
+
+        @keyframes orbFloat1 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(20px, -30px) scale(1.05); } }
+        @keyframes orbFloat2 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(-25px, 20px) scale(0.95); } }
+        @keyframes orbFloat3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(15px, 25px) scale(1.03); } }
+
+        /* === TITLE SLIDE ANIMATED BLOBS === */
+        .blob-canvas {
+            position: absolute; inset: 0; overflow: hidden;
+            pointer-events: none; z-index: 0;
+        }
+        .blob {
+            position: absolute; border-radius: 50%;
+            filter: blur(80px);
+            will-change: transform, opacity;
+        }
+        /* Each blob: movement + scale + color shift */
+        @keyframes blob1 {
+            0%   { transform: translate(0, 0) scale(1);       background: rgba(139,92,246,0.55); }
+            25%  { transform: translate(8vw, -12vh) scale(1.2);  background: rgba(217,70,239,0.6); }
+            50%  { transform: translate(-5vw, 8vh) scale(0.9);   background: rgba(59,130,246,0.5); }
+            75%  { transform: translate(12vw, 5vh) scale(1.15);  background: rgba(236,72,153,0.55); }
+            100% { transform: translate(0, 0) scale(1);       background: rgba(139,92,246,0.55); }
+        }
+        @keyframes blob2 {
+            0%   { transform: translate(0, 0) scale(1);       background: rgba(217,70,239,0.5); }
+            25%  { transform: translate(-10vw, 6vh) scale(1.15); background: rgba(59,130,246,0.55); }
+            50%  { transform: translate(6vw, -10vh) scale(0.85); background: rgba(255,153,0,0.4); }
+            75%  { transform: translate(-8vw, -4vh) scale(1.1);  background: rgba(139,92,246,0.5); }
+            100% { transform: translate(0, 0) scale(1);       background: rgba(217,70,239,0.5); }
+        }
+        @keyframes blob3 {
+            0%   { transform: translate(0, 0) scale(1);       background: rgba(59,130,246,0.45); }
+            33%  { transform: translate(10vw, 8vh) scale(1.25);  background: rgba(139,92,246,0.55); }
+            66%  { transform: translate(-6vw, -12vh) scale(0.8); background: rgba(217,70,239,0.45); }
+            100% { transform: translate(0, 0) scale(1);       background: rgba(59,130,246,0.45); }
+        }
+        @keyframes blob4 {
+            0%   { transform: translate(0, 0) scale(1);       background: rgba(236,72,153,0.35); }
+            30%  { transform: translate(-12vw, 10vh) scale(1.3); background: rgba(139,92,246,0.45); }
+            60%  { transform: translate(8vw, -6vh) scale(0.85);  background: rgba(59,200,180,0.35); }
+            100% { transform: translate(0, 0) scale(1);       background: rgba(236,72,153,0.35); }
+        }
+
+        /* === ANIMATIONS === */
+        .reveal {
+            opacity: 0; transform: translateY(25px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo), transform var(--duration-normal) var(--ease-out-expo);
+        }
+        .slide.visible .reveal { opacity: 1; transform: translateY(0); }
+        .slide.visible .reveal.d1 { transition-delay: 0.1s; }
+        .slide.visible .reveal.d2 { transition-delay: 0.2s; }
+        .slide.visible .reveal.d3 { transition-delay: 0.3s; }
+        .slide.visible .reveal.d4 { transition-delay: 0.4s; }
+        .slide.visible .reveal.d5 { transition-delay: 0.5s; }
+        .slide.visible .reveal.d6 { transition-delay: 0.6s; }
+        .slide.visible .reveal.d7 { transition-delay: 0.7s; }
+
+        /* === FOOTER === */
+        .slide-footer {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: clamp(0.6rem, 1.2vw, 1rem) var(--slide-padding);
+            font-size: clamp(0.55rem, 0.75vw, 0.7rem);
+            color: rgba(255, 255, 255, 0.4); text-align: center; z-index: 2;
+            letter-spacing: 0.05em;
+        }
+
+        /* === PAGE NUMBER === */
+        .page-number {
+            position: fixed;
+            bottom: clamp(8px, 1.2vh, 16px);
+            right: clamp(12px, 2vw, 24px);
+            z-index: 999;
+            font-family: var(--font-body);
+            font-size: clamp(0.55rem, 0.8vw, 0.7rem);
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 0.05em;
+            font-variant-numeric: tabular-nums;
+        }
+        @media (max-height: 600px) { .page-number { display: none; } }
+
+        /* ============================================
+           SLIDE 1: TITLE — RICH GRADIENT BACKGROUND
+           ============================================ */
+        .title-slide {
+            background: #0B0015;
+        }
+        /* Vignette overlay */
+        .title-slide::after {
+            content: ''; position: absolute; inset: 0;
+            background:
+                radial-gradient(ellipse 90% 90% at 50% 50%, transparent 40%, rgba(11,0,21,0.6) 100%);
+            pointer-events: none; z-index: 0;
+        }
+        .title-slide .slide-content {
+            align-items: center; text-align: center;
+            gap: clamp(0.6rem, 1.5vw, 1.2rem);
+        }
+        .title-label {
+            font-family: var(--font-body); font-size: var(--small-size); font-weight: 500;
+            letter-spacing: 0.35em; text-transform: uppercase;
+            color: rgba(255,255,255,0.6);
+        }
+        .title-main {
+            font-family: var(--font-display); font-size: var(--title-size);
+            font-weight: 800; line-height: 1.05; letter-spacing: -0.025em;
+            text-shadow:
+                0 0 30px rgba(139,92,246,0.3),
+                0 0 80px rgba(139,92,246,0.15);
+        }
+        .title-main em {
+            font-style: normal; position: relative;
+            background: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 25px rgba(217,70,239,0.5)) drop-shadow(0 0 60px rgba(139,92,246,0.3));
+        }
+        .title-accent {
+            width: clamp(40px, 5vw, 56px); height: 3px;
+            background: linear-gradient(90deg, var(--accent-orange), var(--accent-pink));
+            border-radius: 2px;
+            box-shadow: 0 0 12px rgba(255,153,0,0.4), 0 0 30px rgba(217,70,239,0.2);
+        }
+        .title-sub {
+            font-size: var(--subtitle-size); color: rgba(255,255,255,0.65);
+            max-width: min(90vw, 550px); line-height: 1.6;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* ============================================
+           SLIDE 2: CONTENT — DARK + PILL CARDS
+           ============================================ */
+        .content-slide { background: var(--bg-primary); }
+        .content-slide .slide-content { justify-content: center; align-items: center; }
+
+        .content-layout {
+            display: grid; grid-template-columns: 2fr 3fr;
+            gap: clamp(2rem, 5vw, 4rem); align-items: center;
+            width: 100%;
+            max-width: min(92vw, 1200px);
+        }
+        .section-label {
+            font-family: var(--font-body); font-size: var(--small-size); font-weight: 500;
+            letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent-purple);
+            margin-bottom: clamp(0.4rem, 0.8vw, 0.6rem);
+        }
+        .section-title {
+            font-family: var(--font-display); font-size: var(--h2-size);
+            font-weight: 700; line-height: 1.15; margin-bottom: clamp(0.4rem, 1vw, 0.8rem);
+        }
+        .section-desc {
+            font-size: var(--body-size); color: var(--text-secondary); line-height: 1.65;
+        }
+
+        /* Pill cards */
+        .pill-cards { display: flex; flex-direction: column; gap: clamp(0.4rem, 0.9vw, 0.65rem); }
+        .pill-card {
+            display: flex; align-items: center; gap: clamp(0.6rem, 1.2vw, 1rem);
+            padding: clamp(0.65rem, 1.3vw, 0.9rem) clamp(0.8rem, 1.5vw, 1.2rem);
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: clamp(10px, 1.2vw, 14px);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .pill-card:hover {
+            border-color: rgba(139,92,246,0.45);
+            box-shadow: 0 0 25px rgba(139,92,246,0.15);
+        }
+        .pill-icon {
+            width: clamp(28px, 3vw, 36px); height: clamp(28px, 3vw, 36px);
+            border-radius: clamp(6px, 0.8vw, 10px); flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(217,70,239,0.12));
+            display: flex; align-items: center; justify-content: center;
+        }
+        .pill-icon svg { width: 55%; height: 55%; stroke: var(--accent-purple); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .pill-text {
+            font-size: var(--body-size); font-weight: 500; line-height: 1.3;
+        }
+        .pill-text span { color: var(--text-secondary); font-weight: 400; }
+
+        /* Arrow icon on right */
+        .pill-arrow {
+            margin-left: auto; flex-shrink: 0;
+            width: clamp(16px, 1.8vw, 22px); height: clamp(16px, 1.8vw, 22px);
+            border-radius: 50%; background: rgba(139,92,246,0.12);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .pill-arrow svg { width: 50%; height: 50%; stroke: rgba(255,255,255,0.4); fill: none; stroke-width: 2.5; stroke-linecap: round; }
+
+        /* ============================================
+           SLIDE 3: STATS + FEATURE GRID
+           ============================================ */
+        .features-slide { background: var(--bg-primary); }
+        .features-slide .slide-content {
+            gap: var(--content-gap); align-items: center;
+        }
+
+        /* Stats row */
+        .stats-row {
+            display: flex; width: 100%; max-width: min(90vw, 900px);
+            border: 1px solid var(--card-border);
+            border-radius: clamp(10px, 1.2vw, 14px);
+            background: var(--card-bg);
+            overflow: hidden;
+        }
+        .stat-item {
+            flex: 1; text-align: center;
+            padding: clamp(0.6rem, 1.5vw, 1.2rem) clamp(0.5rem, 1vw, 1rem);
+            border-right: 1px solid rgba(139,92,246,0.15);
+        }
+        .stat-item:last-child { border-right: none; }
+        .stat-value {
+            font-family: var(--font-display); font-size: clamp(1.4rem, 3.5vw, 2.6rem);
+            font-weight: 800; line-height: 1.1;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-label {
+            font-size: var(--small-size); color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.08em;
+            margin-top: clamp(0.15rem, 0.4vw, 0.3rem);
+        }
+
+        /* Feature grid */
+        .features-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.4rem, 1vw, 0.7rem);
+            width: 100%; max-width: min(90vw, 900px);
+        }
+        .feature-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: clamp(8px, 1vw, 12px);
+            padding: clamp(0.7rem, 1.5vw, 1.1rem);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .feature-card:hover {
+            border-color: rgba(139,92,246,0.4);
+            box-shadow: 0 0 25px rgba(139,92,246,0.12);
+        }
+        .feat-icon {
+            width: clamp(26px, 2.8vw, 34px); height: clamp(26px, 2.8vw, 34px);
+            border-radius: clamp(5px, 0.7vw, 8px);
+            background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(217,70,239,0.1));
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: clamp(0.3rem, 0.7vw, 0.5rem);
+        }
+        .feat-icon svg { width: 55%; height: 55%; stroke: var(--accent-purple); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .feature-card h3 {
+            font-family: var(--font-display); font-size: var(--h3-size);
+            font-weight: 700; margin-bottom: clamp(0.1rem, 0.3vw, 0.2rem);
+        }
+        .feature-card p { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.45; }
+
+        /* ============================================
+           SLIDE 4: SPLIT DIVIDER — product left + bullets right
+           ============================================ */
+        .split-slide { background: var(--bg-primary); }
+        .split-slide .slide-content { justify-content: center; align-items: center; }
+        .split-layout {
+            display: grid; grid-template-columns: 1fr auto 1fr;
+            align-items: center; width: 100%; max-width: min(92vw, 1200px);
+            gap: 0;
+        }
+        .split-left { padding-right: clamp(1.5rem, 4vw, 3rem); }
+        .split-product-name {
+            font-family: var(--font-display); font-size: var(--h2-size);
+            font-weight: 400; line-height: 1.2; margin-bottom: clamp(0.2rem, 0.5vw, 0.4rem);
+        }
+        .split-product-name strong { font-weight: 800; }
+        .split-product-sub {
+            font-size: var(--body-size); color: var(--accent-purple); font-weight: 500;
+        }
+        .split-divider-line {
+            width: 1px; height: clamp(120px, 25vh, 250px);
+            background: linear-gradient(180deg, transparent, rgba(139,92,246,0.4), rgba(217,70,239,0.3), transparent);
+        }
+        .split-right { padding-left: clamp(1.5rem, 4vw, 3rem); }
+        .split-bullets {
+            display: flex; flex-direction: column; gap: clamp(0.8rem, 2vh, 1.5rem);
+            list-style: none;
+        }
+        .split-bullets li {
+            font-size: clamp(0.85rem, 1.6vw, 1.15rem); line-height: 1.4;
+            color: var(--text-secondary);
+        }
+        @media (max-width: 768px) {
+            .split-layout { grid-template-columns: 1fr; text-align: center; }
+            .split-left { padding-right: 0; margin-bottom: 1rem; }
+            .split-divider-line { width: 60%; height: 1px; margin: 0 auto;
+                background: linear-gradient(90deg, transparent, rgba(139,92,246,0.4), transparent); }
+            .split-right { padding-left: 0; margin-top: 1rem; }
+        }
+
+        /* ============================================
+           SLIDE 5: PIPELINE COLUMNS — colored bars + sub-items
+           ============================================ */
+        .pipeline-slide { background: var(--bg-primary); }
+        .pipeline-slide .slide-content { align-items: center; gap: var(--content-gap); }
+        .pipeline-row {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: clamp(0.4rem, 1vw, 0.8rem);
+            width: 100%; max-width: min(92vw, 1100px);
+        }
+        .pipeline-col { text-align: center; }
+        .pipeline-col-title {
+            font-family: var(--font-display); font-size: var(--small-size);
+            font-weight: 700; margin-bottom: clamp(0.3rem, 0.6vw, 0.5rem);
+            line-height: 1.3;
+        }
+        .pipeline-bar {
+            height: clamp(3px, 0.5vw, 5px); border-radius: 3px;
+            margin-bottom: clamp(0.4rem, 0.8vw, 0.6rem);
+        }
+        .pipeline-items {
+            display: flex; flex-direction: column; gap: clamp(0.2rem, 0.4vw, 0.35rem);
+        }
+        .pipeline-items span {
+            font-size: var(--small-size); color: var(--text-secondary); line-height: 1.3;
+        }
+        .pipeline-footer {
+            width: 100%; max-width: min(92vw, 1100px);
+            text-align: center; font-size: var(--small-size);
+            color: var(--text-secondary); letter-spacing: 0.15em; text-transform: uppercase;
+            padding-top: clamp(0.5rem, 1vw, 0.8rem);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        @media (max-width: 768px) {
+            .pipeline-row { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ============================================
+           SLIDE 6: QUOTE
+           ============================================ */
+        .quote-slide { background: var(--bg-primary); }
+        .quote-slide .slide-content { align-items: center; text-align: center; gap: var(--content-gap); }
+        .quote-mark {
+            font-family: var(--font-display); font-size: clamp(3rem, 8vw, 6rem);
+            line-height: 1; font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            opacity: 0.5;
+        }
+        .quote-text {
+            font-family: var(--font-display); font-size: clamp(1.1rem, 2.5vw, 2rem);
+            font-weight: 500; line-height: 1.5; max-width: min(85vw, 800px);
+            color: rgba(255,255,255,0.9);
+        }
+        .quote-attr {
+            font-size: var(--body-size); color: var(--text-secondary);
+        }
+        .quote-attr strong { color: var(--text-primary); font-weight: 600; }
+
+        /* ============================================
+           SLIDE 7: BIG NUMBER HERO
+           ============================================ */
+        .bignumber-slide { background: var(--bg-primary); }
+        .bignumber-slide .slide-content { align-items: center; text-align: center; gap: clamp(0.4rem, 1vw, 0.8rem); }
+        .bignumber {
+            font-family: var(--font-display); font-size: clamp(4rem, 14vw, 12rem);
+            font-weight: 800; line-height: 1;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink), var(--accent-orange));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            filter: drop-shadow(0 0 40px rgba(139,92,246,0.3));
+        }
+        .bignumber-label {
+            font-family: var(--font-display); font-size: var(--h2-size);
+            font-weight: 700;
+        }
+        .bignumber-desc {
+            font-size: var(--subtitle-size); color: var(--text-secondary);
+            max-width: min(80vw, 600px); line-height: 1.6;
+        }
+
+        /* ============================================
+           SLIDE 8: COMPARISON SPLIT
+           ============================================ */
+        .compare-slide { background: var(--bg-primary); }
+        .compare-slide .slide-content { align-items: center; gap: var(--content-gap); }
+        .compare-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: clamp(0.8rem, 2vw, 1.5rem);
+            width: 100%; max-width: min(92vw, 1000px);
+        }
+        .compare-card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: clamp(10px, 1.2vw, 16px);
+            padding: clamp(1rem, 2.5vw, 2rem);
+        }
+        .compare-card-title {
+            font-family: var(--font-display); font-size: var(--h3-size);
+            font-weight: 700; margin-bottom: clamp(0.5rem, 1vw, 0.8rem);
+            display: flex; align-items: center; gap: clamp(0.3rem, 0.6vw, 0.5rem);
+        }
+        .compare-dot {
+            width: clamp(8px, 1vw, 12px); height: clamp(8px, 1vw, 12px);
+            border-radius: 50%; flex-shrink: 0;
+        }
+        .compare-list {
+            list-style: none; display: flex; flex-direction: column;
+            gap: clamp(0.3rem, 0.7vw, 0.5rem);
+        }
+        .compare-list li {
+            font-size: var(--body-size); color: var(--text-secondary);
+            padding-left: clamp(0.8rem, 1.5vw, 1.2rem); position: relative;
+        }
+        .compare-list li::before {
+            content: ''; position: absolute; left: 0;
+            top: clamp(0.35rem, 0.7vw, 0.5rem);
+            width: clamp(4px, 0.5vw, 6px); height: clamp(4px, 0.5vw, 6px);
+            border-radius: 50%; background: var(--accent-purple);
+        }
+        @media (max-width: 768px) { .compare-grid { grid-template-columns: 1fr; } }
+
+        /* ============================================
+           SLIDE 9: PROCESS FLOW — horizontal steps
+           ============================================ */
+        .process-slide { background: var(--bg-primary); }
+        .process-slide .slide-content { align-items: center; gap: var(--content-gap); }
+        .process-row {
+            display: flex; align-items: flex-start;
+            width: 100%; max-width: min(92vw, 1100px);
+            gap: 0; position: relative;
+        }
+        .process-step {
+            flex: 1; text-align: center; position: relative;
+            padding: 0 clamp(0.3rem, 0.8vw, 0.6rem);
+        }
+        .step-num {
+            width: clamp(32px, 4vw, 48px); height: clamp(32px, 4vw, 48px);
+            border-radius: 50%; margin: 0 auto clamp(0.4rem, 0.8vw, 0.6rem);
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-display); font-size: var(--body-size); font-weight: 800;
+            background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(217,70,239,0.15));
+            border: 1px solid var(--card-border);
+            position: relative; z-index: 1;
+        }
+        /* Connecting line between steps */
+        .process-step:not(:last-child)::after {
+            content: ''; position: absolute;
+            top: clamp(16px, 2vw, 24px); left: calc(50% + clamp(20px, 2.5vw, 30px));
+            width: calc(100% - clamp(40px, 5vw, 60px)); height: 1px;
+            background: linear-gradient(90deg, rgba(139,92,246,0.3), rgba(217,70,239,0.2));
+            z-index: 0;
+        }
+        .step-title {
+            font-family: var(--font-display); font-size: var(--h3-size);
+            font-weight: 700; margin-bottom: clamp(0.15rem, 0.3vw, 0.25rem);
+        }
+        .step-desc { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.4; }
+        @media (max-width: 768px) {
+            .process-row { flex-direction: column; gap: clamp(0.5rem, 1.5vw, 1rem); align-items: center; }
+            .process-step { width: 100%; max-width: 300px; }
+            .process-step:not(:last-child)::after { display: none; }
+        }
+
+        /* ============================================
+           SLIDE 10: TIMELINE — horizontal zigzag (3-row grid)
+           ============================================ */
+        .timeline-slide { background: var(--bg-primary); }
+        .timeline-slide .slide-content { align-items: center; gap: clamp(1.5rem, 3vw, 2.5rem); }
+        .timeline {
+            width: 100%; max-width: min(92vw, 1100px);
+            display: grid;
+            grid-template-rows: auto auto auto;
+            grid-template-columns: repeat(5, 1fr);
+            row-gap: 0; column-gap: 0;
+        }
+        /* Row 1: top cards (odd: 1,3,5 show content; even: 2,4 empty) */
+        .tl-top { grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .tl-top .tl-card { margin-bottom: clamp(0.5rem, 1.2vw, 1rem); }
+        .tl-top.empty { visibility: hidden; }
+
+        /* Row 2: center line + dots */
+        .tl-mid {
+            grid-row: 2; display: flex; align-items: center; justify-content: center;
+            position: relative; height: clamp(20px, 2.5vw, 30px);
+        }
+        /* Horizontal track line across all mid cells */
+        .tl-mid::before {
+            content: ''; position: absolute; left: 0; right: 0;
+            top: 50%; height: 3px; transform: translateY(-50%);
+            background: rgba(139,92,246,0.3);
+        }
+        /* Fade edges */
+        .tl-col1.tl-mid::before { left: 50%; background: linear-gradient(90deg, rgba(59,130,246,0.5), rgba(139,92,246,0.4)); }
+        .tl-col5.tl-mid::before { right: 50%; background: linear-gradient(90deg, rgba(217,70,239,0.4), rgba(236,72,153,0.3)); }
+
+        .tl-dot {
+            width: clamp(14px, 1.6vw, 20px); height: clamp(14px, 1.6vw, 20px);
+            border-radius: 50%; border: 2.5px solid currentColor;
+            background: var(--bg-primary); position: relative; z-index: 1;
+            box-shadow: 0 0 14px currentColor;
+        }
+
+        /* Row 3: bottom cards (even: 2,4 show content; odd: 1,3,5 empty) */
+        .tl-bot { grid-row: 3; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+        .tl-bot .tl-card { margin-top: clamp(0.5rem, 1.2vw, 1rem); }
+        .tl-bot.empty { visibility: hidden; }
+
+        /* Stem lines connecting cards to dots */
+        .tl-stem-up {
+            width: 2px; height: clamp(16px, 3vh, 30px);
+            background: linear-gradient(180deg, transparent, currentColor);
+            margin-bottom: clamp(0.15rem, 0.3vw, 0.25rem);
+        }
+        .tl-stem-down {
+            width: 2px; height: clamp(16px, 3vh, 30px);
+            background: linear-gradient(180deg, currentColor, transparent);
+            margin-top: clamp(0.15rem, 0.3vw, 0.25rem);
+        }
+
+        .tl-card { text-align: center; padding: 0 clamp(0.2rem, 0.5vw, 0.4rem); }
+        .tl-year {
+            font-family: var(--font-display); font-size: var(--h3-size);
+            font-weight: 800; color: currentColor;
+        }
+        .tl-desc {
+            font-size: var(--small-size); color: var(--text-secondary); line-height: 1.35;
+            margin-top: clamp(0.1rem, 0.3vw, 0.2rem);
+        }
+        /* Per-column colors */
+        .tl-col1 { color: #3b82f6; }
+        .tl-col2 { color: #8b5cf6; }
+        .tl-col3 { color: #a855f7; }
+        .tl-col4 { color: #d946ef; }
+        .tl-col5 { color: #ec4899; }
+
+        @media (max-width: 768px) {
+            .tl-year { font-size: var(--small-size); }
+            .tl-desc { font-size: clamp(0.55rem, 1vw, 0.75rem); }
+        }
+
+        /* === PROGRESS BAR === */
+        .progress-bar {
+            position: fixed; top: 0; left: 0; height: 2px;
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink), var(--accent-orange));
+            box-shadow: 0 0 12px var(--glow-purple);
+            z-index: 1000; transition: width 0.3s ease;
+        }
+
+        /* === NAV DOTS === */
+        .nav-dots {
+            position: fixed; right: clamp(0.8rem, 2vw, 1.5rem); top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: clamp(0.4rem, 0.8vw, 0.6rem); z-index: 1000;
+        }
+        .nav-dot {
+            width: clamp(6px, 0.7vw, 9px); height: clamp(6px, 0.7vw, 9px);
+            border-radius: 50%; background: rgba(255, 255, 255, 0.15);
+            cursor: pointer; transition: all 0.3s; border: none; padding: 0;
+        }
+        .nav-dot.active {
+            background: var(--accent-purple);
+            box-shadow: 0 0 8px var(--glow-purple);
+            transform: scale(1.4);
+        }
+        .nav-dot:hover { background: rgba(139, 92, 246, 0.5); }
+    </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<nav class="nav-dots" id="navDots" aria-label="Slide navigation"></nav>
+<div class="page-number" id="pageNumber">1</div>
+
+<!-- =============================================
+     SLIDE 1: TITLE — RICH MESH GRADIENT
+     ============================================= -->
+<section class="slide title-slide" aria-label="Title">
+    <!-- Animated color blobs — large, slow, dramatic movement -->
+    <div class="blob-canvas">
+        <div class="blob" style="width:55vw;height:55vw;top:-10%;left:40%;background:rgba(139,92,246,0.5);animation:blob1 12s ease-in-out infinite;"></div>
+        <div class="blob" style="width:50vw;height:50vw;bottom:-5%;left:-10%;background:rgba(217,70,239,0.45);animation:blob2 15s ease-in-out infinite;"></div>
+        <div class="blob" style="width:40vw;height:40vw;top:20%;left:10%;background:rgba(59,80,200,0.4);animation:blob3 18s ease-in-out infinite;"></div>
+        <div class="blob" style="width:35vw;height:35vw;bottom:10%;right:5%;background:rgba(236,72,153,0.3);animation:blob4 20s ease-in-out infinite;"></div>
+    </div>
+
+    <div class="slide-content">
+        <div class="title-label reveal d1">AMAZON WEB SERVICES</div>
+        <h1 class="title-main reveal d2">
+            Building with<br><em>Generative AI</em>
+        </h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="title-sub reveal d4">
+            From foundation models to production applications,<br>
+            accelerate innovation on AWS
+        </p>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 2: CONTENT — DARK + PILL CARDS
+     ============================================= -->
+<section class="slide content-slide" aria-label="Key Capabilities">
+    <div class="floating-orb orb-purple" style="width:30vw;height:30vw;top:8%;right:5%;animation:orbFloat2 15s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink" style="width:22vw;height:22vw;bottom:12%;left:3%;animation:orbFloat3 17s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="content-layout">
+            <div>
+                <div class="section-label reveal d1">CORE CAPABILITIES</div>
+                <h2 class="section-title reveal d2">End-to-End<br>AI Platform</h2>
+                <p class="section-desc reveal d3">
+                    A complete stack for building, training, and deploying generative AI applications at any scale.
+                </p>
+            </div>
+            <div class="pill-cards">
+                <div class="pill-card reveal d2">
+                    <div class="pill-icon">
+                        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <div class="pill-text">Amazon Bedrock<br><span>Access leading foundation models</span></div>
+                    <div class="pill-arrow"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+                </div>
+                <div class="pill-card reveal d3">
+                    <div class="pill-icon">
+                        <svg viewBox="0 0 24 24"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+                    </div>
+                    <div class="pill-text">Amazon SageMaker<br><span>Train and fine-tune models</span></div>
+                    <div class="pill-arrow"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+                </div>
+                <div class="pill-card reveal d4">
+                    <div class="pill-icon">
+                        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    </div>
+                    <div class="pill-text">Amazon Q Developer<br><span>AI-powered assistant for developers</span></div>
+                    <div class="pill-arrow"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+                </div>
+                <div class="pill-card reveal d5">
+                    <div class="pill-icon">
+                        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+                    </div>
+                    <div class="pill-text">AWS Trainium<br><span>Custom silicon for AI workloads</span></div>
+                    <div class="pill-arrow"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 3: STATS + FEATURE GRID
+     ============================================= -->
+<section class="slide features-slide" aria-label="Stats and Features">
+    <div class="floating-orb orb-purple" style="width:25vw;height:25vw;top:12%;left:65%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink" style="width:18vw;height:18vw;bottom:18%;right:65%;animation:orbFloat2 14s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="section-label reveal d1" style="text-align:center;">BY THE NUMBERS</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">Proven at Scale</h2>
+
+        <div class="stats-row reveal d3">
+            <div class="stat-item">
+                <div class="stat-value">100K+</div>
+                <div class="stat-label">Customers</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">6x</div>
+                <div class="stat-label">Performance</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">4x</div>
+                <div class="stat-label">Bandwidth</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">33</div>
+                <div class="stat-label">Regions</div>
+            </div>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card reveal d4">
+                <div class="feat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <h3>Enterprise Security</h3>
+                <p>VPC isolation, encryption, IAM integration</p>
+            </div>
+            <div class="feature-card reveal d5">
+                <div class="feat-icon">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                </div>
+                <h3>Global Infrastructure</h3>
+                <p>Low-latency inference across 33 regions</p>
+            </div>
+            <div class="feature-card reveal d6">
+                <div class="feat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <h3>Optimized Cost</h3>
+                <p>Custom chips, up to 40% savings</p>
+            </div>
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 4: SPLIT DIVIDER
+     ============================================= -->
+<section class="slide split-slide" aria-label="Product Feature Split">
+    <div class="floating-orb orb-purple" style="width:22vw;height:22vw;bottom:10%;left:60%;animation:orbFloat1 15s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="split-layout">
+            <div class="split-left">
+                <div class="section-label reveal d1">NEW ENHANCEMENTS</div>
+                <div class="split-product-name reveal d2">
+                    Amazon<br><strong>CodeWhisperer</strong>
+                </div>
+                <div class="split-product-sub reveal d3">AI-powered code companion</div>
+            </div>
+            <div class="split-divider-line reveal d2"></div>
+            <div class="split-right">
+                <ul class="split-bullets">
+                    <li class="reveal d3">Infrastructure as Code support — CloudFormation, CDK, Terraform</li>
+                    <li class="reveal d4">Customization with your private codebase and APIs</li>
+                    <li class="reveal d5">Security scans for vulnerabilities across 10+ languages</li>
+                    <li class="reveal d6">Available in VS Code, JetBrains, and Visual Studio</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 5: PIPELINE COLUMNS
+     ============================================= -->
+<section class="slide pipeline-slide" aria-label="Platform Pipeline">
+    <div class="floating-orb orb-pink" style="width:20vw;height:20vw;top:8%;right:10%;animation:orbFloat3 17s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <h2 class="section-title reveal d1" style="text-align:center;">Amazon Bedrock</h2>
+        <p class="reveal d2" style="text-align:center;font-size:var(--subtitle-size);color:var(--text-secondary);margin-bottom:clamp(0.5rem,1vw,0.8rem);">The easiest and fastest way to build generative AI applications</p>
+
+        <div class="pipeline-row">
+            <div class="pipeline-col reveal d3">
+                <div class="pipeline-col-title">Broadest choice of models</div>
+                <div class="pipeline-bar" style="background:linear-gradient(90deg,#3b82f6,#6366f1);"></div>
+                <div class="pipeline-items">
+                    <span>Custom Model Import</span>
+                    <span>Model Evaluation</span>
+                </div>
+            </div>
+            <div class="pipeline-col reveal d4">
+                <div class="pipeline-col-title">Optimize for cost &amp; latency</div>
+                <div class="pipeline-bar" style="background:linear-gradient(90deg,#6366f1,#8b5cf6);"></div>
+                <div class="pipeline-items">
+                    <span>Latency-optimized inference</span>
+                    <span>Model Distillation</span>
+                </div>
+            </div>
+            <div class="pipeline-col reveal d5">
+                <div class="pipeline-col-title">Customize with your data</div>
+                <div class="pipeline-bar" style="background:linear-gradient(90deg,#8b5cf6,#a855f7);"></div>
+                <div class="pipeline-items">
+                    <span>Fine-tuning</span>
+                    <span>Knowledge Bases / RAG</span>
+                </div>
+            </div>
+            <div class="pipeline-col reveal d6">
+                <div class="pipeline-col-title">Safety &amp; responsible AI</div>
+                <div class="pipeline-bar" style="background:linear-gradient(90deg,#a855f7,#d946ef);"></div>
+                <div class="pipeline-items">
+                    <span>Guardrails</span>
+                    <span>Automated Reasoning</span>
+                </div>
+            </div>
+            <div class="pipeline-col reveal d7">
+                <div class="pipeline-col-title">Build &amp; orchestrate agents</div>
+                <div class="pipeline-bar" style="background:linear-gradient(90deg,#d946ef,#ec4899);"></div>
+                <div class="pipeline-items">
+                    <span>Agents</span>
+                    <span>Multi-agent collaboration</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="pipeline-footer reveal d7">AWS Security, Privacy, and Reliability Built-in</div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 6: QUOTE
+     ============================================= -->
+<section class="slide quote-slide" aria-label="Quote">
+    <div class="floating-orb orb-purple" style="width:28vw;height:28vw;top:15%;left:5%;animation:orbFloat2 16s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink" style="width:20vw;height:20vw;bottom:10%;right:8%;animation:orbFloat1 14s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="quote-mark reveal d1">"</div>
+        <p class="quote-text reveal d2">
+            Every application is going to be reinvented with generative AI. The question is not if, but how fast.
+        </p>
+        <div class="quote-attr reveal d3">
+            <strong>Andy Jassy</strong> — CEO, Amazon
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 7: BIG NUMBER HERO
+     ============================================= -->
+<section class="slide bignumber-slide" aria-label="Key Metric">
+    <div class="floating-orb orb-purple" style="width:35vw;height:35vw;top:5%;right:15%;animation:orbFloat3 18s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="section-label reveal d1">ADOPTION</div>
+        <div class="bignumber reveal d2">100K+</div>
+        <div class="bignumber-label reveal d3">Customers Using AI on AWS</div>
+        <p class="bignumber-desc reveal d4">
+            From startups to enterprises, organizations worldwide are building the next generation of applications with AWS AI services.
+        </p>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 8: COMPARISON SPLIT
+     ============================================= -->
+<section class="slide compare-slide" aria-label="Comparison">
+    <div class="floating-orb orb-pink" style="width:22vw;height:22vw;top:12%;left:8%;animation:orbFloat2 15s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="section-label reveal d1" style="text-align:center;">CHOOSE YOUR PATH</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">SageMaker vs Bedrock</h2>
+
+        <div class="compare-grid">
+            <div class="compare-card reveal d3">
+                <div class="compare-card-title">
+                    <div class="compare-dot" style="background:var(--accent-purple);"></div>
+                    Amazon SageMaker
+                </div>
+                <ul class="compare-list">
+                    <li>Full control over training &amp; infrastructure</li>
+                    <li>Bring your own model architecture</li>
+                    <li>Custom training on your data</li>
+                    <li>MLOps pipeline &amp; experiment tracking</li>
+                    <li>Best for ML teams with custom needs</li>
+                </ul>
+            </div>
+            <div class="compare-card reveal d4">
+                <div class="compare-card-title">
+                    <div class="compare-dot" style="background:var(--accent-pink);"></div>
+                    Amazon Bedrock
+                </div>
+                <ul class="compare-list">
+                    <li>Fully managed foundation models</li>
+                    <li>No infrastructure to manage</li>
+                    <li>Fine-tune via API with your data</li>
+                    <li>Built-in RAG, Agents, Guardrails</li>
+                    <li>Best for fast GenAI application development</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 9: PROCESS FLOW
+     ============================================= -->
+<section class="slide process-slide" aria-label="Process">
+    <div class="floating-orb orb-purple" style="width:24vw;height:24vw;bottom:15%;right:5%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="section-label reveal d1" style="text-align:center;">HOW IT WORKS</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">From Idea to Production</h2>
+
+        <div class="process-row">
+            <div class="process-step reveal d3">
+                <div class="step-num">1</div>
+                <div class="step-title">Choose Model</div>
+                <div class="step-desc">Select from leading FMs or import your own</div>
+            </div>
+            <div class="process-step reveal d4">
+                <div class="step-num">2</div>
+                <div class="step-title">Customize</div>
+                <div class="step-desc">Fine-tune with your data via RAG or training</div>
+            </div>
+            <div class="process-step reveal d5">
+                <div class="step-num">3</div>
+                <div class="step-title">Build Agents</div>
+                <div class="step-desc">Orchestrate multi-step tasks with tools</div>
+            </div>
+            <div class="process-step reveal d6">
+                <div class="step-num">4</div>
+                <div class="step-title">Add Guardrails</div>
+                <div class="step-desc">Apply safety, PII filters, content policies</div>
+            </div>
+            <div class="process-step reveal d7">
+                <div class="step-num">5</div>
+                <div class="step-title">Deploy</div>
+                <div class="step-desc">Scale globally with built-in monitoring</div>
+            </div>
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- =============================================
+     SLIDE 10: TIMELINE
+     ============================================= -->
+<section class="slide timeline-slide" aria-label="Timeline">
+    <div class="floating-orb orb-purple" style="width:22vw;height:22vw;top:10%;right:8%;animation:orbFloat2 16s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink" style="width:16vw;height:16vw;bottom:12%;left:5%;animation:orbFloat3 14s ease-in-out infinite;"></div>
+
+    <div class="slide-content">
+        <div class="section-label reveal d1" style="text-align:center;margin-bottom:clamp(0.3rem,0.8vw,0.5rem);">MILESTONES</div>
+        <h2 class="section-title reveal d2" style="text-align:center;margin-bottom:clamp(1rem,3vw,2.5rem);">AWS AI Journey</h2>
+
+        <div class="timeline reveal d3">
+            <!-- Row 1: top cards (odd cols have content, even cols empty) -->
+            <div class="tl-top tl-col1">
+                <div class="tl-card">
+                    <div class="tl-year">2017</div>
+                    <div class="tl-desc">SageMaker — managed ML training</div>
+                </div>
+                <div class="tl-stem-up"></div>
+            </div>
+            <div class="tl-top tl-col2 empty"><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div><div class="tl-stem-up"></div></div>
+            <div class="tl-top tl-col3">
+                <div class="tl-card">
+                    <div class="tl-year">2023</div>
+                    <div class="tl-desc">Amazon Bedrock — foundation models</div>
+                </div>
+                <div class="tl-stem-up"></div>
+            </div>
+            <div class="tl-top tl-col4 empty"><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div><div class="tl-stem-up"></div></div>
+            <div class="tl-top tl-col5">
+                <div class="tl-card">
+                    <div class="tl-year">2025</div>
+                    <div class="tl-desc">Trainium4 &amp; Kiro autonomous agent</div>
+                </div>
+                <div class="tl-stem-up"></div>
+            </div>
+
+            <!-- Row 2: center dots (all columns) -->
+            <div class="tl-mid tl-col1"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col2"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col3"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col4"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col5"><div class="tl-dot"></div></div>
+
+            <!-- Row 3: bottom cards (even cols have content, odd cols empty) -->
+            <div class="tl-bot tl-col1 empty"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div></div>
+            <div class="tl-bot tl-col2">
+                <div class="tl-stem-down"></div>
+                <div class="tl-card">
+                    <div class="tl-year">2022</div>
+                    <div class="tl-desc">Trainium &amp; Inferentia2 custom silicon</div>
+                </div>
+            </div>
+            <div class="tl-bot tl-col3 empty"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div></div>
+            <div class="tl-bot tl-col4">
+                <div class="tl-stem-down"></div>
+                <div class="tl-card">
+                    <div class="tl-year">2024</div>
+                    <div class="tl-desc">Amazon Q &amp; multi-agent orchestration</div>
+                </div>
+            </div>
+            <div class="tl-bot tl-col5 empty"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div></div>
+            </div>
+        </div>
+    </div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<script>
+(function() {
+    const slides = document.querySelectorAll('.slide');
+    const bar = document.getElementById('progressBar');
+    const dotsContainer = document.getElementById('navDots');
+    let current = 0;
+
+    const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+            if (e.isIntersecting) {
+                e.target.classList.add('visible');
+                current = [...slides].indexOf(e.target);
+                updateUI();
+            }
+        });
+    }, { threshold: 0.5 });
+    slides.forEach(s => obs.observe(s));
+
+    slides.forEach((_, i) => {
+        const d = document.createElement('button');
+        d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+        d.setAttribute('aria-label', 'Slide ' + (i + 1));
+        d.addEventListener('click', () => go(i));
+        dotsContainer.appendChild(d);
+    });
+    const dots = dotsContainer.querySelectorAll('.nav-dot');
+
+    const pageNum = document.getElementById('pageNumber');
+    function updateUI() {
+        bar.style.width = ((current + 1) / slides.length * 100) + '%';
+        dots.forEach((d, i) => d.classList.toggle('active', i === current));
+        if (pageNum) pageNum.textContent = current + 1;
+    }
+
+    function go(i) {
+        if (i < 0 || i >= slides.length) return;
+        current = i;
+        slides[i].scrollIntoView({ behavior: 'smooth' });
+        updateUI();
+    }
+
+    document.addEventListener('keydown', e => {
+        if (['ArrowDown','ArrowRight',' ','PageDown'].includes(e.key)) { e.preventDefault(); go(current + 1); }
+        else if (['ArrowUp','ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); go(current - 1); }
+        else if (e.key === 'Home') { e.preventDefault(); go(0); }
+        else if (e.key === 'End') { e.preventDefault(); go(slides.length - 1); }
+    });
+
+    let wt = null;
+    document.addEventListener('wheel', e => {
+        if (wt) return;
+        wt = setTimeout(() => wt = null, 800);
+        if (e.deltaY > 30) go(current + 1);
+        else if (e.deltaY < -30) go(current - 1);
+    }, { passive: true });
+
+    let ty = 0;
+    document.addEventListener('touchstart', e => { ty = e.touches[0].clientY; }, { passive: true });
+    document.addEventListener('touchend', e => {
+        const d = ty - e.changedTouches[0].clientY;
+        if (Math.abs(d) > 50) go(current + (d > 0 ? 1 : -1));
+    }, { passive: true });
+
+    updateUI();
+})();
+</script>
+</body>
+</html>

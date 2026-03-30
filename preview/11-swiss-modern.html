@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Swiss Modern - Claude Code</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&family=Nunito:wght@400&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-snap-type:y mandatory;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+  body{width:100vw;background:#fff;color:#000;font-family:'Nunito',sans-serif}
+
+  /* ── Progress bar ── */
+  #progress{position:fixed;top:0;left:0;height:3px;background:#ff3300;width:0;z-index:1000;transition:width .3s}
+
+  /* ── Nav dots ── */
+  #nav-dots{position:fixed;right:clamp(12px,2vw,28px);top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:14px;z-index:1000}
+  #nav-dots button{width:12px;height:12px;border-radius:50%;border:2px solid #000;background:transparent;
+    cursor:pointer;padding:0;transition:background .3s,border-color .3s}
+  #nav-dots button.active{background:#ff3300;border-color:#ff3300}
+
+  /* ── Slides ── */
+  .slide{position:relative;width:100vw;height:100vh;overflow:hidden;scroll-snap-align:start;scroll-snap-stop:always}
+
+  /* Visible grid lines (12-col vertical, 8-row horizontal) */
+  .slide::before{content:'';position:absolute;inset:0;
+    background:repeating-linear-gradient(90deg,transparent,transparent calc(100%/12 - 1px),rgba(0,0,0,.06) calc(100%/12 - 1px),rgba(0,0,0,.06) calc(100%/12));
+    pointer-events:none;z-index:1}
+  .slide::after{content:'';position:absolute;inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent calc(100%/8 - 1px),rgba(0,0,0,.06) calc(100%/8 - 1px),rgba(0,0,0,.06) calc(100%/8));
+    pointer-events:none;z-index:1}
+
+  /* ── Reveal animation ── */
+  .reveal{opacity:0;transform:translateY(32px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+
+  /* ── Typography ── */
+  h1,h2{font-family:'Archivo',sans-serif;font-weight:800;line-height:1;letter-spacing:-0.03em;text-transform:uppercase}
+  h1{font-size:clamp(2.5rem,7vw,6rem);color:#000}
+  h1 .accent{color:#ff3300}
+  h2{font-size:clamp(1.8rem,5vw,4rem);color:#000}
+  .subtitle{font-size:clamp(1rem,2.2vw,2rem);color:#000;letter-spacing:0.08em}
+  .rule{width:clamp(60px,12vw,160px);height:4px;background:#ff3300;margin-top:clamp(0.8rem,2vh,2rem)}
+  .tag{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(0.6rem,1vw,0.9rem);
+    letter-spacing:0.25em;text-transform:uppercase;color:#ff3300}
+
+  /* ── Geometric shapes ── */
+  .geo{position:absolute;z-index:0}
+
+  /* ===== SLIDE 1 – Title ===== */
+  #slide1 .geo-circle{top:8vh;right:8vw;width:clamp(80px,18vw,260px);height:clamp(80px,18vw,260px);
+    border-radius:50%;background:#ff3300}
+  #slide1 .geo-rect{bottom:0;left:0;width:clamp(120px,35vw,500px);height:clamp(60px,18vh,200px);background:#000}
+  #slide1 .geo-line{top:50%;left:0;width:100%;height:3px;background:#000}
+  #slide1 .geo-square{bottom:22vh;right:12vw;width:clamp(40px,6vw,80px);height:clamp(40px,6vw,80px);
+    border:3px solid #ff3300;transform:rotate(15deg)}
+  #slide1 .s1-tag{position:absolute;top:8vh;left:8vw;z-index:2}
+  #slide1 .s1-content{position:absolute;top:38%;left:8vw;z-index:2}
+
+  /* ===== SLIDE 2 – Content ===== */
+  #slide2{background:#fff}
+  #slide2 .geo-bar-top{top:0;left:0;width:100%;height:clamp(6px,1vh,10px);background:#ff3300}
+  #slide2 .geo-block{top:12vh;right:0;width:clamp(60px,10vw,140px);height:clamp(200px,50vh,500px);background:#000}
+  #slide2 .geo-dot{bottom:10vh;left:6vw;width:clamp(30px,4vw,60px);height:clamp(30px,4vw,60px);
+    border-radius:50%;border:3px solid #ff3300}
+  #slide2 .s2-header{position:absolute;top:10vh;left:8vw;z-index:2}
+  #slide2 .s2-grid{position:absolute;top:28vh;left:8vw;right:clamp(80px,14vw,200px);z-index:2;
+    display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,40px)}
+  .feature{padding:clamp(12px,2vw,28px);border-left:4px solid #ff3300;background:rgba(255,255,255,.85)}
+  .feature-title{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(0.9rem,1.6vw,1.4rem);
+    text-transform:uppercase;letter-spacing:0.04em;margin-bottom:clamp(4px,0.8vh,10px)}
+  .feature-desc{font-size:clamp(0.8rem,1.2vw,1.1rem);color:#333;line-height:1.5}
+
+  /* ===== SLIDE 3 – Closing ===== */
+  #slide3{background:#000;color:#fff}
+  #slide3::before{background:repeating-linear-gradient(90deg,transparent,transparent calc(100%/12 - 1px),rgba(255,255,255,.06) calc(100%/12 - 1px),rgba(255,255,255,.06) calc(100%/12))}
+  #slide3::after{background:repeating-linear-gradient(0deg,transparent,transparent calc(100%/8 - 1px),rgba(255,255,255,.06) calc(100%/8 - 1px),rgba(255,255,255,.06) calc(100%/8))}
+  #slide3 .geo-accent-bar{left:0;top:0;width:clamp(8px,1.2vw,16px);height:100%;background:#ff3300}
+  #slide3 .geo-circle-outline{bottom:12vh;right:10vw;width:clamp(100px,20vw,300px);height:clamp(100px,20vw,300px);
+    border-radius:50%;border:3px solid #ff3300}
+  #slide3 .geo-small-rect{top:15vh;right:25vw;width:clamp(40px,8vw,100px);height:clamp(20px,3vh,40px);background:#ff3300}
+  #slide3 .s3-content{position:absolute;top:30%;left:10vw;z-index:2}
+  #slide3 .s3-content h2{color:#fff}
+  #slide3 .s3-content .subtitle{color:rgba(255,255,255,.7)}
+  .install-box{margin-top:clamp(1.5rem,4vh,3rem);position:relative;display:inline-block}
+  .install-box .bar{position:absolute;left:-clamp(12px,2vw,24px);top:0;bottom:0;width:4px;background:#ff3300}
+  .install-cmd{font-family:'Archivo',sans-serif;font-weight:800;font-size:clamp(0.9rem,2vw,1.8rem);
+    color:#fff;background:rgba(255,255,255,.08);padding:clamp(10px,2vh,24px) clamp(16px,3vw,40px);
+    letter-spacing:0.05em;border:1px solid rgba(255,255,255,.12);display:inline-block}
+  .install-cmd .prompt{color:#ff3300}
+  .s3-footnote{margin-top:clamp(1rem,2.5vh,2rem);font-size:clamp(0.75rem,1.1vw,1rem);color:rgba(255,255,255,.4);
+    letter-spacing:0.1em}
+
+  /* ── Reduced motion ── */
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .reveal{opacity:1;transform:none;transition:none!important}
+    #progress{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress"></div>
+
+<!-- Nav dots -->
+<nav id="nav-dots">
+  <button data-slide="0" class="active" aria-label="Slide 1"></button>
+  <button data-slide="1" aria-label="Slide 2"></button>
+  <button data-slide="2" aria-label="Slide 3"></button>
+</nav>
+
+<!-- ===== SLIDE 1 – Title ===== -->
+<section class="slide" id="slide1">
+  <div class="geo geo-circle"></div>
+  <div class="geo geo-rect"></div>
+  <div class="geo geo-line"></div>
+  <div class="geo geo-square"></div>
+  <span class="tag s1-tag reveal">Swiss Modern / 2026</span>
+  <div class="s1-content">
+    <h1 class="reveal">Claude<span class="accent">.</span> Code</h1>
+    <p class="subtitle reveal">AI 驱动的编程助手</p>
+    <div class="rule reveal"></div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 2 – Content ===== -->
+<section class="slide" id="slide2">
+  <div class="geo geo-bar-top"></div>
+  <div class="geo geo-block"></div>
+  <div class="geo geo-dot"></div>
+  <div class="s2-header">
+    <span class="tag reveal">Capabilities</span>
+    <h2 class="reveal" style="margin-top:clamp(6px,1vh,12px)">核心能力</h2>
+    <div class="rule reveal"></div>
+  </div>
+  <div class="s2-grid">
+    <div class="feature reveal">
+      <div class="feature-title">智能代码生成</div>
+      <div class="feature-desc">理解自然语言描述，自动生成高质量代码，支持多种编程语言和框架</div>
+    </div>
+    <div class="feature reveal">
+      <div class="feature-title">上下文理解</div>
+      <div class="feature-desc">深入分析整个代码库结构，理解文件间依赖关系与项目架构</div>
+    </div>
+    <div class="feature reveal">
+      <div class="feature-title">自动调试修复</div>
+      <div class="feature-desc">精准定位代码缺陷，提供修复方案并自动应用补丁</div>
+    </div>
+    <div class="feature reveal">
+      <div class="feature-title">终端集成</div>
+      <div class="feature-desc">直接在命令行中运行，无缝融入现有开发工作流</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SLIDE 3 – Closing ===== -->
+<section class="slide" id="slide3">
+  <div class="geo geo-accent-bar"></div>
+  <div class="geo geo-circle-outline"></div>
+  <div class="geo geo-small-rect"></div>
+  <div class="s3-content">
+    <span class="tag reveal">Get Started</span>
+    <h2 class="reveal" style="margin-top:clamp(6px,1vh,12px)">开始使用</h2>
+    <div class="rule reveal"></div>
+    <div class="install-box reveal">
+      <div class="bar"></div>
+      <code class="install-cmd"><span class="prompt">$</span> npm install -g @anthropic-ai/claude-code</code>
+    </div>
+    <p class="s3-footnote reveal">在终端中即可开始与 Claude Code 协作编程</p>
+  </div>
+</section>
+
+<script>
+(function(){
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('#nav-dots button');
+  const progress = document.getElementById('progress');
+  const total = slides.length;
+  let current = 0;
+  let isScrolling = false;
+
+  /* ── IntersectionObserver for .reveal ── */
+  const revealObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        e.target.classList.add('visible');
+      }
+    });
+  },{threshold:0.15});
+  document.querySelectorAll('.reveal').forEach(function(el){revealObs.observe(el)});
+
+  /* ── Track current slide via IntersectionObserver ── */
+  const slideObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        current = Array.from(slides).indexOf(e.target);
+        updateUI();
+      }
+    });
+  },{threshold:0.55});
+  slides.forEach(function(s){slideObs.observe(s)});
+
+  function updateUI(){
+    /* progress */
+    var pct = ((current + 1) / total) * 100;
+    progress.style.width = pct + '%';
+    /* dots */
+    dots.forEach(function(d,i){
+      d.classList.toggle('active', i === current);
+    });
+  }
+
+  function goTo(index){
+    if(index < 0 || index >= total) return;
+    slides[index].scrollIntoView({behavior:'smooth'});
+  }
+
+  /* ── Nav dots click ── */
+  dots.forEach(function(d){
+    d.addEventListener('click',function(){
+      goTo(parseInt(d.dataset.slide));
+    });
+  });
+
+  /* ── Keyboard navigation ── */
+  document.addEventListener('keydown',function(e){
+    if(e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' '){
+      e.preventDefault(); goTo(current + 1);
+    } else if(e.key === 'ArrowUp' || e.key === 'PageUp'){
+      e.preventDefault(); goTo(current - 1);
+    } else if(e.key === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(e.key === 'End'){
+      e.preventDefault(); goTo(total - 1);
+    }
+  });
+
+  /* ── Wheel navigation (debounced) ── */
+  document.addEventListener('wheel',function(e){
+    if(isScrolling) return;
+    if(Math.abs(e.deltaY) < 30) return;
+    isScrolling = true;
+    if(e.deltaY > 0) goTo(current + 1);
+    else goTo(current - 1);
+    setTimeout(function(){isScrolling = false},800);
+  },{passive:true});
+
+  /* ── Touch navigation ── */
+  var touchStartY = 0;
+  document.addEventListener('touchstart',function(e){
+    touchStartY = e.changedTouches[0].screenY;
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    var dy = touchStartY - e.changedTouches[0].screenY;
+    if(Math.abs(dy) < 50) return;
+    if(dy > 0) goTo(current + 1);
+    else goTo(current - 1);
+  },{passive:true});
+
+  /* ── Initial state ── */
+  updateUI();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Split Pastel - Claude Code</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{
+    height:100%;font-family:'Outfit',sans-serif;color:#1a1a1a;
+    overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth
+  }
+  body{height:100%;overflow-x:hidden}
+
+  /* ---- Progress bar ---- */
+  .progress-bar{
+    position:fixed;top:0;left:0;height:4px;
+    background:linear-gradient(90deg,#f5e6dc,#e4dff0);
+    width:0%;z-index:100;transition:width .35s ease
+  }
+
+  /* ---- Nav dots ---- */
+  .nav-dots{
+    position:fixed;right:clamp(.8rem,2vw,2rem);top:50%;
+    transform:translateY(-50%);z-index:90;
+    display:flex;flex-direction:column;gap:.75rem
+  }
+  .nav-dot{
+    width:12px;height:12px;border-radius:50%;border:2px solid #1a1a1a;
+    background:transparent;cursor:pointer;transition:background .3s,transform .3s;
+    padding:0
+  }
+  .nav-dot.active{background:#1a1a1a;transform:scale(1.25)}
+
+  /* ---- Slide ---- */
+  .slide{
+    display:flex;height:100vh;width:100vw;
+    scroll-snap-align:start;scroll-snap-stop:always;
+    position:relative;overflow:hidden
+  }
+  .panel{
+    flex:1;display:flex;flex-direction:column;justify-content:center;
+    padding:clamp(2rem,5vw,6rem);position:relative
+  }
+  .left{background:#f5e6dc}
+  .right{background:#e4dff0;overflow:hidden}
+  .right::before{
+    content:'';position:absolute;inset:0;
+    background-image:radial-gradient(circle,rgba(0,0,0,.06) 1px,transparent 1px);
+    background-size:24px 24px;pointer-events:none
+  }
+
+  /* ---- Typography ---- */
+  h1{font-weight:800;font-size:clamp(2.4rem,5vw,4.5rem);line-height:1.1;margin-bottom:.4em}
+  h2{font-weight:700;font-size:clamp(1.8rem,3.5vw,3rem);line-height:1.15;margin-bottom:.5em}
+  .subtitle{font-weight:500;font-size:clamp(1rem,2vw,1.6rem);opacity:.75;margin-bottom:1.8em}
+  .right-content{position:relative;z-index:1}
+  .right-content p{font-size:clamp(.9rem,1.4vw,1.15rem);line-height:1.7;max-width:34ch}
+  .right-content .label{
+    font-weight:700;font-size:clamp(.7rem,.9vw,.8rem);
+    text-transform:uppercase;letter-spacing:.12em;opacity:.5;margin-bottom:.8rem
+  }
+
+  /* ---- Badges ---- */
+  .badges{display:flex;flex-wrap:wrap;gap:.6rem}
+  .badge{
+    display:inline-flex;align-items:center;gap:.45rem;
+    padding:.45em 1.1em;border-radius:999px;
+    font-size:clamp(.78rem,1.2vw,1rem);font-weight:500;
+    backdrop-filter:blur(4px)
+  }
+  .badge-mint{background:#c8f0d8}
+  .badge-yellow{background:#f0f0c8}
+  .badge-pink{background:#f0d4e0}
+
+  /* ---- Feature list (slide 2) ---- */
+  .feature-list{display:flex;flex-direction:column;gap:1.4rem;margin-top:.5rem}
+  .feature-item{display:flex;align-items:flex-start;gap:1rem}
+  .feature-icon{
+    flex-shrink:0;width:clamp(2.4rem,3.5vw,3.2rem);height:clamp(2.4rem,3.5vw,3.2rem);
+    border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:clamp(1rem,1.6vw,1.4rem)
+  }
+  .feature-text strong{
+    display:block;font-weight:700;
+    font-size:clamp(.95rem,1.3vw,1.15rem);margin-bottom:.15em
+  }
+  .feature-text span{
+    font-weight:400;font-size:clamp(.82rem,1.1vw,1rem);opacity:.7;line-height:1.5
+  }
+
+  /* ---- CTA button ---- */
+  .cta{
+    margin-top:2.2rem;display:inline-block;
+    padding:.7em 2em;border-radius:999px;border:none;
+    background:#1a1a1a;color:#fff;
+    font-family:inherit;font-weight:700;font-size:clamp(.85rem,1.3vw,1.05rem);
+    cursor:pointer;transition:transform .2s,box-shadow .2s;
+    text-decoration:none
+  }
+  .cta:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.15)}
+
+  .cta-secondary{
+    margin-top:1rem;display:inline-block;
+    padding:.55em 1.6em;border-radius:999px;
+    border:2px solid #1a1a1a;background:transparent;color:#1a1a1a;
+    font-family:inherit;font-weight:600;font-size:clamp(.8rem,1.1vw,.95rem);
+    cursor:pointer;transition:transform .2s,background .2s,color .2s;
+    text-decoration:none;margin-left:.6rem
+  }
+  .cta-secondary:hover{background:#1a1a1a;color:#fff;transform:translateY(-2px)}
+
+  /* ---- Reveal animation ---- */
+  .reveal{opacity:0;transform:translateY(32px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+  .reveal.delay-1{transition-delay:.1s}
+  .reveal.delay-2{transition-delay:.2s}
+  .reveal.delay-3{transition-delay:.3s}
+  .reveal.delay-4{transition-delay:.4s}
+  .reveal.delay-5{transition-delay:.5s}
+
+  /* ---- Closing slide accent ---- */
+  .closing-accent{
+    font-size:clamp(3rem,8vw,7rem);line-height:1;opacity:.08;
+    position:absolute;bottom:clamp(1rem,3vw,3rem);right:clamp(1rem,3vw,3rem);
+    font-weight:800;user-select:none;pointer-events:none
+  }
+
+  /* ---- Responsive ---- */
+  @media(max-width:680px){
+    .slide{flex-direction:column}
+    .panel{flex:none;height:50vh}
+    .nav-dots{right:.5rem;gap:.5rem}
+    .nav-dot{width:10px;height:10px}
+    .cta-secondary{margin-left:0;margin-top:.8rem;display:block;text-align:center;width:fit-content}
+  }
+
+  /* ---- Reduced motion ---- */
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .cta,.cta-secondary{transition:none}
+    .reveal{transition:none;opacity:1;transform:none}
+    .nav-dot{transition:none}
+    .progress-bar{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Nav dots -->
+<nav class="nav-dots" aria-label="Slide navigation">
+  <button class="nav-dot active" data-slide="0" aria-label="Slide 1"></button>
+  <button class="nav-dot" data-slide="1" aria-label="Slide 2"></button>
+  <button class="nav-dot" data-slide="2" aria-label="Slide 3"></button>
+</nav>
+
+<!-- ============ Slide 1: Title ============ -->
+<section class="slide" id="slide-0">
+  <div class="panel left">
+    <h1 class="reveal">Claude Code</h1>
+    <p class="subtitle reveal delay-1">AI 驱动的编程助手</p>
+    <div class="badges reveal delay-2">
+      <span class="badge badge-mint">&#9889; 智能</span>
+      <span class="badge badge-yellow">&#9998; 高效</span>
+      <span class="badge badge-pink">&#9825; 简洁</span>
+    </div>
+  </div>
+  <div class="panel right">
+    <div class="right-content">
+      <p class="label reveal delay-3">Why Claude Code</p>
+      <p class="reveal delay-4">在终端中与 AI 结对编程，理解整个代码库上下文，自动执行复杂的多步骤任务。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Slide 2: Content ============ -->
+<section class="slide" id="slide-1">
+  <div class="panel left">
+    <h2 class="reveal">核心能力</h2>
+    <p class="subtitle reveal delay-1">强大功能，为开发者而生</p>
+    <div class="feature-list">
+      <div class="feature-item reveal delay-1">
+        <div class="feature-icon badge-mint">&#9889;</div>
+        <div class="feature-text">
+          <strong>智能代码补全</strong>
+          <span>基于上下文理解，精准预测你的下一步操作</span>
+        </div>
+      </div>
+      <div class="feature-item reveal delay-2">
+        <div class="feature-icon badge-yellow">&#9998;</div>
+        <div class="feature-text">
+          <strong>自动代码重构</strong>
+          <span>一键优化代码结构，提升可读性与性能</span>
+        </div>
+      </div>
+      <div class="feature-item reveal delay-3">
+        <div class="feature-icon badge-pink">&#9825;</div>
+        <div class="feature-text">
+          <strong>自然语言交互</strong>
+          <span>用自然语言描述需求，AI 即刻生成实现方案</span>
+        </div>
+      </div>
+      <div class="feature-item reveal delay-4">
+        <div class="feature-icon badge-mint">&#9881;</div>
+        <div class="feature-text">
+          <strong>终端原生体验</strong>
+          <span>无缝集成你的开发工作流，零切换成本</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel right">
+    <div class="right-content">
+      <p class="label reveal delay-2">Highlights</p>
+      <div class="badges reveal delay-3" style="flex-direction:column;gap:1rem">
+        <span class="badge badge-mint" style="width:fit-content">&#10003; 理解完整代码库上下文</span>
+        <span class="badge badge-yellow" style="width:fit-content">&#10003; 支持多步骤自动化任务</span>
+        <span class="badge badge-pink" style="width:fit-content">&#10003; 安全沙箱执行环境</span>
+        <span class="badge badge-mint" style="width:fit-content">&#10003; 与 Git 工作流深度集成</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Slide 3: Closing ============ -->
+<section class="slide" id="slide-2">
+  <div class="panel left">
+    <h2 class="reveal">开始使用</h2>
+    <p class="subtitle reveal delay-1">只需一行命令，即可开启 AI 编程之旅</p>
+    <code class="reveal delay-2" style="
+      display:block;background:rgba(26,26,26,.07);padding:1em 1.4em;
+      border-radius:12px;font-size:clamp(.85rem,1.2vw,1.05rem);
+      font-family:'Courier New',monospace;margin-bottom:1.2rem;width:fit-content
+    ">$ npm install -g @anthropic-ai/claude-code</code>
+    <div class="reveal delay-3">
+      <button class="cta" onclick="window.open('https://docs.anthropic.com/en/docs/claude-code','_blank')">立即体验</button>
+      <button class="cta-secondary" onclick="window.open('https://github.com/anthropics/claude-code','_blank')">GitHub</button>
+    </div>
+  </div>
+  <div class="panel right">
+    <div class="right-content">
+      <p class="label reveal delay-2">Get Started</p>
+      <p class="reveal delay-3">Claude Code 可在你的终端中直接运行，理解你的代码库，帮助你更快地编写、调试和发布高质量代码。</p>
+      <div class="badges reveal delay-4" style="margin-top:1.4rem">
+        <span class="badge badge-mint">免费试用</span>
+        <span class="badge badge-yellow">跨平台</span>
+        <span class="badge badge-pink">开源</span>
+      </div>
+    </div>
+    <div class="closing-accent" aria-hidden="true">&lt;/&gt;</div>
+  </div>
+</section>
+
+<script>
+(function(){
+  /* ---- Elements ---- */
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.nav-dot');
+  const bar = document.getElementById('progressBar');
+  const totalSlides = slides.length;
+
+  /* ---- IntersectionObserver for .reveal ---- */
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const revealObserver = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting) e.target.classList.add('visible');
+    });
+  },{threshold:0.15});
+
+  document.querySelectorAll('.reveal').forEach(function(el){
+    if(prefersReduced){
+      el.classList.add('visible');
+    } else {
+      revealObserver.observe(el);
+    }
+  });
+
+  /* ---- Progress bar & active dot ---- */
+  function updateUI(){
+    var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+    var scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+    var pct = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    bar.style.width = pct + '%';
+
+    /* Determine active slide */
+    var idx = 0;
+    slides.forEach(function(s, i){
+      var rect = s.getBoundingClientRect();
+      if(rect.top <= window.innerHeight * 0.5) idx = i;
+    });
+    dots.forEach(function(d, i){
+      d.classList.toggle('active', i === idx);
+    });
+  }
+
+  document.documentElement.addEventListener('scroll', updateUI, {passive:true});
+  updateUI();
+
+  /* ---- Dot click navigation ---- */
+  dots.forEach(function(dot){
+    dot.addEventListener('click', function(){
+      var i = parseInt(dot.dataset.slide, 10);
+      slides[i].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    });
+  });
+
+  /* ---- Keyboard navigation ---- */
+  function currentSlideIndex(){
+    var idx = 0;
+    slides.forEach(function(s, i){
+      var rect = s.getBoundingClientRect();
+      if(Math.abs(rect.top) < window.innerHeight * 0.5) idx = i;
+    });
+    return idx;
+  }
+
+  document.addEventListener('keydown', function(e){
+    var key = e.key;
+    if(key === 'ArrowDown' || key === 'PageDown' || key === ' '){
+      e.preventDefault();
+      var next = Math.min(currentSlideIndex() + 1, totalSlides - 1);
+      slides[next].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    } else if(key === 'ArrowUp' || key === 'PageUp'){
+      e.preventDefault();
+      var prev = Math.max(currentSlideIndex() - 1, 0);
+      slides[prev].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    } else if(key === 'Home'){
+      e.preventDefault();
+      slides[0].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    } else if(key === 'End'){
+      e.preventDefault();
+      slides[totalSlides - 1].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    }
+  });
+
+  /* ---- Touch swipe navigation ---- */
+  var touchStartY = 0;
+  var touchLocked = false;
+
+  document.addEventListener('touchstart', function(e){
+    touchStartY = e.touches[0].clientY;
+    touchLocked = false;
+  }, {passive:true});
+
+  document.addEventListener('touchend', function(e){
+    if(touchLocked) return;
+    var diff = touchStartY - e.changedTouches[0].clientY;
+    if(Math.abs(diff) < 50) return;
+    touchLocked = true;
+    var idx = currentSlideIndex();
+    if(diff > 0 && idx < totalSlides - 1){
+      slides[idx + 1].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    } else if(diff < 0 && idx > 0){
+      slides[idx - 1].scrollIntoView({behavior: prefersReduced ? 'auto' : 'smooth'});
+    }
+  }, {passive:true});
+
+  /* ---- Wheel snap assist ---- */
+  var wheelTimeout;
+  document.addEventListener('wheel', function(){
+    clearTimeout(wheelTimeout);
+    wheelTimeout = setTimeout(updateUI, 150);
+  }, {passive:true});
+})();
+</script>
+</body>
+</html>

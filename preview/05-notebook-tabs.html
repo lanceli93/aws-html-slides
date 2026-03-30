@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notebook Tabs - Claude Code</title>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{height:100%;overflow:hidden;scroll-behavior:smooth}
+  body{height:100%;overflow:hidden;background:#2d2d2d;font-family:'DM Sans',sans-serif;color:#1a1a1a}
+
+  /* --- Scroll container --- */
+  .slides{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch}
+  .slides::-webkit-scrollbar{display:none}
+  .slide{height:100vh;min-height:100vh;scroll-snap-align:start;scroll-snap-stop:always;
+    display:flex;align-items:center;justify-content:center;position:relative}
+
+  /* --- Progress bar --- */
+  .progress{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,#98d4bb,#c7b8ea,#f4b8c5,#a8d8ea,#ffe6a7);
+    width:0%;z-index:100;transition:width .35s ease}
+
+  /* --- Nav dots --- */
+  .nav-dots{position:fixed;right:clamp(12px,2vw,24px);top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:12px;z-index:100}
+  .nav-dot{width:10px;height:10px;border-radius:50%;border:2px solid rgba(255,255,255,.5);
+    background:transparent;cursor:pointer;transition:all .3s ease;padding:0}
+  .nav-dot.active{background:#f8f6f1;border-color:#f8f6f1;transform:scale(1.3)}
+  .nav-dot:hover{border-color:#f8f6f1}
+
+  /* --- Scene / Page --- */
+  .scene{position:relative;width:min(82vw,740px);height:min(72vh,540px);display:flex}
+  .page{position:relative;flex:1;background:#f8f6f1;border-radius:4px;
+    box-shadow:0 8px 32px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.18);
+    padding:clamp(1.5rem,4vw,3rem);padding-left:clamp(3rem,6vw,5rem);
+    display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+
+  /* Binder rule line */
+  .page::before{content:'';position:absolute;left:clamp(1rem,2.5vw,2rem);top:0;bottom:0;width:2px;
+    background:repeating-linear-gradient(to bottom,transparent,transparent 48px,#ccc 48px,#ccc 50px)}
+
+  /* Binder holes */
+  .holes{position:absolute;left:clamp(0.55rem,1.8vw,1.55rem);top:10%;bottom:10%;
+    display:flex;flex-direction:column;justify-content:space-around}
+  .hole{width:clamp(10px,1.2vw,14px);height:clamp(10px,1.2vw,14px);border-radius:50%;
+    background:#2d2d2d;border:1.5px solid #bbb;box-shadow:inset 0 1px 2px rgba(0,0,0,.3)}
+
+  /* --- Tabs on right edge --- */
+  .tabs{position:absolute;right:-36px;top:10%;bottom:10%;
+    display:flex;flex-direction:column;justify-content:space-around;gap:4px}
+  .tab{width:36px;height:clamp(48px,10vh,72px);border-radius:0 6px 6px 0;
+    display:flex;align-items:center;justify-content:center;
+    writing-mode:vertical-rl;text-orientation:mixed;
+    font-family:'DM Sans',sans-serif;font-weight:500;
+    font-size:clamp(0.5rem,1vh,0.7rem);letter-spacing:.06em;color:#1a1a1a;
+    cursor:pointer;transition:width .25s ease,filter .25s ease;opacity:.85}
+  .tab:nth-child(1){background:#98d4bb}
+  .tab:nth-child(2){background:#c7b8ea}
+  .tab:nth-child(3){background:#f4b8c5}
+  .tab:nth-child(4){background:#a8d8ea}
+  .tab:nth-child(5){background:#ffe6a7}
+  .tab:hover{width:44px;opacity:1}
+  .tab.active{width:48px;opacity:1;font-weight:700;box-shadow:2px 0 8px rgba(0,0,0,.15)}
+
+  /* --- Typography --- */
+  h1{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(1.8rem,4.5vw,3.2rem);
+    line-height:1.15;margin-bottom:.35em;letter-spacing:-.01em}
+  h2{font-family:'Bodoni Moda',serif;font-weight:700;font-size:clamp(1.4rem,3.2vw,2.2rem);
+    line-height:1.2;margin-bottom:.5em;letter-spacing:-.01em}
+  .subtitle{font-family:'DM Sans',sans-serif;font-weight:400;font-size:clamp(0.9rem,2vw,1.3rem);
+    color:#555;margin-bottom:1.5em}
+  .divider{width:60px;height:3px;border-radius:2px;margin-bottom:1.2em;
+    background:linear-gradient(90deg,#98d4bb,#c7b8ea,#f4b8c5,#a8d8ea,#ffe6a7)}
+  .body-text{font-size:clamp(0.75rem,1.4vw,1rem);line-height:1.65;color:#444;max-width:48ch}
+
+  /* --- Features grid (slide 2) --- */
+  .features{display:grid;grid-template-columns:1fr 1fr;gap:clamp(0.8rem,1.8vw,1.4rem);margin-top:.5em}
+  .feature{display:flex;align-items:flex-start;gap:clamp(0.5rem,1vw,0.8rem)}
+  .feature-icon{flex-shrink:0;width:clamp(28px,3vw,38px);height:clamp(28px,3vw,38px);
+    border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:clamp(0.85rem,1.6vw,1.15rem)}
+  .feature-icon.mint{background:#98d4bb30;color:#3a8a6a}
+  .feature-icon.lavender{background:#c7b8ea30;color:#6b5b95}
+  .feature-icon.pink{background:#f4b8c530;color:#b5566a}
+  .feature-icon.sky{background:#a8d8ea30;color:#4a8da8}
+  .feature h3{font-family:'DM Sans',sans-serif;font-weight:500;font-size:clamp(0.7rem,1.2vw,0.95rem);
+    margin-bottom:.2em;color:#1a1a1a}
+  .feature p{font-size:clamp(0.6rem,1vw,0.8rem);line-height:1.5;color:#666}
+
+  /* --- Install command (slide 3) --- */
+  .install-block{margin-top:1em}
+  .install-cmd{display:inline-block;background:#2d2d2d;color:#98d4bb;
+    font-family:'Courier New',monospace;font-size:clamp(0.75rem,1.6vw,1.1rem);
+    padding:clamp(0.6rem,1.2vw,1rem) clamp(1rem,2vw,1.8rem);border-radius:6px;
+    letter-spacing:.02em;box-shadow:inset 0 1px 4px rgba(0,0,0,.4);margin-bottom:1em}
+  .install-cmd .prompt{color:#ffe6a7;margin-right:.3em}
+  .install-hint{font-size:clamp(0.65rem,1.1vw,0.85rem);color:#888;line-height:1.6}
+
+  /* --- Reveal animation --- */
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+  .reveal.delay-1{transition-delay:.12s}
+  .reveal.delay-2{transition-delay:.24s}
+  .reveal.delay-3{transition-delay:.36s}
+  .reveal.delay-4{transition-delay:.48s}
+
+  /* --- Reduced motion --- */
+  @media(prefers-reduced-motion:reduce){
+    .reveal{transition:none;opacity:1;transform:none}
+    .tab,.nav-dot,.progress{transition:none}
+    .slides{scroll-behavior:auto}
+  }
+
+  /* --- Small screens --- */
+  @media(max-width:600px){
+    .scene{width:88vw;height:min(68vh,480px)}
+    .tabs{right:-28px}
+    .tab{width:28px;height:clamp(36px,8vh,56px)}
+    .tab:hover{width:34px}
+    .tab.active{width:38px}
+    .features{grid-template-columns:1fr;gap:0.7rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress" id="progress"></div>
+
+<!-- Nav dots -->
+<nav class="nav-dots" id="navDots">
+  <button class="nav-dot active" data-slide="0" aria-label="Slide 1"></button>
+  <button class="nav-dot" data-slide="1" aria-label="Slide 2"></button>
+  <button class="nav-dot" data-slide="2" aria-label="Slide 3"></button>
+</nav>
+
+<!-- Slides -->
+<div class="slides" id="slides">
+
+  <!-- Slide 1: Title -->
+  <section class="slide" data-index="0">
+    <div class="scene">
+      <div class="page">
+        <div class="holes">
+          <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+          <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+        </div>
+        <h1 class="reveal">Claude Code</h1>
+        <p class="subtitle reveal delay-1">AI 驱动的编程助手</p>
+        <div class="divider reveal delay-2"></div>
+        <p class="body-text reveal delay-3">Terminal-native AI assistant that understands your codebase, writes clean code, and orchestrates complex workflows — right from your command line.</p>
+      </div>
+      <div class="tabs">
+        <div class="tab active" data-tab="0">Overview</div>
+        <div class="tab" data-tab="1">Features</div>
+        <div class="tab" data-tab="2">Setup</div>
+        <div class="tab" data-tab="3">Models</div>
+        <div class="tab" data-tab="4">Pricing</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 2: Core capabilities -->
+  <section class="slide" data-index="1">
+    <div class="scene">
+      <div class="page">
+        <div class="holes">
+          <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+          <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+        </div>
+        <h2 class="reveal">核心能力</h2>
+        <div class="divider reveal delay-1"></div>
+        <div class="features">
+          <div class="feature reveal delay-1">
+            <div class="feature-icon mint">&#xf121;</div>
+            <div>
+              <h3>代码生成</h3>
+              <p>理解上下文，生成高质量代码，支持多种语言和框架</p>
+            </div>
+          </div>
+          <div class="feature reveal delay-2">
+            <div class="feature-icon lavender">&#xf002;</div>
+            <div>
+              <h3>代码库理解</h3>
+              <p>深度索引项目结构，精准定位相关文件与依赖关系</p>
+            </div>
+          </div>
+          <div class="feature reveal delay-3">
+            <div class="feature-icon pink">&#xf085;</div>
+            <div>
+              <h3>智能调试</h3>
+              <p>自动分析错误日志，定位问题根因并提供修复方案</p>
+            </div>
+          </div>
+          <div class="feature reveal delay-4">
+            <div class="feature-icon sky">&#xf0e8;</div>
+            <div>
+              <h3>工作流编排</h3>
+              <p>多步骤任务自动执行，从规划到测试一气呵成</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab" data-tab="0">Overview</div>
+        <div class="tab active" data-tab="1">Features</div>
+        <div class="tab" data-tab="2">Setup</div>
+        <div class="tab" data-tab="3">Models</div>
+        <div class="tab" data-tab="4">Pricing</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 3: Getting started -->
+  <section class="slide" data-index="2">
+    <div class="scene">
+      <div class="page">
+        <div class="holes">
+          <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+          <div class="hole"></div><div class="hole"></div><div class="hole"></div>
+        </div>
+        <h2 class="reveal">开始使用</h2>
+        <p class="subtitle reveal delay-1">一行命令，即刻安装</p>
+        <div class="divider reveal delay-2"></div>
+        <div class="install-block reveal delay-3">
+          <div class="install-cmd"><span class="prompt">$</span>npm install -g @anthropic-ai/claude-code</div>
+        </div>
+        <p class="install-hint reveal delay-4">
+          安装完成后，进入任意项目目录运行 <strong>claude</strong> 即可启动。<br>
+          支持 macOS、Linux 和 WSL 环境。
+        </p>
+      </div>
+      <div class="tabs">
+        <div class="tab" data-tab="0">Overview</div>
+        <div class="tab" data-tab="1">Features</div>
+        <div class="tab active" data-tab="2">Setup</div>
+        <div class="tab" data-tab="3">Models</div>
+        <div class="tab" data-tab="4">Pricing</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const container = document.getElementById('slides');
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.nav-dot');
+  const progress = document.getElementById('progress');
+  const totalSlides = slides.length;
+  let current = 0;
+  let isScrolling = false;
+
+  /* --- Update progress bar --- */
+  function updateProgress(index){
+    const pct = ((index + 1) / totalSlides) * 100;
+    progress.style.width = pct + '%';
+  }
+
+  /* --- Update nav dots --- */
+  function updateDots(index){
+    dots.forEach(d => d.classList.remove('active'));
+    dots[index].classList.add('active');
+  }
+
+  /* --- Update active tabs across all slides --- */
+  function updateTabs(index){
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', parseInt(t.dataset.tab) === index);
+    });
+  }
+
+  /* --- Navigate to slide --- */
+  function goTo(index){
+    if(index < 0 || index >= totalSlides || isScrolling) return;
+    isScrolling = true;
+    current = index;
+    slides[index].scrollIntoView({behavior:'smooth'});
+    updateProgress(index);
+    updateDots(index);
+    updateTabs(index);
+    setTimeout(()=>{ isScrolling = false; }, 600);
+  }
+
+  /* --- IntersectionObserver for .reveal --- */
+  const revealObs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting) e.target.classList.add('visible');
+      else e.target.classList.remove('visible');
+    });
+  },{threshold:0.15});
+  document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+  /* --- IntersectionObserver for slide tracking --- */
+  const slideObs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const idx = parseInt(e.target.dataset.index);
+        current = idx;
+        updateProgress(idx);
+        updateDots(idx);
+        updateTabs(idx);
+      }
+    });
+  },{root:container, threshold:0.55});
+  slides.forEach(s => slideObs.observe(s));
+
+  /* --- Keyboard nav --- */
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' '){
+      e.preventDefault(); goTo(current + 1);
+    } else if(e.key === 'ArrowUp' || e.key === 'PageUp'){
+      e.preventDefault(); goTo(current - 1);
+    } else if(e.key === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(e.key === 'End'){
+      e.preventDefault(); goTo(totalSlides - 1);
+    }
+  });
+
+  /* --- Wheel nav (debounced) --- */
+  let wheelTimer = null;
+  container.addEventListener('wheel', e=>{
+    e.preventDefault();
+    if(wheelTimer) return;
+    wheelTimer = setTimeout(()=>{ wheelTimer = null; }, 700);
+    if(e.deltaY > 30) goTo(current + 1);
+    else if(e.deltaY < -30) goTo(current - 1);
+  },{passive:false});
+
+  /* --- Touch nav --- */
+  let touchStartY = 0;
+  container.addEventListener('touchstart', e=>{
+    touchStartY = e.touches[0].clientY;
+  },{passive:true});
+  container.addEventListener('touchend', e=>{
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    if(Math.abs(dy) > 50){
+      if(dy > 0) goTo(current + 1);
+      else goTo(current - 1);
+    }
+  },{passive:true});
+
+  /* --- Nav dot clicks --- */
+  dots.forEach(d=>{
+    d.addEventListener('click', ()=> goTo(parseInt(d.dataset.slide)));
+  });
+
+  /* --- Tab clicks --- */
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      const tabIdx = parseInt(t.dataset.tab);
+      if(tabIdx < totalSlides) goTo(tabIdx);
+    });
+  });
+
+  /* --- Init --- */
+  updateProgress(0);
+})();
+</script>
+
+</body>
+</html>

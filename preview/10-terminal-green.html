@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terminal Green — Claude Code</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--green:#39d353;--dim:#1a2332;
+  --glow:rgba(57,211,83,.15);--green-mid:rgba(57,211,83,.4);
+  --slide-count:3;
+}
+html{scroll-snap-type:y mandatory;scroll-behavior:smooth;overflow-y:scroll}
+body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--green)}
+
+/* ── Progress bar ── */
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--green);
+  z-index:100;transition:width .35s ease;box-shadow:0 0 8px var(--green)}
+
+/* ── Nav dots ── */
+#dots{position:fixed;right:clamp(.75rem,2vw,1.5rem);top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:12px;z-index:100}
+#dots a{display:block;width:10px;height:10px;border-radius:50%;border:1.5px solid var(--green);
+  background:transparent;transition:background .3s,box-shadow .3s;cursor:pointer;text-decoration:none}
+#dots a.active{background:var(--green);box-shadow:0 0 8px var(--green)}
+
+/* ── Slides ── */
+.slide{
+  min-height:100vh;min-height:100dvh;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:clamp(1.5rem,4vw,4rem);position:relative;
+  scroll-snap-align:start;scroll-snap-stop:always;
+}
+
+/* Scan lines overlay */
+.slide::before{content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.12) 2px,rgba(0,0,0,.12) 4px);
+  pointer-events:none;z-index:2}
+/* Screen glow */
+.slide::after{content:'';position:absolute;inset:0;
+  box-shadow:inset 0 0 120px var(--glow);pointer-events:none;z-index:1}
+
+/* ── Terminal chrome ── */
+.terminal{
+  border:1px solid var(--green);border-radius:6px;
+  padding:clamp(1rem,3vw,2.5rem);
+  background:var(--dim);position:relative;
+  max-width:56rem;width:100%;margin:0 auto;
+  box-shadow:0 0 30px var(--glow),inset 0 0 60px rgba(0,0,0,.4);
+}
+.bar{display:flex;gap:.5rem;margin-bottom:clamp(.75rem,2vw,1.5rem);
+  padding-bottom:.75rem;border-bottom:1px solid rgba(57,211,83,.2)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--green);opacity:.5}
+.dot:first-child{background:#ff5f57}
+.dot:nth-child(2){background:#febc2e}
+.dot:nth-child(3){background:#28c840}
+
+/* ── Typography ── */
+.prompt{opacity:.6;margin-bottom:.25rem;font-size:clamp(.7rem,1.2vw,.95rem)}
+.cmd{font-size:clamp(.8rem,1.4vw,1.05rem);margin-bottom:clamp(.75rem,2vw,1.5rem)}
+.cmd .path{color:#58a6ff}
+.cmd .arrow{color:#f78166}
+
+h1{font-size:clamp(1.8rem,5vw,3.6rem);font-weight:700;line-height:1.1;
+  text-shadow:0 0 20px var(--glow);margin-bottom:.15em}
+h2{font-size:clamp(.95rem,2.2vw,1.6rem);font-weight:400;opacity:.75;
+  margin-bottom:clamp(1rem,2.5vw,2rem)}
+
+.output{font-size:clamp(.7rem,1.1vw,.9rem);line-height:1.7;opacity:.7}
+.output span{display:block}
+
+/* Syntax colours */
+.kw{color:#ff7b72}
+.str{color:#a5d6ff}
+.fn{color:#d2a8ff}
+.cm{color:#8b949e}
+
+/* ── Slide 2: feature list ── */
+.feature-list{list-style:none;padding:0;margin:0}
+.feature-list li{
+  font-size:clamp(.8rem,1.4vw,1.1rem);
+  line-height:1.8;padding:clamp(.35rem,.8vw,.6rem) 0;
+  border-bottom:1px solid rgba(57,211,83,.1);
+}
+.feature-list li:last-child{border-bottom:none}
+.feature-list .prompt-sym{color:#f78166;margin-right:.5em;font-weight:700}
+.feature-list .desc{opacity:.85}
+.feature-list .tag{color:#8b949e;font-size:clamp(.6rem,1vw,.8rem);margin-left:.5em}
+.section-title{font-size:clamp(1.2rem,3.2vw,2.4rem);font-weight:700;
+  margin-bottom:clamp(.75rem,2vw,1.5rem);text-shadow:0 0 15px var(--glow)}
+
+/* ── Slide 3: install commands ── */
+.install-block{margin-top:clamp(.5rem,1.5vw,1rem)}
+.install-line{
+  font-size:clamp(.75rem,1.3vw,1.05rem);
+  line-height:2;padding:clamp(.2rem,.5vw,.4rem) 0;
+}
+.install-line .dollar{color:#8b949e;margin-right:.5em;user-select:none}
+.install-line .typed{color:var(--green)}
+.install-line .out{color:#8b949e;opacity:.7;font-size:clamp(.65rem,1.1vw,.85rem)}
+.install-note{margin-top:clamp(.75rem,2vw,1.5rem);font-size:clamp(.7rem,1.1vw,.9rem);
+  opacity:.5;line-height:1.6}
+
+/* ── Blinking cursor ── */
+.cursor::after{content:'\2588';animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ── Reveal animation ── */
+.reveal-item{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.reveal-item.visible{opacity:1;transform:translateY(0)}
+.reveal-item:nth-child(2){transition-delay:.1s}
+.reveal-item:nth-child(3){transition-delay:.2s}
+.reveal-item:nth-child(4){transition-delay:.3s}
+.reveal-item:nth-child(5){transition-delay:.35s}
+.reveal-item:nth-child(6){transition-delay:.4s}
+.reveal-item:nth-child(7){transition-delay:.45s}
+.reveal-item:nth-child(8){transition-delay:.5s}
+.reveal-item:nth-child(9){transition-delay:.55s}
+.reveal-item:nth-child(10){transition-delay:.6s}
+
+/* ── Reduced motion ── */
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .cursor::after{animation:none}
+  .slide::before{background:none}
+  .reveal-item{opacity:1;transform:none;transition:none}
+  #progress{transition:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div id="progress" style="width:0%"></div>
+
+<!-- Nav dots -->
+<nav id="dots">
+  <a href="#slide-1" class="active" aria-label="Slide 1"></a>
+  <a href="#slide-2" aria-label="Slide 2"></a>
+  <a href="#slide-3" aria-label="Slide 3"></a>
+</nav>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 1 — Title
+     ════════════════════════════════════════════ -->
+<section class="slide" id="slide-1">
+  <div class="terminal">
+    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="prompt reveal-item">user@dev <span style="color:#58a6ff">~/projects</span></div>
+    <div class="cmd reveal-item"><span class="arrow">&gt;</span> claude <span class="path">--model opus</span></div>
+    <h1 class="reveal-item" style="white-space:pre;line-height:1.15;font-size:clamp(1rem,3.8vw,2.8rem)"> _____ _                 _
+/ ____| |               | |
+| |    | | __ _ _   _  __| | ___
+| |    | |/ _` | | | |/ _` |/ _ \
+| |____| | (_| | |_| | (_| |  __/
+ \_____|_|\__,_|\__,_|\__,_|\___|
+  / ____|        | |
+ | |     ___   __| | ___
+ | |    / _ \ / _` |/ _ \
+ | |___| (_) | (_| |  __/
+  \_____\___/ \__,_|\___|</h1>
+    <h2 class="reveal-item">AI 驱动的编程助手<span class="cursor"></span></h2>
+    <div class="output reveal-item">
+      <span><span class="cm">// initializing agent...</span></span>
+      <span><span class="kw">import</span> { <span class="fn">Claude</span> } <span class="kw">from</span> <span class="str">"@anthropic/sdk"</span>;</span>
+      <span><span class="kw">const</span> agent = <span class="kw">await</span> Claude.<span class="fn">connect</span>({ model: <span class="str">"opus"</span> });</span>
+      <span><span class="cm">// ready. type your task below _</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 2 — Core Capabilities
+     ════════════════════════════════════════════ -->
+<section class="slide" id="slide-2">
+  <div class="terminal">
+    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="prompt reveal-item">user@dev <span style="color:#58a6ff">~/projects</span></div>
+    <div class="cmd reveal-item"><span class="arrow">&gt;</span> claude <span class="path">--capabilities</span></div>
+    <div class="section-title reveal-item">核心能力</div>
+    <ul class="feature-list">
+      <li class="reveal-item">
+        <span class="prompt-sym">$</span>
+        <span class="desc">自然语言编码 —— 用中文描述需求，直接生成生产级代码</span>
+        <span class="tag">[code-gen]</span>
+      </li>
+      <li class="reveal-item">
+        <span class="prompt-sym">$</span>
+        <span class="desc">智能调试修复 —— 自动定位 Bug 根因并提交修复补丁</span>
+        <span class="tag">[debug]</span>
+      </li>
+      <li class="reveal-item">
+        <span class="prompt-sym">$</span>
+        <span class="desc">代码库理解 —— 全局索引，跨文件追踪引用与架构分析</span>
+        <span class="tag">[codebase]</span>
+      </li>
+      <li class="reveal-item">
+        <span class="prompt-sym">$</span>
+        <span class="desc">终端原生集成 —— CLI 工作流，Git/Shell/测试无缝协作</span>
+        <span class="tag">[terminal]</span>
+      </li>
+    </ul>
+    <div class="output reveal-item" style="margin-top:clamp(.75rem,1.5vw,1.25rem)">
+      <span><span class="cm"># 4 capabilities loaded. ready.</span><span class="cursor"></span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════
+     SLIDE 3 — Get Started
+     ════════════════════════════════════════════ -->
+<section class="slide" id="slide-3">
+  <div class="terminal">
+    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+    <div class="prompt reveal-item">user@dev <span style="color:#58a6ff">~/projects</span></div>
+    <div class="cmd reveal-item"><span class="arrow">&gt;</span> claude <span class="path">--install</span></div>
+    <div class="section-title reveal-item">开始使用</div>
+    <div class="install-block">
+      <div class="install-line reveal-item">
+        <span class="dollar">$</span>
+        <span class="typed">npm install -g @anthropic-ai/claude-code</span>
+      </div>
+      <div class="install-line reveal-item">
+        <span class="out">+ @anthropic-ai/claude-code@1.0.0</span>
+      </div>
+      <div class="install-line reveal-item">
+        <span class="out">added 1 package in 3.2s</span>
+      </div>
+      <div class="install-line reveal-item" style="margin-top:clamp(.3rem,.8vw,.6rem)">
+        <span class="dollar">$</span>
+        <span class="typed">claude</span>
+      </div>
+      <div class="install-line reveal-item">
+        <span class="out" style="color:var(--green);opacity:1">
+          > Claude Code v1.0.0 initialized
+        </span>
+      </div>
+      <div class="install-line reveal-item">
+        <span class="out" style="color:var(--green);opacity:1">
+          > Model: opus | Context: 200k tokens
+        </span>
+      </div>
+      <div class="install-line reveal-item">
+        <span class="out" style="color:var(--green);opacity:1">
+          > Ready. Describe your task...<span class="cursor"></span>
+        </span>
+      </div>
+    </div>
+    <div class="install-note reveal-item">
+      <span class="cm"># 只需两步：安装、启动，即刻开始 AI 编程之旅</span>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  'use strict';
+
+  const slides = document.querySelectorAll('.slide');
+  const dots   = document.querySelectorAll('#dots a');
+  const bar    = document.getElementById('progress');
+  const total  = slides.length;
+  let current  = 0;
+  let isNav    = false;
+
+  /* ── IntersectionObserver: reveal items ── */
+  const revealObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting) e.target.classList.add('visible');
+    });
+  },{threshold:0.15});
+  document.querySelectorAll('.reveal-item').forEach(function(el){revealObs.observe(el)});
+
+  /* ── IntersectionObserver: track active slide ── */
+  const slideObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        var idx = Array.prototype.indexOf.call(slides, e.target);
+        if(idx !== -1) setCurrent(idx);
+      }
+    });
+  },{threshold:0.55});
+  slides.forEach(function(s){slideObs.observe(s)});
+
+  function setCurrent(idx){
+    current = idx;
+    var pct = ((idx + 1) / total) * 100;
+    bar.style.width = pct + '%';
+    dots.forEach(function(d,i){
+      d.classList.toggle('active', i === idx);
+    });
+  }
+
+  function goTo(idx){
+    if(idx < 0 || idx >= total || isNav) return;
+    isNav = true;
+    slides[idx].scrollIntoView({behavior:'smooth'});
+    setTimeout(function(){isNav = false}, 600);
+  }
+
+  /* ── Keyboard nav ── */
+  document.addEventListener('keydown',function(e){
+    if(e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' '){
+      e.preventDefault(); goTo(current + 1);
+    } else if(e.key === 'ArrowUp' || e.key === 'PageUp'){
+      e.preventDefault(); goTo(current - 1);
+    } else if(e.key === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(e.key === 'End'){
+      e.preventDefault(); goTo(total - 1);
+    }
+  });
+
+  /* ── Wheel nav (debounced) ── */
+  var wheelTimer = 0;
+  document.addEventListener('wheel',function(e){
+    var now = Date.now();
+    if(now - wheelTimer < 800) return;
+    if(Math.abs(e.deltaY) < 30) return;
+    wheelTimer = now;
+    if(e.deltaY > 0) goTo(current + 1);
+    else goTo(current - 1);
+  },{passive:true});
+
+  /* ── Touch nav ── */
+  var touchY = 0;
+  document.addEventListener('touchstart',function(e){
+    touchY = e.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    var diff = touchY - e.changedTouches[0].clientY;
+    if(Math.abs(diff) > 50){
+      if(diff > 0) goTo(current + 1);
+      else goTo(current - 1);
+    }
+  },{passive:true});
+
+  /* ── Dot clicks ── */
+  dots.forEach(function(dot,i){
+    dot.addEventListener('click',function(e){
+      e.preventDefault();
+      goTo(i);
+    });
+  });
+
+  /* ── Init ── */
+  setCurrent(0);
+})();
+</script>
+</body>
+</html>

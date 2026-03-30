@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Vintage Editorial — Claude Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#f5f3ee;--text:#1a1a1a;--text2:#555;--accent:#e8d4c0;
+    --font-display:'Fraunces',serif;--font-body:'Work Sans',sans-serif;
+  }
+  html{scroll-snap-type:y mandatory;scroll-behavior:smooth}
+  html,body{height:100%;font-family:var(--font-body);background:var(--bg);color:var(--text);overflow-x:hidden}
+
+  /* ── Progress bar ── */
+  .progress-bar{
+    position:fixed;top:0;left:0;height:3px;background:var(--text);
+    width:0%;z-index:100;transition:width .35s ease;
+  }
+
+  /* ── Nav dots ── */
+  .nav-dots{
+    position:fixed;right:clamp(1rem,2vw,2rem);top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:.75rem;z-index:100;
+  }
+  .nav-dot{
+    width:10px;height:10px;border-radius:50%;border:2px solid var(--text);
+    background:transparent;cursor:pointer;transition:background .3s;padding:0;
+  }
+  .nav-dot.active{background:var(--text)}
+
+  /* ── Slides ── */
+  .slide{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;padding:clamp(2rem,5vw,4rem);position:relative;overflow:hidden;
+    text-align:center;scroll-snap-align:start;scroll-snap-stop:always;
+  }
+
+  /* ── Geometric decorations ── */
+  .geo-circle{
+    position:absolute;width:clamp(120px,18vw,260px);aspect-ratio:1;
+    border:3px solid var(--accent);border-radius:50%;opacity:.7;
+  }
+  .geo-line{
+    position:absolute;width:clamp(80px,12vw,180px);height:3px;
+    background:var(--accent);opacity:.7;
+  }
+  .geo-dot{
+    position:absolute;width:clamp(10px,1.5vw,18px);aspect-ratio:1;
+    background:var(--text);border-radius:50%;opacity:.5;
+  }
+  .geo-corner{
+    position:absolute;width:clamp(60px,8vw,120px);aspect-ratio:1;
+    border-right:3px solid var(--accent);border-bottom:3px solid var(--accent);opacity:.6;
+  }
+  .geo-line-h{
+    position:absolute;height:3px;background:var(--accent);opacity:.6;
+  }
+  .geo-ring{
+    position:absolute;width:clamp(60px,10vw,140px);aspect-ratio:1;
+    border:2px solid var(--accent);border-radius:50%;opacity:.5;
+  }
+  .geo-square{
+    position:absolute;width:clamp(40px,6vw,90px);aspect-ratio:1;
+    border:3px solid var(--accent);opacity:.5;
+  }
+
+  /* ── Typography ── */
+  h1{
+    font-family:var(--font-display);font-weight:900;
+    font-size:clamp(2.4rem,6vw,5.5rem);line-height:1.05;
+    letter-spacing:-.02em;margin-bottom:.4em;position:relative;z-index:1;
+  }
+  h2{
+    font-family:var(--font-display);font-weight:900;
+    font-size:clamp(1.8rem,4.5vw,3.8rem);line-height:1.1;
+    letter-spacing:-.02em;margin-bottom:.6em;position:relative;z-index:1;
+  }
+  .subtitle{
+    font-family:var(--font-body);font-weight:500;
+    font-size:clamp(1rem,2.2vw,1.6rem);color:var(--text2);
+    margin-bottom:1.8em;position:relative;z-index:1;
+  }
+  .tagline{
+    margin-top:2.2em;font-size:clamp(.8rem,1.2vw,1rem);
+    color:var(--text2);font-weight:400;font-style:italic;
+    position:relative;z-index:1;
+  }
+
+  /* ── CTA button ── */
+  .cta{
+    display:inline-block;padding:.7em 2em;
+    border:3px solid var(--text);font-family:var(--font-display);font-weight:700;
+    font-size:clamp(.9rem,1.4vw,1.15rem);color:var(--text);
+    text-decoration:none;letter-spacing:.03em;
+    transition:background .3s,color .3s;position:relative;z-index:1;
+    cursor:pointer;background:transparent;
+  }
+  .cta:hover{background:var(--text);color:var(--bg)}
+
+  /* ── Bordered box (editorial signature) ── */
+  .bordered-box{
+    border:3px solid var(--text);padding:clamp(1.5rem,3vw,3rem) clamp(2rem,4vw,4rem);
+    position:relative;z-index:1;max-width:600px;width:90%;
+  }
+  .bordered-box h2{margin-bottom:.3em}
+  .bordered-box .subtitle{margin-bottom:1.4em}
+
+  /* ── Feature grid (Slide 2) ── */
+  .features{
+    display:grid;grid-template-columns:repeat(2,1fr);
+    gap:clamp(1.2rem,2.5vw,2rem);max-width:820px;width:90%;
+    position:relative;z-index:1;
+  }
+  .feature-card{
+    text-align:left;padding:clamp(1.2rem,2vw,2rem);
+    border:2px solid var(--accent);background:rgba(245,243,238,.6);
+    transition:border-color .3s;
+  }
+  .feature-card:hover{border-color:var(--text)}
+  .feature-num{
+    font-family:var(--font-display);font-weight:900;
+    font-size:clamp(1.6rem,3vw,2.6rem);color:var(--accent);
+    line-height:1;margin-bottom:.3em;
+  }
+  .feature-title{
+    font-family:var(--font-display);font-weight:700;
+    font-size:clamp(.95rem,1.5vw,1.25rem);margin-bottom:.4em;
+  }
+  .feature-desc{
+    font-size:clamp(.8rem,1.1vw,.95rem);color:var(--text2);
+    line-height:1.55;font-weight:400;
+  }
+
+  /* ── Reveal animation ── */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+  .reveal.delay-1{transition-delay:.12s}
+  .reveal.delay-2{transition-delay:.24s}
+  .reveal.delay-3{transition-delay:.36s}
+  .reveal.delay-4{transition-delay:.48s}
+
+  /* ── Responsive ── */
+  @media(max-width:640px){
+    .features{grid-template-columns:1fr}
+    .nav-dots{right:.75rem;gap:.5rem}
+    .nav-dot{width:8px;height:8px}
+  }
+
+  /* ── Reduced motion ── */
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;scroll-snap-type:none}
+    .cta,.feature-card,.nav-dot{transition:none}
+    .reveal{opacity:1;transform:none;transition:none}
+    .reveal.visible{opacity:1;transform:none}
+    .progress-bar{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Nav dots -->
+<nav class="nav-dots" id="navDots">
+  <button class="nav-dot active" data-slide="0" aria-label="Slide 1"></button>
+  <button class="nav-dot" data-slide="1" aria-label="Slide 2"></button>
+  <button class="nav-dot" data-slide="2" aria-label="Slide 3"></button>
+</nav>
+
+<!-- ═══════════ Slide 1: Title ═══════════ -->
+<section class="slide" id="slide0">
+  <div class="geo-circle" style="top:12%;left:8%"></div>
+  <div class="geo-corner" style="top:10%;right:12%"></div>
+  <div class="geo-line" style="bottom:22%;right:10%;transform:rotate(-35deg)"></div>
+  <div class="geo-dot" style="bottom:28%;right:8%"></div>
+  <div class="geo-ring" style="bottom:15%;left:12%"></div>
+
+  <h1 class="reveal">Claude Code</h1>
+  <p class="subtitle reveal delay-1">AI 驱动的编程助手</p>
+  <p class="tagline reveal delay-2">Your code called. It wants better tooling.</p>
+</section>
+
+<!-- ═══════════ Slide 2: Features ═══════════ -->
+<section class="slide" id="slide1">
+  <div class="geo-circle" style="top:6%;right:5%;width:clamp(80px,12vw,180px);border-width:2px"></div>
+  <div class="geo-line-h" style="top:18%;left:5%;width:clamp(60px,10vw,140px)"></div>
+  <div class="geo-dot" style="top:20%;left:5%"></div>
+  <div class="geo-square" style="bottom:10%;left:8%;transform:rotate(15deg)"></div>
+  <div class="geo-line" style="bottom:8%;right:15%;width:clamp(50px,8vw,120px);transform:rotate(25deg)"></div>
+
+  <h2 class="reveal">核心能力</h2>
+  <p class="subtitle reveal delay-1" style="margin-bottom:clamp(1.5rem,3vw,2.5rem)">Four pillars. Zero compromise.</p>
+
+  <div class="features">
+    <div class="feature-card reveal delay-1">
+      <div class="feature-num">01</div>
+      <div class="feature-title">智能代码生成</div>
+      <div class="feature-desc">从自然语言到精确代码，理解你的意图并生成优雅的实现方案。</div>
+    </div>
+    <div class="feature-card reveal delay-2">
+      <div class="feature-num">02</div>
+      <div class="feature-title">上下文理解</div>
+      <div class="feature-desc">深度感知项目结构与代码风格，给出符合你代码库习惯的建议。</div>
+    </div>
+    <div class="feature-card reveal delay-3">
+      <div class="feature-num">03</div>
+      <div class="feature-title">终端原生集成</div>
+      <div class="feature-desc">直接在命令行中运行，无需离开你的工作流，文件编辑与执行一气呵成。</div>
+    </div>
+    <div class="feature-card reveal delay-4">
+      <div class="feature-num">04</div>
+      <div class="feature-title">迭代式调试</div>
+      <div class="feature-desc">自动识别错误并提出修复方案，支持多轮对话逐步完善代码。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ Slide 3: Closing ═══════════ -->
+<section class="slide" id="slide2">
+  <div class="geo-circle" style="bottom:12%;right:8%;width:clamp(100px,15vw,220px)"></div>
+  <div class="geo-corner" style="bottom:8%;left:10%;transform:rotate(180deg)"></div>
+  <div class="geo-dot" style="top:18%;left:15%"></div>
+  <div class="geo-dot" style="top:22%;left:18%"></div>
+  <div class="geo-line" style="top:15%;right:12%;transform:rotate(-20deg);width:clamp(60px,9vw,140px)"></div>
+  <div class="geo-ring" style="top:8%;left:6%"></div>
+
+  <div class="bordered-box reveal">
+    <h2>开始使用</h2>
+    <p class="subtitle">The best tools don't get in the way — they get out of it.</p>
+    <a class="cta" href="#">npm install -g @anthropic-ai/claude-code</a>
+  </div>
+  <p class="tagline reveal delay-1">Less boilerplate. More brilliance.</p>
+</section>
+
+<script>
+(function(){
+  /* ── Elements ── */
+  const slides = document.querySelectorAll('.slide');
+  const dots = document.querySelectorAll('.nav-dot');
+  const bar = document.getElementById('progressBar');
+  const totalSlides = slides.length;
+  let currentSlide = 0;
+
+  /* ── IntersectionObserver for .reveal ── */
+  const revealObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting) e.target.classList.add('visible');
+    });
+  },{threshold:0.15});
+  document.querySelectorAll('.reveal').forEach(function(el){revealObs.observe(el)});
+
+  /* ── Slide tracking observer ── */
+  const slideObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        var idx = Array.prototype.indexOf.call(slides, e.target);
+        if(idx !== -1) setActive(idx);
+      }
+    });
+  },{threshold:0.55});
+  slides.forEach(function(s){slideObs.observe(s)});
+
+  function setActive(idx){
+    currentSlide = idx;
+    /* progress */
+    bar.style.width = ((idx + 1) / totalSlides * 100) + '%';
+    /* dots */
+    dots.forEach(function(d,i){
+      d.classList.toggle('active', i === idx);
+    });
+  }
+
+  function goTo(idx){
+    idx = Math.max(0, Math.min(idx, totalSlides - 1));
+    slides[idx].scrollIntoView({behavior:'smooth'});
+  }
+
+  /* ── Dot click ── */
+  dots.forEach(function(d){
+    d.addEventListener('click',function(){
+      goTo(parseInt(d.dataset.slide));
+    });
+  });
+
+  /* ── Keyboard navigation ── */
+  document.addEventListener('keydown',function(e){
+    if(e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown'){
+      e.preventDefault(); goTo(currentSlide + 1);
+    } else if(e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp'){
+      e.preventDefault(); goTo(currentSlide - 1);
+    } else if(e.key === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(e.key === 'End'){
+      e.preventDefault(); goTo(totalSlides - 1);
+    }
+  });
+
+  /* ── Wheel navigation (debounced) ── */
+  var wheelCool = false;
+  document.addEventListener('wheel',function(e){
+    if(wheelCool) return;
+    if(Math.abs(e.deltaY) < 30) return;
+    wheelCool = true;
+    if(e.deltaY > 0) goTo(currentSlide + 1);
+    else goTo(currentSlide - 1);
+    setTimeout(function(){wheelCool = false}, 800);
+  },{passive:true});
+
+  /* ── Touch navigation ── */
+  var touchY = 0;
+  document.addEventListener('touchstart',function(e){
+    touchY = e.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchend',function(e){
+    var diff = touchY - e.changedTouches[0].clientY;
+    if(Math.abs(diff) > 50){
+      if(diff > 0) goTo(currentSlide + 1);
+      else goTo(currentSlide - 1);
+    }
+  },{passive:true});
+
+  /* ── Init ── */
+  setActive(0);
+})();
+</script>
+</body>
+</html>

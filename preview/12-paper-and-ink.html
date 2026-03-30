@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paper &amp; Ink - Claude Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  html{height:100%;overflow:hidden;scroll-behavior:smooth}
+  body{
+    height:100%;overflow:hidden;
+    background:#faf9f7;color:#1a1a1a;
+    font-family:'Source Serif 4',Georgia,serif;
+  }
+
+  /* --- Scroll-snap container --- */
+  .deck{
+    height:100vh;overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch;
+    scroll-behavior:smooth;
+  }
+
+  /* --- Slides --- */
+  .slide{
+    width:100vw;height:100vh;min-height:100vh;
+    scroll-snap-align:start;scroll-snap-stop:always;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:clamp(2rem,6vw,6rem);text-align:center;
+    position:relative;
+  }
+
+  /* --- Reveal animation --- */
+  .reveal{
+    opacity:0;transform:translateY(28px);
+    transition:opacity 0.7s cubic-bezier(.25,.46,.45,.94),
+               transform 0.7s cubic-bezier(.25,.46,.45,.94);
+  }
+  .reveal.visible{opacity:1;transform:translateY(0)}
+  .reveal:nth-child(2){transition-delay:0.12s}
+  .reveal:nth-child(3){transition-delay:0.24s}
+  .reveal:nth-child(4){transition-delay:0.36s}
+  .reveal:nth-child(5){transition-delay:0.48s}
+  .reveal:nth-child(6){transition-delay:0.60s}
+  .reveal:nth-child(7){transition-delay:0.72s}
+  .reveal:nth-child(8){transition-delay:0.84s}
+
+  /* --- Typography --- */
+  h1{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-weight:700;
+    font-size:clamp(3rem,8vw,7rem);
+    letter-spacing:0.02em;line-height:1.1;
+    margin-bottom:0.3em;
+  }
+  h2{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-weight:700;
+    font-size:clamp(2rem,5vw,4rem);
+    letter-spacing:0.02em;line-height:1.15;
+    margin-bottom:0.5em;
+  }
+
+  /* --- Drop cap for title --- */
+  .drop-cap{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-size:clamp(4rem,10vw,9rem);
+    font-weight:700;
+    color:#c41e3a;
+    line-height:0.85;
+    display:inline-block;
+    margin-right:0.05em;
+    vertical-align:baseline;
+  }
+  .title-rest{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-weight:700;
+    font-size:clamp(3rem,8vw,7rem);
+    letter-spacing:0.02em;line-height:1.1;
+  }
+  .title-group{
+    display:flex;align-items:baseline;justify-content:center;
+    margin-bottom:0.3em;flex-wrap:nowrap;
+  }
+
+  .subtitle{
+    font-family:'Source Serif 4',Georgia,serif;
+    font-size:clamp(1.1rem,2.5vw,2rem);
+    font-weight:400;color:#555;
+    margin-bottom:1.5em;letter-spacing:0.05em;
+  }
+
+  /* --- Elegant horizontal rules --- */
+  hr.elegant{
+    border:none;width:min(60%,18rem);height:1px;
+    background:linear-gradient(90deg,transparent,#c41e3a,transparent);
+    margin:0 auto;
+  }
+  hr.elegant.spacer-below{margin-bottom:1.8em}
+  hr.elegant.spacer-above{margin-top:1.8em}
+  hr.elegant.spacer-both{margin-top:1.4em;margin-bottom:1.4em}
+
+  /* --- Pull quote style heading --- */
+  .pull-heading{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-style:italic;
+    font-size:clamp(1.6rem,3.5vw,2.8rem);
+    font-weight:600;
+    color:#c41e3a;
+    border-top:1px solid rgba(196,30,58,0.3);
+    border-bottom:1px solid rgba(196,30,58,0.3);
+    padding:0.6em 1.4em;
+    margin-bottom:1.6em;
+    letter-spacing:0.03em;
+  }
+
+  /* --- Feature list (literary layout) --- */
+  .features{
+    max-width:min(92%,42rem);width:100%;
+    display:flex;flex-direction:column;
+    align-items:center;gap:0;
+  }
+  .feature-item{
+    padding:clamp(0.8rem,1.5vw,1.2rem) 0;
+    text-align:center;width:100%;
+  }
+  .feature-title{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-weight:700;
+    font-size:clamp(1.15rem,2.2vw,1.6rem);
+    color:#1a1a1a;
+    margin-bottom:0.3em;
+  }
+  .feature-desc{
+    font-family:'Source Serif 4',Georgia,serif;
+    font-size:clamp(0.9rem,1.5vw,1.1rem);
+    color:#555;line-height:1.65;
+    max-width:32rem;margin:0 auto;
+  }
+  .feature-rule{
+    border:none;width:min(30%,8rem);height:1px;
+    background:linear-gradient(90deg,transparent,rgba(196,30,58,0.35),transparent);
+    margin:0 auto;
+  }
+
+  /* --- Pull quote --- */
+  .pullquote{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-style:italic;font-size:clamp(1.1rem,2.2vw,1.6rem);
+    color:#c41e3a;margin-top:1.8em;
+    border-top:1px solid rgba(196,30,58,0.25);
+    border-bottom:1px solid rgba(196,30,58,0.25);
+    padding:0.8em 1.2em;max-width:min(90%,34rem);
+  }
+
+  /* --- Closing slide text --- */
+  .closing-text{
+    font-family:'Source Serif 4',Georgia,serif;
+    font-size:clamp(1rem,1.8vw,1.3rem);
+    color:#555;line-height:1.7;
+    max-width:min(90%,34rem);
+    margin-bottom:1.6em;
+  }
+
+  /* --- Code block (literary style) --- */
+  .code-block{
+    background:#1a1a1a;color:#faf9f7;
+    font-family:'Source Code Pro',Menlo,Consolas,monospace;
+    font-size:clamp(0.85rem,1.6vw,1.15rem);
+    padding:clamp(0.8rem,2vw,1.5rem) clamp(1.2rem,3vw,2.5rem);
+    border-radius:3px;
+    letter-spacing:0.03em;
+    box-shadow:0 2px 16px rgba(26,26,26,0.12);
+    position:relative;
+    display:inline-block;
+    max-width:min(92%,36rem);
+    text-align:left;
+  }
+  .code-block::before{
+    content:'';position:absolute;top:0;left:0;right:0;
+    height:2px;
+    background:linear-gradient(90deg,transparent,#c41e3a,transparent);
+  }
+  .code-label{
+    font-family:'Cormorant Garamond',Garamond,serif;
+    font-style:italic;
+    font-size:clamp(0.85rem,1.4vw,1rem);
+    color:#999;margin-bottom:0.6em;
+    letter-spacing:0.05em;
+  }
+
+  /* --- Progress bar --- */
+  .progress-bar{
+    position:fixed;top:0;left:0;height:3px;
+    background:#c41e3a;
+    width:0%;z-index:100;
+    transition:width 0.35s ease;
+  }
+
+  /* --- Nav dots --- */
+  .nav-dots{
+    position:fixed;right:clamp(1rem,2vw,2rem);
+    top:50%;transform:translateY(-50%);
+    display:flex;flex-direction:column;gap:12px;
+    z-index:100;
+  }
+  .nav-dot{
+    width:10px;height:10px;border-radius:50%;
+    border:1.5px solid #c41e3a;
+    background:transparent;cursor:pointer;
+    transition:background 0.3s ease,transform 0.3s ease;
+    padding:0;
+  }
+  .nav-dot:hover{transform:scale(1.3)}
+  .nav-dot.active{background:#c41e3a}
+
+  /* --- Reduced motion --- */
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition-duration:0.01ms!important}
+    .reveal{opacity:1;transform:none}
+    .deck{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Nav dots -->
+<nav class="nav-dots" id="navDots">
+  <button class="nav-dot active" data-slide="0" aria-label="Slide 1"></button>
+  <button class="nav-dot" data-slide="1" aria-label="Slide 2"></button>
+  <button class="nav-dot" data-slide="2" aria-label="Slide 3"></button>
+</nav>
+
+<div class="deck" id="deck">
+
+  <!-- ===== SLIDE 1: Title ===== -->
+  <section class="slide" data-index="0">
+    <div class="title-group reveal">
+      <span class="drop-cap">C</span>
+      <span class="title-rest">laude Code</span>
+    </div>
+    <p class="subtitle reveal">AI 驱动的编程助手</p>
+    <hr class="elegant spacer-below reveal">
+    <p class="pullquote reveal">"好的代码如同好的散文——清晰、简洁、意蕴深远。"</p>
+  </section>
+
+  <!-- ===== SLIDE 2: Core Capabilities ===== -->
+  <section class="slide" data-index="1">
+    <div class="pull-heading reveal">核心能力</div>
+    <div class="features">
+      <div class="feature-item reveal">
+        <div class="feature-title">自然语言编程</div>
+        <div class="feature-desc">以对话代替指令，用自然语言描述意图，代码自然生成。如同执笔写信，思绪流淌于字里行间。</div>
+      </div>
+      <hr class="feature-rule reveal">
+      <div class="feature-item reveal">
+        <div class="feature-title">智能代码审阅</div>
+        <div class="feature-desc">逐行品读，洞察潜在问题，提供深思熟虑的改进建议。每一次审阅都是一场关于质量的对话。</div>
+      </div>
+      <hr class="feature-rule reveal">
+      <div class="feature-item reveal">
+        <div class="feature-title">全栈技术理解</div>
+        <div class="feature-desc">从前端的优雅呈现到后端的稳健架构，通晓多种语言与框架，融会贯通。</div>
+      </div>
+      <hr class="feature-rule reveal">
+      <div class="feature-item reveal">
+        <div class="feature-title">上下文感知</div>
+        <div class="feature-desc">深入理解项目脉络与代码语境，给出切合实际的方案。如同一位熟悉全书的编辑，字斟句酌。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SLIDE 3: Get Started ===== -->
+  <section class="slide" data-index="2">
+    <div class="pull-heading reveal">开始使用</div>
+    <p class="closing-text reveal">
+      将 Claude Code 引入你的工作流程，让编程回归思考本身。安装只需一行命令，即刻开启人与代码的全新对话。
+    </p>
+    <hr class="elegant spacer-below reveal">
+    <div class="reveal">
+      <div class="code-label">Terminal</div>
+      <div class="code-block">npm install -g @anthropic-ai/claude-code</div>
+    </div>
+    <hr class="elegant spacer-above reveal">
+    <p class="pullquote reveal">"技术的最高境界，是让复杂归于无形。"</p>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll('.slide'));
+  const dots = Array.from(document.querySelectorAll('.nav-dot'));
+  const progressBar = document.getElementById('progressBar');
+  const totalSlides = slides.length;
+  let current = 0;
+  let isScrolling = false;
+
+  /* --- Progress bar & dot update --- */
+  function updateUI(index){
+    current = index;
+    const pct = totalSlides > 1 ? (index / (totalSlides - 1)) * 100 : 100;
+    progressBar.style.width = pct + '%';
+    dots.forEach((d,i) => d.classList.toggle('active', i === index));
+  }
+
+  /* --- Scroll to slide --- */
+  function goTo(index){
+    if(index < 0 || index >= totalSlides || isScrolling) return;
+    isScrolling = true;
+    slides[index].scrollIntoView({behavior:'smooth'});
+    updateUI(index);
+    setTimeout(() => {isScrolling = false}, 600);
+  }
+
+  /* --- IntersectionObserver for .reveal elements --- */
+  const revealObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) e.target.classList.add('visible');
+    });
+  }, {threshold: 0.15});
+  document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+  /* --- IntersectionObserver for slide tracking --- */
+  const slideObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        const idx = parseInt(e.target.dataset.index);
+        if(!isNaN(idx)) updateUI(idx);
+      }
+    });
+  }, {threshold: 0.55});
+  slides.forEach(s => slideObs.observe(s));
+
+  /* --- Keyboard navigation --- */
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' '){
+      e.preventDefault(); goTo(current + 1);
+    } else if(e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp'){
+      e.preventDefault(); goTo(current - 1);
+    } else if(e.key === 'Home'){
+      e.preventDefault(); goTo(0);
+    } else if(e.key === 'End'){
+      e.preventDefault(); goTo(totalSlides - 1);
+    }
+  });
+
+  /* --- Wheel navigation (debounced) --- */
+  let wheelTimer = null;
+  deck.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if(wheelTimer) return;
+    wheelTimer = setTimeout(() => {wheelTimer = null}, 800);
+    if(e.deltaY > 0) goTo(current + 1);
+    else if(e.deltaY < 0) goTo(current - 1);
+  }, {passive: false});
+
+  /* --- Touch navigation --- */
+  let touchStartY = 0;
+  let touchStartX = 0;
+  deck.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+  }, {passive: true});
+  deck.addEventListener('touchend', (e) => {
+    const dy = touchStartY - e.changedTouches[0].clientY;
+    const dx = touchStartX - e.changedTouches[0].clientX;
+    if(Math.abs(dy) < 40 || Math.abs(dx) > Math.abs(dy)) return;
+    if(dy > 0) goTo(current + 1);
+    else goTo(current - 1);
+  }, {passive: true});
+
+  /* --- Nav dot clicks --- */
+  dots.forEach(dot => {
+    dot.addEventListener('click', () => {
+      goTo(parseInt(dot.dataset.slide));
+    });
+  });
+
+  /* --- Initial state --- */
+  updateUI(0);
+})();
+</script>
+</body>
+</html>
