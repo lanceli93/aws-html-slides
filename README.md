@@ -8,6 +8,8 @@
 
 A Claude Code skill for creating stunning, animation-rich HTML presentations — from scratch or by converting PowerPoint files.
 
+Based on [@zarazhangrui](https://github.com/zarazhangrui)'s [frontend-slides](https://github.com/zarazhangrui/frontend-slides).
+
 Here is a deck about the skill, made through the skill:
 
 https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
@@ -129,10 +131,6 @@ my-presentation/
 - [Claude Code](https://claude.ai/claude-code) CLI
 - For PPT conversion: Python with `python-pptx` (auto-installed via `uv`)
 
-### Credits
-
-Created by [@zarazhangrui](https://github.com/zarazhangrui) with Claude Code.
-
 ### License
 
 MIT — See [LICENSE](LICENSE) for details.
@@ -144,6 +142,8 @@ MIT — See [LICENSE](LICENSE) for details.
 ## aws-html-slides
 
 一个 Claude Code 技能，用于创建精美的、动画丰富的 HTML 演示文稿 —— 支持从零开始创建或从 PowerPoint 文件转换。
+
+基于 [@zarazhangrui](https://github.com/zarazhangrui) 的 [frontend-slides](https://github.com/zarazhangrui/frontend-slides) 项目。
 
 以下是一个用本技能制作的、介绍本技能的演示文稿：
 
@@ -265,10 +265,6 @@ my-presentation/
 
 - [Claude Code](https://claude.ai/claude-code) CLI
 - PPT 转换需要：Python 及 `python-pptx`（通过 `uv` 自动安装）
-
-### 致谢
-
-由 [@zarazhangrui](https://github.com/zarazhangrui) 使用 Claude Code 创建。
 
 ### 许可证
 
