@@ -28,26 +28,21 @@ https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
 
 ### Installation
 
-#### Option 1: Clone to your Claude Code skills directory
+#### Option 1: Clone and copy the skill folder
 
 ```bash
-git clone https://github.com/lanceli93/aws-html-slides.git ~/.claude/skills/aws-html-slides
+git clone https://github.com/lanceli93/aws-html-slides.git
+cp -r aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 ```
 
-#### Option 2: Copy manually
+#### Option 2: Clone and symlink (easy to update)
 
 ```bash
-mkdir -p ~/.claude/skills/aws-html-slides/scripts
-mkdir -p ~/.claude/skills/aws-html-slides/preview
-
-# Copy all skill files
-cp SKILL.md STYLE_PRESETS.md viewport-base.css html-template.md \
-   animation-patterns.md chart-reference.md layout-reinvent.md \
-   LICENSE README.md ~/.claude/skills/aws-html-slides/
-
-cp scripts/* ~/.claude/skills/aws-html-slides/scripts/
-cp preview/* ~/.claude/skills/aws-html-slides/preview/
+git clone https://github.com/lanceli93/aws-html-slides.git ~/aws-html-slides
+ln -s ~/aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 ```
+
+To update later, just `git pull` in the cloned repo.
 
 ### Usage
 
@@ -170,26 +165,21 @@ https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
 
 ### 安装
 
-#### 方式一：克隆到 Claude Code 技能目录
+#### 方式一：克隆后复制技能文件夹
 
 ```bash
-git clone https://github.com/lanceli93/aws-html-slides.git ~/.claude/skills/aws-html-slides
+git clone https://github.com/lanceli93/aws-html-slides.git
+cp -r aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 ```
 
-#### 方式二：手动复制
+#### 方式二：克隆后创建符号链接（便于更新）
 
 ```bash
-mkdir -p ~/.claude/skills/aws-html-slides/scripts
-mkdir -p ~/.claude/skills/aws-html-slides/preview
-
-# 复制所有技能文件
-cp SKILL.md STYLE_PRESETS.md viewport-base.css html-template.md \
-   animation-patterns.md chart-reference.md layout-reinvent.md \
-   LICENSE README.md ~/.claude/skills/aws-html-slides/
-
-cp scripts/* ~/.claude/skills/aws-html-slides/scripts/
-cp preview/* ~/.claude/skills/aws-html-slides/preview/
+git clone https://github.com/lanceli93/aws-html-slides.git ~/aws-html-slides
+ln -s ~/aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 ```
+
+后续更新只需在克隆目录中执行 `git pull`。
 
 ### 使用方法
 
