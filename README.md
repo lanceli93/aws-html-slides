@@ -12,11 +12,11 @@ Based on [@zarazhangrui](https://github.com/zarazhangrui)'s [frontend-slides](ht
 
 ### Demo: re:Invent Keynote (Style #13)
 
-https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo-main.mp4
+https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 
 ### Demo: Neon Cyber (Style #9)
 
-https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo.mp4
+https://github.com/user-attachments/assets/c264cc34-67d5-4cbd-a884-9c1b20d06f7a
 
 ## What This Does
 
@@ -151,11 +151,11 @@ MIT — See [LICENSE](LICENSE) for details.
 
 ### 演示：re:Invent Keynote（风格 #13）
 
-https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo-main.mp4
+https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 
 ### 演示：Neon Cyber（风格 #9）
 
-https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo.mp4
+https://github.com/user-attachments/assets/c264cc34-67d5-4cbd-a884-9c1b20d06f7a
 
 ## 这是什么
 
