@@ -151,11 +151,11 @@ MIT — See [LICENSE](LICENSE) for details.
 
 ### 演示：re:Invent Keynote（风格 #13）
 
-https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
+https://github.com/user-attachments/assets/c264cc34-67d5-4cbd-a884-9c1b20d06f7a
 
 ### 演示：Neon Cyber（风格 #9）
 
-https://github.com/user-attachments/assets/c264cc34-67d5-4cbd-a884-9c1b20d06f7a
+https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 
 ## 这是什么
 
