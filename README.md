@@ -6,13 +6,17 @@
 
 # aws-html-slides
 
-A Claude Code skill for creating stunning, animation-rich HTML presentations — from scratch or by converting PowerPoint files.
+An agent skill for creating stunning, animation-rich HTML presentations — from scratch or by converting PowerPoint files.
 
 Based on [@zarazhangrui](https://github.com/zarazhangrui)'s [frontend-slides](https://github.com/zarazhangrui/frontend-slides).
 
-Here is a deck about the skill, made through the skill:
+### Demo: re:Invent Keynote (Style #13)
 
-https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
+https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo-main.mp4
+
+### Demo: Neon Cyber (Style #9)
+
+https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo.mp4
 
 ## What This Does
 
@@ -48,7 +52,7 @@ To update later, just `git pull` in the cloned repo.
 
 ## Usage
 
-Invoke the skill in Claude Code:
+Invoke the skill in your AI IDE or agent:
 
 ```
 /aws-html-slides
@@ -128,7 +132,7 @@ my-presentation/
 
 ## Requirements
 
-- [Claude Code](https://claude.ai/claude-code) CLI
+- An AI IDE or agent that supports skills (e.g. [Claude Code](https://claude.ai/claude-code))
 - For PPT conversion: Python with `python-pptx` (auto-installed via `uv`)
 
 ## License
@@ -141,13 +145,17 @@ MIT — See [LICENSE](LICENSE) for details.
 
 # aws-html-slides
 
-一个 Claude Code 技能，用于创建精美的、动画丰富的 HTML 演示文稿 —— 支持从零开始创建或从 PowerPoint 文件转换。
+一个 Agent 技能，用于创建精美的、动画丰富的 HTML 演示文稿 —— 支持从零开始创建或从 PowerPoint 文件转换。
 
 基于 [@zarazhangrui](https://github.com/zarazhangrui) 的 [frontend-slides](https://github.com/zarazhangrui/frontend-slides) 项目。
 
-以下是一个用本技能制作的、介绍本技能的演示文稿：
+### 演示：re:Invent Keynote（风格 #13）
 
-https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
+https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo-main.mp4
+
+### 演示：Neon Cyber（风格 #9）
+
+https://github.com/lanceli93/aws-html-slides/releases/download/v1.0.0/html-slide-demo.mp4
 
 ## 这是什么
 
@@ -183,7 +191,7 @@ ln -s ~/aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 
 ## 使用方法
 
-在 Claude Code 中调用技能：
+在你的 AI IDE 或 Agent 中调用技能：
 
 ```
 /aws-html-slides
@@ -263,7 +271,7 @@ my-presentation/
 
 ## 环境要求
 
-- [Claude Code](https://claude.ai/claude-code) CLI
+- 支持技能的 AI IDE 或 Agent（如 [Claude Code](https://claude.ai/claude-code)）
 - PPT 转换需要：Python 及 `python-pptx`（通过 `uv` 自动安装）
 
 ## 许可证
