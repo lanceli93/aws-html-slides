@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
 #### Option 1: Clone to your Claude Code skills directory
 
 ```bash
-git clone https://github.com/zarazhangrui/aws-html-slides.git ~/.claude/skills/aws-html-slides
+git clone https://github.com/lanceli93/aws-html-slides.git ~/.claude/skills/aws-html-slides
 ```
 
 #### Option 2: Copy manually
@@ -173,7 +173,7 @@ https://github.com/user-attachments/assets/ef57333e-f879-432a-afb9-180388982478
 #### 方式一：克隆到 Claude Code 技能目录
 
 ```bash
-git clone https://github.com/zarazhangrui/aws-html-slides.git ~/.claude/skills/aws-html-slides
+git clone https://github.com/lanceli93/aws-html-slides.git ~/.claude/skills/aws-html-slides
 ```
 
 #### 方式二：手动复制
