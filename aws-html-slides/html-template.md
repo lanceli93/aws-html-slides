@@ -264,6 +264,7 @@ Every presentation must include:
    - Edit toggle button (hidden by default, revealed via hover hotzone or `E` key)
    - Press `E` to enter edit mode, `Esc` to save & exit
    - Auto-save to localStorage on exit
+   - **Save to file** via File System Access API (Chrome/Edge only): `Ctrl/Cmd+S` or dedicated button writes the edited content back into `index.html` itself, so edits survive browser/cache changes
    - See "Inline Editing Implementation" section below
 
 ## Inline Editing Implementation (Opt-In Only)
@@ -347,8 +348,248 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && editor.isActive) {
         editor.toggleEditMode(); // auto-saves on exit
     }
+    // Ctrl/Cmd+S → persist edits back to the source index.html file
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        editor.saveToFile();
+    }
 });
 ```
+
+### Save-to-File (File System Access API)
+
+`localStorage` only persists within one browser profile — edits are lost on cache clear, different browser, or when sharing the file. The Save-to-File feature writes edited content back into `index.html` itself via the File System Access API.
+
+**Browser support:** Chrome / Edge / Opera (Chromium only). This feature is desktop-only by design.
+
+**UX:**
+- First save: prompts user to **pick the existing `index.html` file** with `showOpenFilePicker` (NOT `showSaveFilePicker` — see warning below). Handle is persisted in IndexedDB, so subsequent saves are one-click.
+- Keyboard shortcut: `Ctrl+S` (Windows/Linux) or `Cmd+S` (macOS).
+- Visible "💾 Save" button appears next to the Edit toggle when in edit mode.
+- Toast notification confirms success / surfaces errors.
+
+**⚠️ Use `showOpenFilePicker`, NOT `showSaveFilePicker`:**
+`showSaveFilePicker` is designed for "save as new file" flows — depending on the OS/browser dialog, it can pre-truncate the target on selection, resulting in an empty file **before** you ever call `write()`. Always use `showOpenFilePicker` to attach to an **existing** file, then call `handle.createWritable()` immediately before writing. Additionally, **read `originalHtml` BEFORE opening the writable stream** — opening `createWritable()` truncates the file.
+
+**Write-back strategy — DOMParser diff-and-patch:**
+
+1. Read the original `index.html` text via the stored `FileSystemFileHandle.getFile()` — do this first.
+2. Sanity-check: if `originalHtml.length < 50`, abort with an error; do not overwrite.
+3. Parse into a detached `Document` with `DOMParser`.
+4. Verify `doc.querySelectorAll('.slide').length > 0` — if zero, the user picked the wrong file. Abort.
+5. For each editable element in the live DOM, find the same element in the parsed document using the same slide/element index pairs used by `localStorage`, and copy its `innerHTML` over.
+6. Serialize back to text: `'<!DOCTYPE html>\n' + parsedDoc.documentElement.outerHTML`.
+7. Open writable with `handle.createWritable()`, write, close.
+
+This preserves all non-edited HTML structure (charts, scripts, comments are untouched).
+
+**HTML additions** (inside `.edit-toggle` area):
+```html
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+<button class="edit-save-file" id="editSaveFile" title="Save to file (Ctrl/Cmd+S)">
+    <i data-lucide="save"></i><span>Save to file</span>
+</button>
+<div class="edit-toast" id="editToast" role="status" aria-live="polite"></div>
+```
+Remember to call `lucide.createIcons()` after the button is in the DOM.
+
+**CSS:**
+```css
+.edit-save-file {
+    position: fixed;
+    top: clamp(12px, 2vh, 20px);
+    left: clamp(72px, 9vw, 96px);       /* sits to the right of .edit-toggle */
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    background: var(--accent, #00ffcc);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 10001;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.edit-save-file svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+body.editing-active .edit-save-file {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.edit-toast {
+    position: fixed;
+    bottom: clamp(20px, 4vh, 40px);
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 10002;
+}
+.edit-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.edit-toast.error {
+    background: rgba(220, 38, 38, 0.92);
+}
+```
+
+**JS — add to `InlineEditor` class:**
+```javascript
+/* === IndexedDB helpers for persisting FileSystemFileHandle === */
+const HANDLE_DB = 'slide-editor';
+const HANDLE_STORE = 'handles';
+const HANDLE_KEY = 'indexHtml';
+
+function openHandleDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(HANDLE_DB, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(HANDLE_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+async function getSavedHandle() {
+    const db = await openHandleDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(HANDLE_STORE, 'readonly');
+        const req = tx.objectStore(HANDLE_STORE).get(HANDLE_KEY);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    });
+}
+async function setSavedHandle(handle) {
+    const db = await openHandleDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(HANDLE_STORE, 'readwrite');
+        tx.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+
+/* === InlineEditor additions === */
+showToast(message, isError = false) {
+    const toast = document.getElementById('editToast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.toggle('error', isError);
+    toast.classList.add('show');
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+/**
+ * Ensure we have a writable handle to an EXISTING index.html file.
+ * Uses showOpenFilePicker (NOT showSaveFilePicker) so the OS never treats
+ * this as "create a new file" and truncates the target.
+ */
+async _ensureHandle() {
+    if (!('showOpenFilePicker' in window)) {
+        throw new Error('Browser does not support File System Access API. Use Chrome or Edge.');
+    }
+    let handle = await getSavedHandle();
+    if (handle) {
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') return handle;
+        const req = await handle.requestPermission({ mode: 'readwrite' });
+        if (req === 'granted') return handle;
+        // Permission denied — forget and re-pick
+        await clearSavedHandle();
+    }
+    const [picked] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{ description: 'HTML', accept: { 'text/html': ['.html', '.htm'] } }]
+    });
+    const writePerm = await picked.requestPermission({ mode: 'readwrite' });
+    if (writePerm !== 'granted') throw new Error('Write permission denied.');
+    await setSavedHandle(picked);
+    return picked;
+}
+
+async saveToFile() {
+    // Snapshot current DOM content
+    const live = {};
+    document.querySelectorAll('.slide').forEach((slide, slideIndex) => {
+        slide.querySelectorAll(this.editableSelector).forEach((el, elIndex) => {
+            live['s' + slideIndex + '_e' + elIndex] = el.innerHTML;
+        });
+    });
+
+    let handle;
+    try {
+        handle = await this._ensureHandle();
+    } catch (e) {
+        if (e.name !== 'AbortError') this.showToast(e.message, true);
+        return;
+    }
+
+    try {
+        // CRITICAL: read BEFORE createWritable() — createWritable() truncates the file.
+        const file = await handle.getFile();
+        const originalHtml = await file.text();
+
+        // Safety: never overwrite if the source read back empty/tiny.
+        if (!originalHtml || originalHtml.length < 50) {
+            throw new Error('Source file is empty or too small — aborting to avoid data loss. Pick the correct index.html again.');
+        }
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(originalHtml, 'text/html');
+        const parsedSlides = doc.querySelectorAll('.slide');
+        if (parsedSlides.length === 0) {
+            throw new Error('No .slide elements found in picked file — wrong file?');
+        }
+        parsedSlides.forEach((slide, slideIndex) => {
+            slide.querySelectorAll(this.editableSelector).forEach((el, elIndex) => {
+                const key = 's' + slideIndex + '_e' + elIndex;
+                if (live[key] !== undefined) el.innerHTML = live[key];
+            });
+        });
+        const output = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+
+        const writable = await handle.createWritable();
+        await writable.write(output);
+        await writable.close();
+
+        try { localStorage.removeItem(this.storageKey); } catch (_) {}
+        this.showToast('Saved to ' + handle.name);
+    } catch (e) {
+        console.error(e);
+        this.showToast('Save failed: ' + e.message, true);
+    }
+}
+```
+
+**Wiring** (next to the existing hotzone/toggle setup):
+```javascript
+document.getElementById('editSaveFile')?.addEventListener('click', () => editor.saveToFile());
+```
+
+**Edge cases handled:**
+- No Chromium support → shows error toast, no crash.
+- User cancels the file picker → silently aborts (no error toast).
+- Stored handle exists but permission revoked → forgets handle, re-prompts for file.
+- File moved/deleted after handle stored → `getFile()` throws; toast surfaces the error so user can re-pick.
+- Wrong file picked (no `.slide` elements) → aborts before overwriting.
+- Source read back empty (<50 chars) → aborts before overwriting — prevents the whole file from being nuked if something upstream went wrong.
 
 ## Image Pipeline (Skip If No Images)
 

@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save-to-File Demo</title>
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@700,500,400&amp;f[]=clash-display@700,600&amp;display=swap">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0f1c;
+            --bg-secondary: #111827;
+            --text-primary: #ffffff;
+            --text-secondary: #9ca3af;
+            --accent: #00ffcc;
+            --accent-glow: rgba(0, 255, 204, 0.3);
+            --font-display: 'Clash Display', sans-serif;
+            --font-body: 'Satoshi', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            overflow-y: auto;
+            scroll-snap-type: y mandatory;
+        }
+
+        .slide {
+            min-height: 100vh;
+            padding: clamp(1.5rem, 4vw, 4rem);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            scroll-snap-align: start;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .slide h1 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 6vw, 5rem);
+            line-height: 1.05;
+            margin-bottom: 1rem;
+        }
+        .slide h2 {
+            font-family: var(--font-display);
+            font-size: clamp(1.6rem, 4vw, 3rem);
+            margin-bottom: 1rem;
+            color: var(--accent);
+        }
+        .slide p {
+            font-size: clamp(1rem, 1.5vw, 1.25rem);
+            color: var(--text-secondary);
+            max-width: 70ch;
+            margin-bottom: 0.75rem;
+        }
+        .slide li {
+            font-size: clamp(1rem, 1.4vw, 1.2rem);
+            color: var(--text-secondary);
+            margin: 0.5rem 0 0.5rem 1.5rem;
+        }
+        [contenteditable="true"] {
+            outline: 2px dashed var(--accent);
+            outline-offset: 4px;
+            border-radius: 4px;
+            min-height: 1em;
+        }
+        [contenteditable="true"]:focus {
+            outline-style: solid;
+            background: rgba(0, 255, 204, 0.06);
+        }
+
+        /* === Edit UI === */
+        .edit-hotzone {
+            position: fixed; top: 0; left: 0;
+            width: 80px; height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+        .edit-toggle {
+            position: fixed;
+            top: clamp(12px, 2vh, 20px);
+            left: clamp(12px, 2vw, 20px);
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            font-family: var(--font-body);
+            background: rgba(255,255,255,0.12);
+            color: var(--text-primary);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 10001;
+        }
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .edit-toggle.active {
+            background: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+        }
+        .edit-save-file {
+            position: fixed;
+            top: clamp(12px, 2vh, 20px);
+            left: clamp(90px, 11vw, 120px);
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            font-family: var(--font-body);
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 10001;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .edit-save-file svg {
+            width: 16px;
+            height: 16px;
+            stroke-width: 2;
+        }
+        body.editing-active .edit-save-file {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .edit-toast {
+            position: fixed;
+            bottom: clamp(20px, 4vh, 40px);
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 10002;
+            max-width: 80vw;
+            text-align: center;
+        }
+        .edit-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .edit-toast.error {
+            background: rgba(220, 38, 38, 0.92);
+            border-color: rgba(255, 100, 100, 0.4);
+        }
+
+        .hint {
+            margin-top: 2rem;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.4);
+            border-left: 2px solid var(--accent);
+            padding: 0.25rem 0 0.25rem 1rem;
+        }
+        kbd {
+            font-family: monospace;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="edit-hotzone"></div>
+    <button class="edit-toggle" id="editToggle" title="Edit mode (E)">✎ Edit</button>
+    <button class="edit-save-file" id="editSaveFile" title="Save to file (Ctrl/Cmd+S)"><i data-lucide="save"></i><span>Save to file</span></button>
+    <div class="edit-toast" id="editToast" role="status" aria-live="polite"></div>
+
+    <section class="slide">
+        <h1>Save-to-File Demo</h1>
+        <p>This is a minimal test page for the File System Access API save-back feature.</p>
+        <p class="hint">
+            Hover the top-left corner for ~400ms, or press <kbd>E</kbd> to enter edit mode.
+            Edit any text, then press <kbd>Ctrl/Cmd+S</kbd> or click <b>Save to file</b>.
+            The first save will ask you to <b>pick this same index.html file</b> to enable write-back.
+        </p>
+    </section>
+
+    <section class="slide">
+        <h2>Slide Two</h2>
+        <p>Edit this paragraph. Try changing the heading above too.</p>
+        <ul>
+            <li>Click into any text to edit it.</li>
+            <li>Your changes are kept in <code>localStorage</code> until you save to file.</li>
+            <li>After saving, reload the page — the text should come from the file itself.</li>
+        </ul>
+    </section>
+
+    <section class="slide">
+        <h2>Slide Three 2</h2>
+        <p>One more slide so you can confirm multi-slide edits round-trip correctly.</p>
+        <p>Change anything here and save; then open this file in a different browser to verify.</p>
+    </section>
+
+    <script>
+    (function () {
+        /* ============================================================
+           IndexedDB helpers — persist FileSystemFileHandle across reloads
+           ============================================================ */
+        const HANDLE_DB = 'slide-editor';
+        const HANDLE_STORE = 'handles';
+        const HANDLE_KEY = 'indexHtml';
+
+        function openHandleDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(HANDLE_DB, 1);
+                req.onupgradeneeded = () => req.result.createObjectStore(HANDLE_STORE);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        async function getSavedHandle() {
+            const db = await openHandleDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(HANDLE_STORE, 'readonly');
+                const req = tx.objectStore(HANDLE_STORE).get(HANDLE_KEY);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        async function setSavedHandle(handle) {
+            const db = await openHandleDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(HANDLE_STORE, 'readwrite');
+                tx.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+        async function clearSavedHandle() {
+            try {
+                const db = await openHandleDB();
+                const tx = db.transaction(HANDLE_STORE, 'readwrite');
+                tx.objectStore(HANDLE_STORE).delete(HANDLE_KEY);
+            } catch (_) { /* best-effort */ }
+        }
+
+        /* ============================================================
+           INLINE EDITOR
+           ============================================================ */
+        class InlineEditor {
+            constructor() {
+                this.isActive = false;
+                this.editToggle = document.getElementById('editToggle');
+                this.hotzone = document.querySelector('.edit-hotzone');
+                this.saveFileBtn = document.getElementById('editSaveFile');
+                this.toast = document.getElementById('editToast');
+                this.hoverTimer = null;
+                this.hideTimeout = null;
+                this.storageKey = 'slide-editor-content-v2';
+                this.editableSelector = 'h1, h2, h3, p, li, span, td, th';
+
+                this._setupHotzone();
+                this._setupToggleButton();
+                this._setupSaveButton();
+                this._setupKeyboard();
+                this._restoreContent();
+            }
+
+            _setupHotzone() {
+                if (!this.hotzone || !this.editToggle) return;
+                this.hotzone.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                    this.hoverTimer = setTimeout(() => {
+                        this.editToggle.classList.add('show');
+                    }, 400);
+                });
+                this.hotzone.addEventListener('mouseleave', () => {
+                    clearTimeout(this.hoverTimer);
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.editToggle.classList.remove('show');
+                    }, 400);
+                });
+                this.editToggle.addEventListener('mouseenter', () => {
+                    clearTimeout(this.hideTimeout);
+                });
+                this.editToggle.addEventListener('mouseleave', () => {
+                    this.hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.editToggle.classList.remove('show');
+                    }, 400);
+                });
+                this.hotzone.addEventListener('click', () => this.toggleEditMode());
+            }
+
+            _setupToggleButton() {
+                if (!this.editToggle) return;
+                this.editToggle.addEventListener('click', () => this.toggleEditMode());
+            }
+
+            _setupSaveButton() {
+                if (!this.saveFileBtn) return;
+                this.saveFileBtn.addEventListener('click', () => this.saveToFile());
+            }
+
+            _setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    const activeEl = document.activeElement;
+                    const isTyping = activeEl && (
+                        activeEl.isContentEditable ||
+                        activeEl.tagName === 'INPUT' ||
+                        activeEl.tagName === 'TEXTAREA'
+                    );
+
+                    if ((e.key === 'e' || e.key === 'E') && !isTyping) {
+                        e.preventDefault();
+                        this.toggleEditMode();
+                    }
+                    if (e.key === 'Escape' && this.isActive) {
+                        this.saveContent();
+                        this.toggleEditMode();
+                    }
+                    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+                        e.preventDefault();
+                        this.saveToFile();
+                    }
+                });
+            }
+
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                if (this.isActive) {
+                    document.body.classList.add('editing-active');
+                    this.editToggle.classList.add('active', 'show');
+                    this.editToggle.innerHTML = '&#10003; Done';
+                    this._enableEditing();
+                } else {
+                    this.saveContent();
+                    document.body.classList.remove('editing-active');
+                    this.editToggle.classList.remove('active', 'show');
+                    this.editToggle.innerHTML = '&#9998; Edit';
+                    this._disableEditing();
+                }
+            }
+
+            _enableEditing() {
+                document.querySelectorAll(this.editableSelector).forEach(el => {
+                    if (el.closest('.edit-toast') || el.closest('.hint')) return;
+                    el.setAttribute('contenteditable', 'true');
+                });
+            }
+
+            _disableEditing() {
+                document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+                    el.removeAttribute('contenteditable');
+                });
+            }
+
+            saveContent() {
+                const data = {};
+                document.querySelectorAll('.slide').forEach((slide, slideIndex) => {
+                    slide.querySelectorAll(this.editableSelector).forEach((el, elIndex) => {
+                        data['s' + slideIndex + '_e' + elIndex] = el.innerHTML;
+                    });
+                });
+                try { localStorage.setItem(this.storageKey, JSON.stringify(data)); }
+                catch (e) { console.warn('localStorage save failed', e); }
+            }
+
+            _restoreContent() {
+                let data;
+                try {
+                    const raw = localStorage.getItem(this.storageKey);
+                    if (!raw) return;
+                    data = JSON.parse(raw);
+                } catch (e) { return; }
+                document.querySelectorAll('.slide').forEach((slide, slideIndex) => {
+                    slide.querySelectorAll(this.editableSelector).forEach((el, elIndex) => {
+                        const key = 's' + slideIndex + '_e' + elIndex;
+                        if (data[key] !== undefined) el.innerHTML = data[key];
+                    });
+                });
+            }
+
+            showToast(message, isError = false) {
+                if (!this.toast) return;
+                this.toast.textContent = message;
+                this.toast.classList.toggle('error', isError);
+                this.toast.classList.add('show');
+                clearTimeout(this._toastTimer);
+                this._toastTimer = setTimeout(() => this.toast.classList.remove('show'), 3200);
+            }
+
+            /**
+             * Ensure we have a writable handle to an EXISTING index.html file.
+             * Uses showOpenFilePicker (not showSaveFilePicker) so the OS never
+             * treats this as "create a new file" and truncates it.
+             */
+            async _ensureHandle() {
+                if (!('showOpenFilePicker' in window)) {
+                    throw new Error('Browser does not support File System Access API. Use Chrome or Edge.');
+                }
+                let handle = await getSavedHandle();
+                if (handle) {
+                    const perm = await handle.queryPermission({ mode: 'readwrite' });
+                    if (perm === 'granted') return handle;
+                    const req = await handle.requestPermission({ mode: 'readwrite' });
+                    if (req === 'granted') return handle;
+                    // Permission denied — fall through to re-pick
+                    await clearSavedHandle();
+                }
+                const [picked] = await window.showOpenFilePicker({
+                    multiple: false,
+                    types: [{ description: 'HTML', accept: { 'text/html': ['.html', '.htm'] } }]
+                });
+                // Ask for write permission up front
+                const writePerm = await picked.requestPermission({ mode: 'readwrite' });
+                if (writePerm !== 'granted') {
+                    throw new Error('Write permission denied.');
+                }
+                await setSavedHandle(picked);
+                return picked;
+            }
+
+            async saveToFile() {
+                // Collect current DOM content
+                const live = {};
+                document.querySelectorAll('.slide').forEach((slide, slideIndex) => {
+                    slide.querySelectorAll(this.editableSelector).forEach((el, elIndex) => {
+                        live['s' + slideIndex + '_e' + elIndex] = el.innerHTML;
+                    });
+                });
+
+                let handle;
+                try {
+                    handle = await this._ensureHandle();
+                } catch (e) {
+                    if (e.name !== 'AbortError') this.showToast(e.message, true);
+                    return;
+                }
+
+                try {
+                    // Read original file BEFORE opening writable (writable truncates).
+                    const file = await handle.getFile();
+                    const originalHtml = await file.text();
+
+                    // Safety: if source file is unexpectedly empty, abort — do not overwrite.
+                    if (!originalHtml || originalHtml.length < 50) {
+                        throw new Error('Source file is empty or too small — aborting to avoid data loss. Pick the correct index.html again.');
+                    }
+
+                    // Parse, patch, serialize
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(originalHtml, 'text/html');
+                    const parsedSlides = doc.querySelectorAll('.slide');
+                    if (parsedSlides.length === 0) {
+                        throw new Error('No .slide elements found in the picked file — did you pick the right one?');
+                    }
+                    parsedSlides.forEach((slide, slideIndex) => {
+                        slide.querySelectorAll(this.editableSelector).forEach((el, elIndex) => {
+                            const key = 's' + slideIndex + '_e' + elIndex;
+                            if (live[key] !== undefined) el.innerHTML = live[key];
+                        });
+                    });
+                    const output = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+
+                    // Write
+                    const writable = await handle.createWritable();
+                    await writable.write(output);
+                    await writable.close();
+
+                    try { localStorage.removeItem(this.storageKey); } catch (_) {}
+
+                    this.showToast('Saved to ' + handle.name);
+                } catch (e) {
+                    console.error(e);
+                    this.showToast('Save failed: ' + e.message, true);
+                }
+            }
+        }
+
+        window.__editor = new InlineEditor();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    })();
+    </script>
+
+
+</body></html>
