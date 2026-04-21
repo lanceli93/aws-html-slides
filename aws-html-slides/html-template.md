@@ -267,6 +267,12 @@ Every presentation must include:
    - **Save to file** via File System Access API (Chrome/Edge only): `Ctrl/Cmd+S` or dedicated button writes the edited content back into `index.html` itself, so edits survive browser/cache changes
    - See "Inline Editing Implementation" section below
 
+5. **Overview Mode** (always on):
+   - Press `Esc` (when not editing) to toggle a PPT-style grid of slide thumbnails
+   - Click a thumbnail to jump; arrow keys + Enter work too
+   - Current slide is highlighted; each card shows `N / total`
+   - See "Overview Mode Implementation" section below
+
 ## Inline Editing Implementation (Opt-In Only)
 
 **If the user chose "No" for inline editing in Phase 1, do NOT generate any edit-related HTML, CSS, or JS.**
@@ -590,6 +596,286 @@ document.getElementById('editSaveFile')?.addEventListener('click', () => editor.
 - File moved/deleted after handle stored → `getFile()` throws; toast surfaces the error so user can re-pick.
 - Wrong file picked (no `.slide` elements) → aborts before overwriting.
 - Source read back empty (<50 chars) → aborts before overwriting — prevents the whole file from being nuked if something upstream went wrong.
+
+## Overview Mode Implementation
+
+`Esc` (when not editing) opens a PPT-style grid of slide thumbnails. Click a thumbnail to jump to that slide; arrow keys + Enter work too. Always on — independent of the opt-in inline editing feature.
+
+**Design decisions:**
+- **Thumbnail fidelity:** clone the live `.slide` DOM and shrink via `transform: scale()`. 100% pixel-perfect — fonts, colors, gradients, layouts are real, not screenshots.
+- **Chart.js canvases:** `canvas` elements in a cloned DOM are blank. Before inserting the clone, rasterize each live canvas with `toDataURL('image/png')` and swap it for an `<img>` in the clone.
+- **Esc conflict:** if `editor.isActive`, the editor handles Esc (exit edit mode). Otherwise Overview handles Esc (open/close). Other keyboard/scroll/wheel handlers must also check `window.__overview.isOpen` and `window.__editor.isActive` to avoid fighting.
+- **Scope gotcha:** cloned `.slide` elements keep the `slide` class. Queries meant to target real slides must use `document.querySelectorAll('body > .slide')`, not `.slide`, or clicking a thumbnail will scroll the wrong element.
+
+**HTML** (place before `<body>` closes or near the lightbox):
+```html
+<div class="overview-overlay" id="overviewOverlay" role="dialog" aria-label="Slide overview" aria-hidden="true">
+    <div class="overview-hint">Click a slide or press <kbd>Esc</kbd> to close</div>
+    <div class="overview-grid" id="overviewGrid"></div>
+</div>
+```
+
+**CSS:**
+```css
+.overview-overlay {
+    position: fixed; inset: 0; z-index: 9998;
+    background: rgba(8, 12, 22, 0.94);
+    backdrop-filter: blur(14px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease;
+    overflow-y: auto;
+}
+.overview-overlay.active { opacity: 1; pointer-events: auto; }
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: clamp(16px, 2.5vw, 32px);
+    padding: clamp(48px, 6vh, 80px) clamp(24px, 5vw, 72px);
+    max-width: 1600px; margin: 0 auto;
+}
+.overview-card {
+    position: relative; aspect-ratio: 16 / 9;
+    background: var(--bg-primary, #0a0a0a);
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    overflow: hidden; cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    padding: 0;
+}
+.overview-card:hover,
+.overview-card:focus-visible {
+    border-color: var(--accent, #8b5cf6);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    outline: none;
+}
+.overview-card.current {
+    border-color: var(--accent, #8b5cf6);
+    box-shadow: 0 0 0 3px rgba(139,92,246,0.4);
+}
+.overview-thumb {
+    position: absolute; inset: 0;
+    pointer-events: none; user-select: none;
+}
+.overview-page-number {
+    position: absolute; bottom: 8px; right: 10px;
+    padding: 2px 8px;
+    font-family: var(--font-body, sans-serif);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: rgba(0,0,0,0.65);
+    border-radius: 4px;
+    z-index: 2;
+}
+.overview-hint {
+    position: fixed;
+    top: clamp(12px, 2vh, 20px);
+    right: clamp(16px, 2vw, 24px);
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.55);
+    z-index: 10003;
+}
+.overview-hint kbd {
+    background: rgba(255,255,255,0.12);
+    padding: 2px 6px; border-radius: 3px;
+    font-family: monospace; font-size: 0.75rem;
+}
+body.overview-open { overflow: hidden; }
+```
+
+**JS — Overview class** (instantiate after `InlineEditor`):
+```javascript
+class Overview {
+    constructor(editor) {
+        this.editor = editor;
+        this.overlay = document.getElementById('overviewOverlay');
+        this.grid = document.getElementById('overviewGrid');
+        this.isOpen = false;
+        this.focusedIndex = 0;
+        this._setupKeyboard();
+        this._setupOverlayClick();
+        window.addEventListener('resize', () => { if (this.isOpen) this._rescaleAll(); });
+    }
+
+    _setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') {
+                if (!this.isOpen) return;
+                const cards = this.grid.querySelectorAll('.overview-card');
+                if (!cards.length) return;
+                const cols = this._currentColumns();
+                let next = this.focusedIndex;
+                if (e.key === 'ArrowRight') next = Math.min(cards.length - 1, next + 1);
+                else if (e.key === 'ArrowLeft') next = Math.max(0, next - 1);
+                else if (e.key === 'ArrowDown') next = Math.min(cards.length - 1, next + cols);
+                else if (e.key === 'ArrowUp') next = Math.max(0, next - cols);
+                else if (e.key === 'Enter') { e.preventDefault(); this._jumpTo(this.focusedIndex); return; }
+                else return;
+                e.preventDefault();
+                this.focusedIndex = next;
+                cards[next].focus();
+                return;
+            }
+            // Esc pressed
+            if (this.editor && this.editor.isActive) return;  // editor owns Esc in edit mode
+            const a = document.activeElement;
+            const isTyping = a && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
+            if (isTyping) return;
+            e.preventDefault();
+            this.toggle();
+        });
+    }
+
+    _setupOverlayClick() {
+        this.overlay.addEventListener('click', (e) => {
+            if (e.target === this.overlay || e.target === this.grid) this.close();
+        });
+    }
+
+    _currentColumns() {
+        const cards = this.grid.querySelectorAll('.overview-card');
+        if (cards.length < 2) return 1;
+        const top0 = cards[0].offsetTop;
+        let c = 1;
+        for (let i = 1; i < cards.length; i++) { if (cards[i].offsetTop !== top0) break; c++; }
+        return c;
+    }
+
+    toggle() { this.isOpen ? this.close() : this.open(); }
+
+    open() {
+        this._build();
+        this.overlay.classList.add('active');
+        this.overlay.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overview-open');
+        this.isOpen = true;
+        this._highlightCurrent();
+        this._rescaleAll();
+        const cards = this.grid.querySelectorAll('.overview-card');
+        if (cards[this.focusedIndex]) cards[this.focusedIndex].focus();
+    }
+
+    close() {
+        this.overlay.classList.remove('active');
+        this.overlay.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('overview-open');
+        this.isOpen = false;
+    }
+
+    _build() {
+        this.grid.innerHTML = '';
+        // CRITICAL: 'body > .slide' skips cloned thumbnails; '.slide' would match both real slides and clones.
+        const slides = document.querySelectorAll('body > .slide');
+        slides.forEach((slide, i) => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'overview-card';
+            card.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+            card.dataset.index = i;
+
+            const thumb = document.createElement('div');
+            thumb.className = 'overview-thumb';
+
+            const clone = slide.cloneNode(true);
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('script').forEach(s => s.remove());
+
+            // Rasterize Chart.js canvases so thumbnails aren't blank
+            const liveC = slide.querySelectorAll('canvas');
+            const cloneC = clone.querySelectorAll('canvas');
+            liveC.forEach((lv, idx) => {
+                const c = cloneC[idx]; if (!c) return;
+                try {
+                    const img = document.createElement('img');
+                    img.src = lv.toDataURL('image/png');
+                    img.style.width = lv.offsetWidth + 'px';
+                    img.style.height = lv.offsetHeight + 'px';
+                    img.style.display = 'block';
+                    c.replaceWith(img);
+                } catch (_) { /* tainted canvas — leave blank */ }
+            });
+
+            // Lock clone to live slide pixel size; CSS scale handles the shrinking.
+            clone.style.width = slide.offsetWidth + 'px';
+            clone.style.height = slide.offsetHeight + 'px';
+            clone.style.minHeight = 'auto';
+            clone.style.transform = 'none';
+            thumb.appendChild(clone);
+
+            const pn = document.createElement('span');
+            pn.className = 'overview-page-number';
+            pn.textContent = (i + 1) + ' / ' + slides.length;
+
+            card.appendChild(thumb);
+            card.appendChild(pn);
+            card.addEventListener('click', () => this._jumpTo(i));
+            card.addEventListener('focus', () => { this.focusedIndex = i; });
+            this.grid.appendChild(card);
+        });
+    }
+
+    _rescaleAll() {
+        this.grid.querySelectorAll('.overview-card').forEach((card) => {
+            const thumb = card.querySelector('.overview-thumb');
+            const clone = thumb.firstElementChild; if (!clone) return;
+            const cardW = card.clientWidth, cardH = card.clientHeight;
+            const slideW = parseFloat(clone.style.width) || window.innerWidth;
+            const slideH = parseFloat(clone.style.height) || window.innerHeight;
+            const scale = Math.min(cardW / slideW, cardH / slideH);
+            clone.style.transform = 'scale(' + scale + ')';
+            clone.style.transformOrigin = 'top left';
+            clone.style.position = 'absolute';
+            clone.style.left = ((cardW - slideW * scale) / 2) + 'px';
+            clone.style.top  = ((cardH - slideH * scale) / 2) + 'px';
+        });
+    }
+
+    _currentSlideIndex() {
+        const slides = document.querySelectorAll('body > .slide');
+        const y = window.scrollY + window.innerHeight / 2;
+        let best = 0, bd = Infinity;
+        slides.forEach((s, i) => {
+            const m = s.offsetTop + s.offsetHeight / 2;
+            const d = Math.abs(m - y);
+            if (d < bd) { bd = d; best = i; }
+        });
+        return best;
+    }
+
+    _highlightCurrent() {
+        const cur = this._currentSlideIndex();
+        this.focusedIndex = cur;
+        this.grid.querySelectorAll('.overview-card').forEach((c, i) => c.classList.toggle('current', i === cur));
+    }
+
+    _jumpTo(i) {
+        const s = document.querySelectorAll('body > .slide')[i]; if (!s) return;
+        this.close();
+        requestAnimationFrame(() => s.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+}
+
+// Instantiate AFTER SlidePresentation + InlineEditor so the Esc-priority checks work.
+window.__overview = new Overview(window.__editor);
+```
+
+**Important: cross-feature Esc/arrow/wheel coordination**
+
+Other handlers (`SlidePresentation` keyboard nav, wheel, touch) must early-return when Overview is open, otherwise arrows/scroll will change the underlying slide beneath the overlay:
+
+```javascript
+document.addEventListener('keydown', e => {
+    if (window.__overview && window.__overview.isOpen) return;
+    if (window.__editor && window.__editor.isActive) return;
+    // ...existing arrow-key slide navigation
+});
+document.addEventListener('wheel', e => {
+    if (window.__overview && window.__overview.isOpen) return;
+    if (window.__editor && window.__editor.isActive) return;
+    // ...existing wheel-to-next-slide
+}, { passive: true });
+```
 
 ## Image Pipeline (Skip If No Images)
 

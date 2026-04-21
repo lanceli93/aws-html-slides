@@ -161,6 +161,92 @@
             border-color: rgba(255, 100, 100, 0.4);
         }
 
+        /* === Overview mode === */
+        .overview-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background: rgba(8, 12, 22, 0.92);
+            backdrop-filter: blur(12px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+            overflow-y: auto;
+        }
+        .overview-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: clamp(16px, 2.5vw, 32px);
+            padding: clamp(24px, 5vh, 64px) clamp(24px, 5vw, 72px);
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .overview-card {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            background: var(--bg-secondary);
+            border: 2px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .overview-card:hover,
+        .overview-card:focus-visible {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px var(--accent-glow);
+            outline: none;
+        }
+        .overview-card.current {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .overview-thumb {
+            position: absolute;
+            inset: 0;
+            transform-origin: top left;
+            pointer-events: none;
+            user-select: none;
+        }
+        .overview-page-number {
+            position: absolute;
+            bottom: 8px;
+            right: 10px;
+            padding: 2px 8px;
+            font-family: var(--font-body);
+            font-size: 0.75rem;
+            font-variant-numeric: tabular-nums;
+            color: #fff;
+            background: rgba(0,0,0,0.6);
+            border-radius: 4px;
+            z-index: 2;
+        }
+        .overview-hint {
+            position: fixed;
+            top: clamp(12px, 2vh, 20px);
+            right: clamp(16px, 2vw, 24px);
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.5);
+            font-family: var(--font-body);
+            letter-spacing: 0.03em;
+            z-index: 2;
+        }
+        .overview-hint kbd {
+            background: rgba(255,255,255,0.12);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.75rem;
+        }
+        body.overview-open {
+            overflow: hidden;
+        }
+
         .hint {
             margin-top: 2rem;
             font-size: 0.85rem;
@@ -182,6 +268,11 @@
     <button class="edit-toggle" id="editToggle" title="Edit mode (E)">✎ Edit</button>
     <button class="edit-save-file" id="editSaveFile" title="Save to file (Ctrl/Cmd+S)"><i data-lucide="save"></i><span>Save to file</span></button>
     <div class="edit-toast" id="editToast" role="status" aria-live="polite"></div>
+
+    <div class="overview-overlay" id="overviewOverlay" role="dialog" aria-label="Slide overview" aria-hidden="true">
+        <div class="overview-hint">Click a slide or press <kbd>Esc</kbd> to close</div>
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
 
     <section class="slide">
         <h1>Save-to-File Demo</h1>
@@ -485,7 +576,225 @@
             }
         }
 
+        /* ============================================================
+           OVERVIEW MODE
+           Esc (when not editing) toggles a grid of slide thumbnails.
+           Thumbnails are cloned DOM scaled with CSS transform — 100%
+           fidelity. Chart.js canvases are rasterized to <img> because
+           cloned canvases are blank.
+           ============================================================ */
+        class Overview {
+            constructor(editor) {
+                this.editor = editor;
+                this.overlay = document.getElementById('overviewOverlay');
+                this.grid = document.getElementById('overviewGrid');
+                this.isOpen = false;
+                this.built = false;
+                this.focusedIndex = 0;
+
+                this._setupKeyboard();
+                this._setupOverlayClick();
+                window.addEventListener('resize', () => {
+                    if (this.isOpen) this._rescaleAll();
+                });
+            }
+
+            _setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Escape') {
+                        if (!this.isOpen) return;
+                        // Grid navigation when overview is open
+                        const cards = this.grid.querySelectorAll('.overview-card');
+                        if (!cards.length) return;
+                        const cols = this._currentColumns();
+                        let next = this.focusedIndex;
+                        if (e.key === 'ArrowRight') next = Math.min(cards.length - 1, next + 1);
+                        else if (e.key === 'ArrowLeft') next = Math.max(0, next - 1);
+                        else if (e.key === 'ArrowDown') next = Math.min(cards.length - 1, next + cols);
+                        else if (e.key === 'ArrowUp') next = Math.max(0, next - cols);
+                        else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this._jumpTo(this.focusedIndex);
+                            return;
+                        } else return;
+                        e.preventDefault();
+                        this.focusedIndex = next;
+                        cards[next].focus();
+                        return;
+                    }
+                    // Esc pressed
+                    if (this.editor && this.editor.isActive) return;  // editor handles its own Esc
+                    const activeEl = document.activeElement;
+                    const isTyping = activeEl && (
+                        activeEl.isContentEditable ||
+                        activeEl.tagName === 'INPUT' ||
+                        activeEl.tagName === 'TEXTAREA'
+                    );
+                    if (isTyping) return;
+                    e.preventDefault();
+                    this.toggle();
+                });
+            }
+
+            _setupOverlayClick() {
+                this.overlay.addEventListener('click', (e) => {
+                    // Click on blank overlay area closes; card clicks are handled on card
+                    if (e.target === this.overlay || e.target === this.grid) this.close();
+                });
+            }
+
+            _currentColumns() {
+                const cards = this.grid.querySelectorAll('.overview-card');
+                if (cards.length < 2) return 1;
+                const top0 = cards[0].offsetTop;
+                let cols = 1;
+                for (let i = 1; i < cards.length; i++) {
+                    if (cards[i].offsetTop !== top0) break;
+                    cols++;
+                }
+                return cols;
+            }
+
+            toggle() {
+                this.isOpen ? this.close() : this.open();
+            }
+
+            open() {
+                this._build();
+                this.overlay.classList.add('active');
+                this.overlay.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('overview-open');
+                this.isOpen = true;
+                this._highlightCurrent();
+                this._rescaleAll();
+                // Focus current card so keyboard nav works immediately
+                const cards = this.grid.querySelectorAll('.overview-card');
+                if (cards[this.focusedIndex]) cards[this.focusedIndex].focus();
+            }
+
+            close() {
+                this.overlay.classList.remove('active');
+                this.overlay.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('overview-open');
+                this.isOpen = false;
+            }
+
+            _build() {
+                // Rebuild every open so current edits are reflected
+                this.grid.innerHTML = '';
+                const slides = document.querySelectorAll('.slide');
+                slides.forEach((slide, i) => {
+                    const card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'overview-card';
+                    card.setAttribute('aria-label', 'Go to slide ' + (i + 1));
+                    card.dataset.index = i;
+
+                    const thumb = document.createElement('div');
+                    thumb.className = 'overview-thumb';
+
+                    // Clone slide deeply
+                    const clone = slide.cloneNode(true);
+                    // Strip contenteditable, form inputs, scripts from the clone
+                    clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+                    clone.querySelectorAll('script').forEach(s => s.remove());
+
+                    // Rasterize canvases (Chart.js) so thumbnails aren't blank
+                    const liveCanvases = slide.querySelectorAll('canvas');
+                    const cloneCanvases = clone.querySelectorAll('canvas');
+                    liveCanvases.forEach((live, idx) => {
+                        const clonedCanvas = cloneCanvases[idx];
+                        if (!clonedCanvas) return;
+                        try {
+                            const dataUrl = live.toDataURL('image/png');
+                            const img = document.createElement('img');
+                            img.src = dataUrl;
+                            img.style.width = live.offsetWidth + 'px';
+                            img.style.height = live.offsetHeight + 'px';
+                            img.style.display = 'block';
+                            clonedCanvas.replaceWith(img);
+                        } catch (_) { /* tainted canvas — leave blank */ }
+                    });
+
+                    // Lock clone size to live slide size; CSS scale will shrink it
+                    clone.style.width = slide.offsetWidth + 'px';
+                    clone.style.height = slide.offsetHeight + 'px';
+                    clone.style.minHeight = 'auto';
+                    clone.style.transform = 'none';
+
+                    thumb.appendChild(clone);
+
+                    const pageNum = document.createElement('span');
+                    pageNum.className = 'overview-page-number';
+                    pageNum.textContent = (i + 1) + ' / ' + slides.length;
+
+                    card.appendChild(thumb);
+                    card.appendChild(pageNum);
+
+                    card.addEventListener('click', () => this._jumpTo(i));
+                    card.addEventListener('focus', () => { this.focusedIndex = i; });
+
+                    this.grid.appendChild(card);
+                });
+                this.built = true;
+            }
+
+            _rescaleAll() {
+                const cards = this.grid.querySelectorAll('.overview-card');
+                cards.forEach((card) => {
+                    const thumb = card.querySelector('.overview-thumb');
+                    const clone = thumb.firstElementChild;
+                    if (!clone) return;
+                    const cardW = card.clientWidth;
+                    const cardH = card.clientHeight;
+                    const slideW = parseFloat(clone.style.width) || window.innerWidth;
+                    const slideH = parseFloat(clone.style.height) || window.innerHeight;
+                    const scale = Math.min(cardW / slideW, cardH / slideH);
+                    clone.style.transform = 'scale(' + scale + ')';
+                    clone.style.transformOrigin = 'top left';
+                    // Center if slide aspect ≠ card aspect
+                    const offsetX = (cardW - slideW * scale) / 2;
+                    const offsetY = (cardH - slideH * scale) / 2;
+                    clone.style.left = offsetX + 'px';
+                    clone.style.top = offsetY + 'px';
+                    clone.style.position = 'absolute';
+                });
+            }
+
+            _currentSlideIndex() {
+                // Pick the slide whose top is nearest to scrollTop
+                const slides = document.querySelectorAll('.slide');
+                const scrollY = window.scrollY + window.innerHeight / 2;
+                let best = 0, bestDist = Infinity;
+                slides.forEach((s, i) => {
+                    const mid = s.offsetTop + s.offsetHeight / 2;
+                    const d = Math.abs(mid - scrollY);
+                    if (d < bestDist) { bestDist = d; best = i; }
+                });
+                return best;
+            }
+
+            _highlightCurrent() {
+                const cur = this._currentSlideIndex();
+                this.focusedIndex = cur;
+                const cards = this.grid.querySelectorAll('.overview-card');
+                cards.forEach((c, i) => c.classList.toggle('current', i === cur));
+            }
+
+            _jumpTo(index) {
+                const slides = document.querySelectorAll('.slide');
+                const target = slides[index];
+                if (!target) return;
+                this.close();
+                // Defer scroll to next tick so the overlay transition doesn't fight it
+                requestAnimationFrame(() => {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            }
+        }
+
         window.__editor = new InlineEditor();
+        window.__overview = new Overview(window.__editor);
         if (typeof lucide !== 'undefined') lucide.createIcons();
     })();
     </script>

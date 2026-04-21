@@ -30,7 +30,13 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **Anti-AI-Slop** — Distinctive styles that avoid generic AI aesthetics. Custom fonts, curated palettes, purposeful animations.
 - **Chart.js Support** — Embed responsive charts directly in slides using simple markdown syntax.
 - **Inline Editing** — Press `E` to edit text directly in the browser, `Esc` to save.
+- **Save to File** — `Cmd/Ctrl+S` writes your edits back into the source `index.html`. No more "lost on cache clear" — edits become permanent changes to the file itself. Chrome / Edge only (uses the File System Access API).
+- **Overview Mode** — Press `Esc` (when not editing) to open a PPT-style grid of all slide thumbnails. Click any thumbnail — or use arrow keys + Enter — to jump. Current slide is highlighted.
 - **Parallel Generation** — For 8+ slide decks, sub-agents generate slide batches in parallel for speed.
+
+### Overview mode
+
+![Overview mode — PPT-style thumbnail grid](docs/overview-slides.png)
 
 ## Installation
 
@@ -169,7 +175,13 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **拒绝 AI 味** —— 独特的设计风格，避免千篇一律的 AI 审美。定制字体、精选配色、有目的的动画。
 - **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表。
 - **浏览器内编辑** —— 按 `E` 进入编辑模式直接修改文字，按 `Esc` 保存。
+- **保存到源文件** —— `Cmd/Ctrl+S` 把编辑内容直接写回源 `index.html` 文件，不再"清缓存就丢失"，编辑真正成为文件本身的持久修改。仅支持 Chrome / Edge（基于 File System Access API）。
+- **概览模式** —— 非编辑状态下按 `Esc` 打开类似 PPT 的缩略图网格。点击任意缩略图，或用方向键 + Enter，即可跳转到对应页，当前页高亮显示。
 - **并行生成** —— 8 页以上的演示文稿，多个子代理并行生成幻灯片批次，提升速度。
+
+### 概览模式
+
+![概览模式 —— PPT 风格缩略图网格](docs/overview-slides.png)
 
 ## 安装
 
