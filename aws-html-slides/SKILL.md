@@ -13,6 +13,8 @@ Create zero-dependency, animation-rich HTML presentations that run entirely in t
 
 This skill helps you create browser-based HTML presentations with rich animations. There are two paths:
 
+**Rich content blocks** (usable in any slide): images/video, data **charts**, comparison **tables**, and **diagrams** — flowcharts, AWS architecture, sequence/UML/ER, network, or mind maps (drawn via the drawio skill; needs the draw.io desktop CLI).
+
 ### Two Paths
 
 | Path | Flow |
@@ -96,6 +98,7 @@ These invariants apply to EVERY slide in EVERY presentation:
 | Image slide | 1 heading + 1 image (max 60vh height) |
 | Chart slide | 1 heading + 1-2 charts (max 50vh) + optional 1-line caption |
 | Table slide | 1 heading + 1 table (max 6 rows) |
+| Diagram slide | 1 heading + 1 diagram (max 60vh) + optional 1-line caption |
 
 **Content exceeds limits? Split into multiple slides. Never cram, never scroll.**
 
@@ -205,6 +208,11 @@ Where `<page_count>` is the middle value of the chosen range (Short=8, Medium=15
 
 **Tell the user:** Fill in `<topic>/content.md` with your content, then come back. I'll review it before generating.
 
+**Also mention the optional rich blocks** so the user knows what's available (the template header in content.md documents each in full):
+- `### chart` — data charts (bar, line, pie, etc.)
+- `### table` — comparison tables
+- `### diagram` — flowcharts, **AWS architecture diagrams**, sequence/UML/ER, network topology, or mind maps, drawn via the drawio skill. Example: a slide with `### diagram` + `type: aws` + a plain-language description of the components. **Note:** diagrams require the draw.io desktop CLI (`brew install --cask drawio`); if it's not installed, I'll flag it at review and fall back to a CSS layout. See [diagram-reference.md](diagram-reference.md).
+
 **IMPORTANT: Do NOT fill in or modify content.md on behalf of the user.** The content must come from the user. If the user asks you to draft content, confirm the topic and outline with them first via AskUserQuestion before writing anything. Never assume or auto-generate slide content without explicit user approval.
 
 ---
@@ -222,6 +230,7 @@ Read the completed content.md and perform a review before proceeding:
    - Media files referenced but not found
    - Chart blocks: validate `type` is one of line/bar/doughnut/pie/radar/polarArea, labels count matches data count
    - Table blocks: validate markdown table syntax is well-formed
+   - Diagram blocks: validate `type` (if present) is one of flowchart/aws/sequence/class/er/network/mindmap, and the description is non-empty. If the deck has any `### diagram` block, note that rendering needs the draw.io desktop CLI (`drawio`) — flag once here if it's missing, and mention the fallbacks in [diagram-reference.md](diagram-reference.md)
 4. **Present a summary table** to the user showing: slide number, title, content preview, media count, any warnings
 5. **Ask for confirmation** via AskUserQuestion (header: "Review"):
    - "Looks good, proceed" — Continue to Step 5
@@ -240,6 +249,7 @@ Generate the full presentation using content from Step 4 and style from Step 3.
 - [viewport-base.css](viewport-base.css) — Mandatory CSS (include in full)
 - [animation-patterns.md](animation-patterns.md) — Animation reference for the chosen feeling
 - [chart-reference.md](chart-reference.md) — Chart.js patterns (only if content.md contains `### chart` blocks)
+- [diagram-reference.md](diagram-reference.md) — draw.io diagram patterns via the drawio skill (only if content.md contains `### diagram` blocks)
 - **Layout patterns file for the chosen style** (if available) — CSS classes + HTML templates for rich layouts. These are extracted from preview files and contain the actual implementation details. Read the matching file:
   - Style #13 re:Invent Keynote → [layout-reinvent.md](layout-reinvent.md)
   - (Other styles: to be added as needed)
@@ -297,6 +307,7 @@ When generating presentations with **8 or more slides**, use parallel sub-agents
 - All agents must use the **same CSS class names** — define these clearly in each prompt
 - Include HTML pattern examples (title slide, divider, grid, image, etc.) in each prompt
 - File naming with numeric prefixes (`00-`, `10-`, `20-`...) ensures correct concatenation order
+- **Diagram blocks**: export all `### diagram` PNGs to `assets/` (via the drawio skill) **before** launching slide batch agents. Give each batch agent only the relative `assets/diagram-N.png` path to embed — batch agents write `<section>` markup, they do not run the drawio CLI. See [diagram-reference.md](diagram-reference.md).
 
 ### Delivery
 
@@ -323,6 +334,7 @@ After generation:
 | [html-template.md](html-template.md) | HTML structure, JS features, code quality standards | Step 5 (generation) |
 | [animation-patterns.md](animation-patterns.md) | CSS/JS animation snippets and effect-to-feeling guide | Step 5 (generation) |
 | [chart-reference.md](chart-reference.md) | Chart.js integration patterns, theme color palettes, parsing rules | Step 5 (when charts used) |
+| [diagram-reference.md](diagram-reference.md) | draw.io diagram patterns (flowchart, AWS architecture, sequence/UML/ER, network, mindmap) via the drawio skill — parsing, theme-matching, PNG embedding, fallbacks | Step 5 (when `### diagram` blocks used) |
 | [layout-reinvent.md](layout-reinvent.md) | re:Invent Keynote layout patterns — CSS + HTML for 10 slide types | Step 5 (style #13) |
 | [scripts/extract-pptx.py](scripts/extract-pptx.py) | Python script for PPT content extraction | Step 3 (PPT conversion) |
 | [scripts/gen-content.py](scripts/gen-content.py) | Generate content.md template by page count (no AI needed) | Step 3 (project setup) |
