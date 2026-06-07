@@ -29,6 +29,7 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **PPT Conversion** — Convert existing `.pptx` files to web presentations, preserving images, text, and notes.
 - **Anti-AI-Slop** — Distinctive styles that avoid generic AI aesthetics. Custom fonts, curated palettes, purposeful animations.
 - **Chart.js Support** — Embed responsive charts directly in slides using simple markdown syntax.
+- **Diagram Support** — Draw flowcharts, AWS architecture diagrams, sequence/UML/ER, network topology, or mind maps via the [drawio-skill](https://github.com/Agents365-ai/drawio-skill). Just describe the diagram in plain language in `content.md` — the skill generates and embeds a PNG automatically.
 - **Inline Editing** — Press `E` to edit text directly in the browser, `Esc` to save.
 - **Save to File** — `Cmd/Ctrl+S` writes your edits back into the source `index.html`. No more "lost on cache clear" — edits become permanent changes to the file itself. Chrome / Edge only (uses the File System Access API).
 - **Overview Mode** — Press `Esc` (when not editing) to open a PPT-style grid of all slide thumbnails. Click any thumbnail — or use arrow keys + Enter — to jump. Current slide is highlighted.
@@ -140,6 +141,7 @@ my-presentation/
 
 - An AI IDE or agent that supports skills (e.g. [Claude Code](https://claude.ai/claude-code))
 - For PPT conversion: Python with `python-pptx` (auto-installed via `uv`)
+- For diagrams (optional): [draw.io desktop app](https://github.com/jgraph/drawio-desktop/releases) CLI on PATH (`brew install --cask drawio`) and the [drawio-skill](https://github.com/Agents365-ai/drawio-skill) installed
 
 ## License
 
@@ -174,6 +176,7 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **PPT 转换** —— 将已有的 `.pptx` 文件转换为网页演示文稿，保留图片、文字和备注。
 - **拒绝 AI 味** —— 独特的设计风格，避免千篇一律的 AI 审美。定制字体、精选配色、有目的的动画。
 - **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表。
+- **架构图/流程图支持** —— 通过 [drawio-skill](https://github.com/Agents365-ai/drawio-skill) 绘制流程图、AWS 架构图、时序/UML/ER 图、网络拓扑或思维导图。在 `content.md` 中用自然语言描述即可，技能会自动生成并嵌入 PNG 图片。
 - **浏览器内编辑** —— 按 `E` 进入编辑模式直接修改文字，按 `Esc` 保存。
 - **保存到源文件** —— `Cmd/Ctrl+S` 把编辑内容直接写回源 `index.html` 文件，不再"清缓存就丢失"，编辑真正成为文件本身的持久修改。仅支持 Chrome / Edge（基于 File System Access API）。
 - **概览模式** —— 非编辑状态下按 `Esc` 打开类似 PPT 的缩略图网格。点击任意缩略图，或用方向键 + Enter，即可跳转到对应页，当前页高亮显示。
@@ -285,6 +288,7 @@ my-presentation/
 
 - 支持技能的 AI IDE 或 Agent（如 [Claude Code](https://claude.ai/claude-code)）
 - PPT 转换需要：Python 及 `python-pptx`（通过 `uv` 自动安装）
+- 架构图/流程图（可选）：[draw.io 桌面版](https://github.com/jgraph/drawio-desktop/releases) CLI 已添加到 PATH（`brew install --cask drawio`），并安装 [drawio-skill](https://github.com/Agents365-ai/drawio-skill)
 
 ## 许可证
 
