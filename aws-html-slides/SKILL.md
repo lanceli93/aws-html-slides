@@ -155,23 +155,12 @@ Ask the user to provide the .pptx file path.
 
 ### Style Selection (both paths)
 
-Show the 13 available presets. Available presets are defined in [STYLE_PRESETS.md](STYLE_PRESETS.md).
+Show the 2 available presets. Available presets are defined in [STYLE_PRESETS.md](STYLE_PRESETS.md).
 
 | # | Preset | Vibe | Theme |
 |---|--------|------|-------|
-| 1 | Bold Signal | Confident, bold, high-impact | Dark |
-| 2 | Electric Studio | Clean, professional, split-panel | Dark |
-| 3 | Creative Voltage | Energetic, retro-modern, electric | Dark |
-| 4 | Dark Botanical | Elegant, sophisticated, warm | Dark |
-| 5 | Notebook Tabs | Editorial, organized, tactile | Light |
-| 6 | Pastel Geometry | Friendly, approachable, modern | Light |
-| 7 | Split Pastel | Playful, modern, two-color split | Light |
-| 8 | Vintage Editorial | Witty, personality-driven | Light |
-| 9 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
-| 10 | Terminal Green | Developer-focused, hacker aesthetic | Specialty |
-| 11 | Swiss Modern | Minimal, Bauhaus-inspired | Specialty |
-| 12 | Paper & Ink | Editorial, literary, thoughtful | Specialty |
-| 13 | re:Invent Keynote | Futuristic, keynote-stage, high-tech | Specialty |
+| 1 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
+| 2 | re:Invent Keynote | Futuristic, keynote-stage, high-tech, 3D-ready | Specialty |
 
 **Open the preview directory in Finder** so the user can browse and double-click any style to preview it. The preview files are bundled inside the skill directory at `preview/` (relative to the skill base directory).
 
@@ -179,7 +168,9 @@ Show the 13 available presets. Available presets are defined in [STYLE_PRESETS.m
 open <skill-base-dir>/preview/
 ```
 
-User picks a number (1-13) or says "Mix elements".
+User picks a number (1-2) or says "Mix elements".
+
+> **3D & motion effects (optional, experimental):** re:Invent Keynote (#2) can be enriched with self-contained, offline 3D/motion effects — CSS 3D heroes, hand-written WebGL shader backgrounds, and GSAP-orchestrated titles. These are standalone demos + a reference, not part of the default flow — see [effects-reference.md](effects-reference.md) and the `demos/` directory. The CSS animated-blob cover remains the lightweight default.
 
 ### PPT Conversion — Extract + Generate (end of PPT path)
 
@@ -251,8 +242,8 @@ Generate the full presentation using content from Step 4 and style from Step 3.
 - [chart-reference.md](chart-reference.md) — Chart.js patterns (only if content.md contains `### chart` blocks)
 - [diagram-reference.md](diagram-reference.md) — draw.io diagram patterns via the drawio skill (only if content.md contains `### diagram` blocks)
 - **Layout patterns file for the chosen style** (if available) — CSS classes + HTML templates for rich layouts. These are extracted from preview files and contain the actual implementation details. Read the matching file:
-  - Style #13 re:Invent Keynote → [layout-reinvent.md](layout-reinvent.md)
-  - (Other styles: to be added as needed)
+  - Style #2 re:Invent Keynote → [layout-reinvent.md](layout-reinvent.md)
+  - (Style #1 Neon Cyber: use STYLE_PRESETS.md + the preview file directly)
 
 **Layout rule: Never use plain left-aligned bullet lists.** Always use a layout pattern from the layout reference file (pill cards, feature grid, split divider, process flow, etc.). Match content type to the recommended layout in the "Layout Selection Guide" table.
 
@@ -329,13 +320,14 @@ After generation:
 
 | File | Purpose | When to Read |
 |------|---------|-------------|
-| [STYLE_PRESETS.md](STYLE_PRESETS.md) | 13 curated visual presets with colors, fonts, and signature elements | Step 3 (style selection) |
+| [STYLE_PRESETS.md](STYLE_PRESETS.md) | 2 curated visual presets with colors, fonts, and signature elements | Step 3 (style selection) |
 | [viewport-base.css](viewport-base.css) | Mandatory responsive CSS — copy into every presentation | Step 5 (generation) |
 | [html-template.md](html-template.md) | HTML structure, JS features, code quality standards | Step 5 (generation) |
 | [animation-patterns.md](animation-patterns.md) | CSS/JS animation snippets and effect-to-feeling guide | Step 5 (generation) |
 | [chart-reference.md](chart-reference.md) | Chart.js integration patterns, theme color palettes, parsing rules | Step 5 (when charts used) |
 | [diagram-reference.md](diagram-reference.md) | draw.io diagram patterns (flowchart, AWS architecture, sequence/UML/ER, network, mindmap) via the drawio skill — parsing, theme-matching, PNG embedding, fallbacks | Step 5 (when `### diagram` blocks used) |
-| [layout-reinvent.md](layout-reinvent.md) | re:Invent Keynote layout patterns — CSS + HTML for 10 slide types | Step 5 (style #13) |
+| [layout-reinvent.md](layout-reinvent.md) | re:Invent Keynote layout patterns — CSS + HTML for all slide types | Step 5 (style #2) |
+| [effects-reference.md](effects-reference.md) | 3D & motion effects catalog (CSS 3D, WebGL shaders, GSAP, View Transitions) — license red-lines, offline rules, demos in `../demos/` | Optional (richer 3D/motion) |
 | [scripts/extract-pptx.py](scripts/extract-pptx.py) | Python script for PPT content extraction | Step 3 (PPT conversion) |
 | [scripts/gen-content.py](scripts/gen-content.py) | Generate content.md template by page count (no AI needed) | Step 3 (project setup) |
-| [preview/](preview/) | 13 pre-built style preview HTML files (bundled with skill) | Step 3 (style selection) |
+| [preview/](preview/) | 2 pre-built style preview HTML files (bundled with skill) | Step 3 (style selection) |

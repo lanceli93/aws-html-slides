@@ -10,22 +10,24 @@ An agent skill for creating stunning, animation-rich HTML presentations — from
 
 Based on [@zarazhangrui](https://github.com/zarazhangrui)'s [frontend-slides](https://github.com/zarazhangrui/frontend-slides).
 
-### Demo: re:Invent Keynote (Style #13)
+### Demo: re:Invent Keynote (Style #2)
 
 https://github.com/user-attachments/assets/c264cc34-67d5-4cbd-a884-9c1b20d06f7a
 
-### Demo: Neon Cyber (Style #9)
+### Demo: Neon Cyber (Style #1)
 
 https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 
 ## What This Does
 
-**aws-html-slides** helps non-designers create beautiful web presentations without knowing CSS or JavaScript. Instead of asking you to describe your aesthetic preferences in words, it provides **13 pre-built visual previews** and lets you pick what you like.
+**aws-html-slides** helps non-designers create beautiful web presentations without knowing CSS or JavaScript. Instead of asking you to describe your aesthetic preferences in words, it provides **2 pre-built visual previews** and lets you pick what you like.
 
 ## Key Features
 
 - **Zero Dependencies** — Single HTML files with inline CSS/JS. No npm, no build tools, no frameworks.
-- **Visual Style Discovery** — Browse 13 curated styles (dark, light, specialty themes) and pick by preview.
+- **Visual Style Discovery** — Browse 2 curated specialty styles (Neon Cyber, re:Invent Keynote) and pick by preview.
+- **Rich Layouts** — re:Invent Keynote ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, and more) so long decks never look monotonous.
+- **Experimental 3D & Motion Effects** — Optional, self-contained, offline effects for re:Invent Keynote: CSS 3D heroes, hand-written WebGL shader backgrounds, and GSAP-orchestrated titles. See `demos/` and `aws-html-slides/effects-reference.md`.
 - **PPT Conversion** — Convert existing `.pptx` files to web presentations, preserving images, text, and notes.
 - **Anti-AI-Slop** — Distinctive styles that avoid generic AI aesthetics. Custom fonts, curated palettes, purposeful animations.
 - **Chart.js Support** — Embed responsive charts directly in slides using simple markdown syntax.
@@ -70,7 +72,7 @@ Invoke the skill in your AI IDE or agent:
 ```
 Step 1  →  Setup (language, mode, editing, page count)
 Step 2  →  Topic
-Step 3  →  Pick a style from 13 previews
+Step 3  →  Pick a style from 2 previews
 Step 4  →  Fill in content.md
 Step 5  →  Generate HTML
 ```
@@ -85,7 +87,7 @@ Example:
 
 The skill will:
 1. Ask your preferences (language / mode / editing / page count) in one go
-2. Show 13 style previews in Finder — pick by number
+2. Show 2 style previews in Finder — pick by number
 3. Generate a `content.md` template for you to fill in
 4. Review your content and generate a self-contained HTML presentation
 
@@ -94,7 +96,7 @@ The skill will:
 ```
 Step 1  →  Setup (language, mode)
 Step 2  →  Provide .pptx file path
-Step 3  →  Pick a style → auto-extract + generate (done)
+Step 3  →  Pick a style (1-2) → auto-extract + generate (done)
 ```
 
 Example:
@@ -123,19 +125,8 @@ my-presentation/
 
 | # | Style | Vibe | Theme |
 |---|-------|------|-------|
-| 1 | Bold Signal | Confident, bold, high-impact | Dark |
-| 2 | Electric Studio | Clean, professional, split-panel | Dark |
-| 3 | Creative Voltage | Energetic, retro-modern, electric | Dark |
-| 4 | Dark Botanical | Elegant, sophisticated, warm | Dark |
-| 5 | Notebook Tabs | Editorial, organized, tactile | Light |
-| 6 | Pastel Geometry | Friendly, approachable, modern | Light |
-| 7 | Split Pastel | Playful, modern, two-color split | Light |
-| 8 | Vintage Editorial | Witty, personality-driven | Light |
-| 9 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
-| 10 | Terminal Green | Developer-focused, hacker aesthetic | Specialty |
-| 11 | Swiss Modern | Minimal, Bauhaus-inspired | Specialty |
-| 12 | Paper & Ink | Editorial, literary, thoughtful | Specialty |
-| 13 | re:Invent Keynote | Futuristic, keynote-stage, high-tech | Specialty |
+| 1 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
+| 2 | re:Invent Keynote | Futuristic, keynote-stage, high-tech, 3D-ready | Specialty |
 
 ## Requirements
 
@@ -157,22 +148,24 @@ MIT — See [LICENSE](LICENSE) for details.
 
 基于 [@zarazhangrui](https://github.com/zarazhangrui) 的 [frontend-slides](https://github.com/zarazhangrui/frontend-slides) 项目。
 
-### 演示：re:Invent Keynote（风格 #13）
+### 演示：re:Invent Keynote（风格 #2）
 
 https://github.com/user-attachments/assets/c264cc34-67d5-4cbd-a884-9c1b20d06f7a
 
-### 演示：Neon Cyber（风格 #9）
+### 演示：Neon Cyber（风格 #1）
 
 https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 
 ## 这是什么
 
-**aws-html-slides** 帮助非设计师在不了解 CSS 或 JavaScript 的情况下创建漂亮的网页演示文稿。它不要求你用文字描述审美偏好，而是提供 **13 个预构建的视觉预览**，让你直接挑选喜欢的风格。
+**aws-html-slides** 帮助非设计师在不了解 CSS 或 JavaScript 的情况下创建漂亮的网页演示文稿。它不要求你用文字描述审美偏好，而是提供 **2 个预构建的视觉预览**，让你直接挑选喜欢的风格。
 
 ## 核心特性
 
 - **零依赖** —— 单个 HTML 文件，内联所有 CSS/JS。无需 npm、构建工具或框架。
-- **视觉化风格发现** —— 浏览 13 种精选风格（深色、浅色、特色主题），通过预览选择。
+- **视觉化风格发现** —— 浏览 2 种精选特色风格（Neon Cyber、re:Invent Keynote），通过预览选择。
+- **丰富排版** —— re:Invent Keynote 内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏等），长篇幻灯片不再单调。
+- **实验性 3D 与动效** —— re:Invent Keynote 可选用自包含、离线可用的特效：CSS 3D 主视觉、手写 WebGL shader 背景、GSAP 编排标题。详见 `demos/` 与 `aws-html-slides/effects-reference.md`。
 - **PPT 转换** —— 将已有的 `.pptx` 文件转换为网页演示文稿，保留图片、文字和备注。
 - **拒绝 AI 味** —— 独特的设计风格，避免千篇一律的 AI 审美。定制字体、精选配色、有目的的动画。
 - **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表。
@@ -217,7 +210,7 @@ ln -s ~/aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 ```
 步骤 1  →  设置（语言、模式、编辑功能、页数）
 步骤 2  →  主题
-步骤 3  →  从 13 个预览中选择风格
+步骤 3  →  从 2 个预览中选择风格
 步骤 4  →  填写 content.md
 步骤 5  →  生成 HTML
 ```
@@ -232,7 +225,7 @@ ln -s ~/aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 
 技能将会：
 1. 一次性询问你的偏好（语言 / 模式 / 编辑 / 页数）
-2. 在 Finder 中展示 13 个风格预览 —— 输入编号选择
+2. 在 Finder 中展示 2 个风格预览 —— 输入编号选择
 3. 生成 `content.md` 模板供你填写内容
 4. 审查你的内容并生成自包含的 HTML 演示文稿
 
@@ -241,7 +234,7 @@ ln -s ~/aws-html-slides/aws-html-slides ~/.claude/skills/aws-html-slides
 ```
 步骤 1  →  设置（语言、模式）
 步骤 2  →  提供 .pptx 文件路径
-步骤 3  →  选择风格 → 自动提取 + 生成（完成）
+步骤 3  →  选择风格（1-2）→ 自动提取 + 生成（完成）
 ```
 
 示例：
@@ -270,19 +263,8 @@ my-presentation/
 
 | # | 风格 | 氛围 | 主题 |
 |---|------|------|------|
-| 1 | Bold Signal | 自信、大胆、高冲击力 | 深色 |
-| 2 | Electric Studio | 干净、专业、分栏布局 | 深色 |
-| 3 | Creative Voltage | 活力、复古现代、电光感 | 深色 |
-| 4 | Dark Botanical | 优雅、精致、暖色调 | 深色 |
-| 5 | Notebook Tabs | 杂志风、有序、触感纹理 | 浅色 |
-| 6 | Pastel Geometry | 友好、亲和、现代感 | 浅色 |
-| 7 | Split Pastel | 俏皮、现代、双色分栏 | 浅色 |
-| 8 | Vintage Editorial | 诙谐、个性鲜明 | 浅色 |
-| 9 | Neon Cyber | 未来感、科技、霓虹光效 | 特色 |
-| 10 | Terminal Green | 开发者风、黑客美学 | 特色 |
-| 11 | Swiss Modern | 极简、包豪斯风格 | 特色 |
-| 12 | Paper & Ink | 杂志、文学、深思 | 特色 |
-| 13 | re:Invent Keynote | 未来感、主题演讲、高科技 | 特色 |
+| 1 | Neon Cyber | 未来感、科技、霓虹光效 | 特色 |
+| 2 | re:Invent Keynote | 未来感、主题演讲、高科技、支持 3D | 特色 |
 
 ## 环境要求
 

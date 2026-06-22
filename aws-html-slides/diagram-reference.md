@@ -142,12 +142,7 @@ PNG diagrams must read cleanly on the chosen slide background. draw.io shapes de
 
 | Theme group | Node stroke | Label color | Edge color | Panel? |
 |-------------|-------------|-------------|------------|--------|
-| Dark (Bold Signal, Electric Studio, Creative Voltage, Dark Botanical) | `rgba(255,255,255,0.7)` | `#ffffff` | preset `--accent` | optional |
-| Light (Notebook Tabs, Pastel Geometry, Split Pastel, Vintage Editorial) | `rgba(0,0,0,0.6)` | `#1a1a1a` | preset `--accent` | no |
 | Neon Cyber | `#00ffcc` / `#ff00aa` | `#e0e0ff` | `#00ffcc` | no (glow reads on black) |
-| Terminal Green | `#39d353` | `#7ee787` | `#39d353` | no |
-| Swiss Modern | `#1a1a1a` | `#1a1a1a` | `#ff3300` | no |
-| Paper & Ink | `#2c1810` | `#2c1810` | `#c41e3a` | no |
 | re:Invent Keynote | `rgba(255,255,255,0.7)` | `#ffffff` | `#8B5CF6` | optional |
 
 Because `var()` cannot be used inside the `.drawio` XML, **resolve every color to a literal hex/rgba** when building the drawio brief — same rule as Chart.js configs.
