@@ -27,11 +27,12 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **Zero Dependencies** — Single HTML files with inline CSS/JS. No npm, no build tools, no frameworks.
 - **Visual Style Discovery** — Browse 2 curated specialty styles (Neon Cyber, re:Invent Keynote) and pick by preview.
 - **Rich Layouts** — re:Invent Keynote ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, and more) so long decks never look monotonous.
-- **Experimental 3D & Motion Effects** — Optional, self-contained, offline effects for re:Invent Keynote: CSS 3D heroes, hand-written WebGL shader backgrounds, and GSAP-orchestrated titles. See `demos/` and `aws-html-slides/effects-reference.md`.
+- **Experimental 3D & Motion Effects** — Optional, self-contained, offline effects for re:Invent Keynote: real Three.js WebGL, CSS 3D, pointer-driven tilt, shader backgrounds, and GSAP kinetic type. See [3D & Motion Effects](#3d--motion-effects-experimental) below.
 - **PPT Conversion** — Convert existing `.pptx` files to web presentations, preserving images, text, and notes.
 - **Anti-AI-Slop** — Distinctive styles that avoid generic AI aesthetics. Custom fonts, curated palettes, purposeful animations.
-- **Chart.js Support** — Embed responsive charts directly in slides using simple markdown syntax.
+- **Chart.js Support** — Embed responsive charts (line, bar, doughnut, pie, radar, polar) directly in slides using simple markdown syntax — auto-themed to match your chosen style.
 - **Diagram Support** — Draw flowcharts, AWS architecture diagrams, sequence/UML/ER, network topology, or mind maps via the [drawio-skill](https://github.com/Agents365-ai/drawio-skill). Just describe the diagram in plain language in `content.md` — the skill generates and embeds a PNG automatically.
+- **Tables & Media Lightbox** — Themed comparison tables from plain markdown, plus click-to-enlarge lightbox for any image or diagram.
 - **Inline Editing** — Press `E` to edit text directly in the browser, `Esc` to save.
 - **Save to File** — `Cmd/Ctrl+S` writes your edits back into the source `index.html`. No more "lost on cache clear" — edits become permanent changes to the file itself. Chrome / Edge only (uses the File System Access API).
 - **Overview Mode** — Press `Esc` (when not editing) to open a PPT-style grid of all slide thumbnails. Click any thumbnail — or use arrow keys + Enter — to jump. Current slide is highlighted.
@@ -128,6 +129,27 @@ my-presentation/
 | 1 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
 | 2 | re:Invent Keynote | Futuristic, keynote-stage, high-tech, 3D-ready | Specialty |
 
+**Neon Cyber** — black-and-neon aesthetic with cyan/magenta glow, scanlines, and grid. Best for technical, futuristic, or product-launch topics that want energy.
+
+**re:Invent Keynote** — the most developed style, modeled on AWS keynote stages. Ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, process flows, timelines, big-number slides) so long decks never look monotonous, and it's the style wired for the optional 3D/motion effects below.
+
+## 3D & Motion Effects (Experimental)
+
+Optional, **fully offline and self-contained** ways to add depth and motion to a re:Invent Keynote deck — no CDN at runtime, libraries vendored locally. These are a deliberate, per-deck menu rather than the default flow; the lightweight CSS animated-blob cover stays the default. The reference and its licensing red-lines live in [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md), and each technique ships a working demo under [`demos/`](demos/):
+
+| Technique | What it gives you | Demo |
+|-----------|-------------------|------|
+| **Three.js (real WebGL)** | Genuine 3D hero — emissive morphing core, fresnel rim, orbiting lights, particle cloud, inline bloom | [`demos/threejs-hero/`](demos/threejs-hero/) |
+| **CSS 3D** | Pure-CSS rotating geometry + 2.5D parallax via `preserve-3d` / `perspective` — no JS library | [`demos/css-3d-hero/`](demos/css-3d-hero/) |
+| **Pointer tilt** | Cards that tilt toward the cursor with layered `translateZ` depth and a specular sheen | [`demos/pointer-tilt/`](demos/pointer-tilt/) |
+| **WebGL shader background** | Hand-written animated nebula shader behind the slide | [`demos/webgl-nebula/`](demos/webgl-nebula/) |
+| **2D-canvas particles** | Lightweight constellation/network background, no WebGL | [`demos/particles-network/`](demos/particles-network/) |
+| **GSAP kinetic type & micro-motion** | Orchestrated title reveals and content micro-effects (GSAP 3.13, vendored) | [`demos/gsap-title/`](demos/gsap-title/), [`demos/gsap-micro/`](demos/gsap-micro/) |
+
+[`demos/qa-runs/nova-core/`](demos/qa-runs/nova-core/) shows all three 3D techniques integrated into one deck, with per-slide animated backgrounds and an `IntersectionObserver` that runs each effect only while its slide is on screen.
+
+> **Status:** these effects are not yet auto-wired into the default generation flow — you opt in per deck. Licensing is documented up front (always-safe: Three.js, GSAP, tsParticles, lottie-web, Lucide; avoid Spline/Shadertoy/LYGIA for commercial use).
+
 ## Requirements
 
 - An AI IDE or agent that supports skills (e.g. [Claude Code](https://claude.ai/claude-code))
@@ -165,11 +187,12 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **零依赖** —— 单个 HTML 文件，内联所有 CSS/JS。无需 npm、构建工具或框架。
 - **视觉化风格发现** —— 浏览 2 种精选特色风格（Neon Cyber、re:Invent Keynote），通过预览选择。
 - **丰富排版** —— re:Invent Keynote 内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏等），长篇幻灯片不再单调。
-- **实验性 3D 与动效** —— re:Invent Keynote 可选用自包含、离线可用的特效：CSS 3D 主视觉、手写 WebGL shader 背景、GSAP 编排标题。详见 `demos/` 与 `aws-html-slides/effects-reference.md`。
+- **实验性 3D 与动效** —— re:Invent Keynote 可选用自包含、离线可用的特效：真实 Three.js WebGL、CSS 3D、跟随鼠标的倾斜、shader 背景、GSAP 动态文字。详见下方 [3D 与动效](#3d-与动效实验性)。
 - **PPT 转换** —— 将已有的 `.pptx` 文件转换为网页演示文稿，保留图片、文字和备注。
 - **拒绝 AI 味** —— 独特的设计风格，避免千篇一律的 AI 审美。定制字体、精选配色、有目的的动画。
-- **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表。
+- **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表（折线、柱状、环形、饼图、雷达、极坐标），并自动套用所选风格的配色。
 - **架构图/流程图支持** —— 通过 [drawio-skill](https://github.com/Agents365-ai/drawio-skill) 绘制流程图、AWS 架构图、时序/UML/ER 图、网络拓扑或思维导图。在 `content.md` 中用自然语言描述即可，技能会自动生成并嵌入 PNG 图片。
+- **表格与媒体灯箱** —— 用纯 Markdown 生成套用主题配色的对比表格，图片和架构图均支持点击放大灯箱。
 - **浏览器内编辑** —— 按 `E` 进入编辑模式直接修改文字，按 `Esc` 保存。
 - **保存到源文件** —— `Cmd/Ctrl+S` 把编辑内容直接写回源 `index.html` 文件，不再"清缓存就丢失"，编辑真正成为文件本身的持久修改。仅支持 Chrome / Edge（基于 File System Access API）。
 - **概览模式** —— 非编辑状态下按 `Esc` 打开类似 PPT 的缩略图网格。点击任意缩略图，或用方向键 + Enter，即可跳转到对应页，当前页高亮显示。
@@ -265,6 +288,27 @@ my-presentation/
 |---|------|------|------|
 | 1 | Neon Cyber | 未来感、科技、霓虹光效 | 特色 |
 | 2 | re:Invent Keynote | 未来感、主题演讲、高科技、支持 3D | 特色 |
+
+**Neon Cyber** —— 黑底霓虹美学，青/品红辉光、扫描线和网格背景。适合技术、未来感或产品发布类、想要冲击力的主题。
+
+**re:Invent Keynote** —— 最完善的风格，仿照 AWS 主题演讲舞台。内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏、流程图、时间线、大数字页），长篇幻灯片不再单调；下方可选的 3D/动效也是为这个风格接入的。
+
+## 3D 与动效（实验性）
+
+为 re:Invent Keynote 增加纵深与动感的可选方案，**完全离线、自包含** —— 运行时不依赖 CDN，所有库都本地内置。这些是按需逐个 deck 选用的菜单，而非默认流程；轻量的 CSS 流体动画封面仍是默认。参考与授权红线见 [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md)，每种技术在 [`demos/`](demos/) 下都有可运行的示例：
+
+| 技术 | 效果 | 示例 |
+|------|------|------|
+| **Three.js（真实 WebGL）** | 真正的 3D 主视觉 —— 自发光形变核心、菲涅尔边缘光、环绕光源、粒子云、内联泛光 | [`demos/threejs-hero/`](demos/threejs-hero/) |
+| **CSS 3D** | 纯 CSS 旋转几何体 + 通过 `preserve-3d` / `perspective` 实现的 2.5D 视差，无需 JS 库 | [`demos/css-3d-hero/`](demos/css-3d-hero/) |
+| **鼠标倾斜** | 卡片随鼠标倾斜，配合 `translateZ` 分层纵深与高光扫光 | [`demos/pointer-tilt/`](demos/pointer-tilt/) |
+| **WebGL shader 背景** | 手写的星云动画 shader 作为幻灯片背景 | [`demos/webgl-nebula/`](demos/webgl-nebula/) |
+| **2D Canvas 粒子** | 轻量的星座/网络背景，无需 WebGL | [`demos/particles-network/`](demos/particles-network/) |
+| **GSAP 动态文字与微动效** | 编排式标题入场与内容微动效（内置 GSAP 3.13） | [`demos/gsap-title/`](demos/gsap-title/)、[`demos/gsap-micro/`](demos/gsap-micro/) |
+
+[`demos/qa-runs/nova-core/`](demos/qa-runs/nova-core/) 演示了三种 3D 技术整合进同一个 deck，配合逐页动画背景，以及只在对应幻灯片可见时才运行特效的 `IntersectionObserver`。
+
+> **状态：** 这些特效尚未自动接入默认生成流程 —— 需逐个 deck 主动选用。授权情况已提前标注（始终安全：Three.js、GSAP、tsParticles、lottie-web、Lucide；商用请避开 Spline/Shadertoy/LYGIA）。
 
 ## 环境要求
 
