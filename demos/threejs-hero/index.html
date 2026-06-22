@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AWS re:Invent Keynote — Three.js Real 3D Hero</title>
+
+<!--
+  ============================================================================
+  THREE.JS REAL-3D HERO  (AWS re:Invent Keynote cover)
+  ----------------------------------------------------------------------------
+  A genuine WebGL 3D centerpiece — NOT a CSS trick and NOT the old procedural
+  "earth". An abstract "compute core": a glowing emissive icosahedron wrapped
+  in a slowly counter-rotating wireframe shell, a fresnel rim light, an orbiting
+  ring of glow sprites, and a parallax starfield. Drag to orbit; it auto-spins.
+
+  Keynote-grade look is the whole point (the earth demo failed this bar):
+    * ACES Filmic tone mapping + sRGB output  -> filmic, not flat
+    * Emissive core + additive fresnel shell   -> it actually glows
+    * Hand-rolled INLINE bloom (bright-pass -> separable blur -> additive
+      composite) using ShaderMaterials + render targets. We do NOT use the
+      examples/jsm postprocessing addons because those are ESM-only and would
+      break the vendored-global, double-click-offline model.
+
+  SELF-CONTAINED / OFFLINE: three.min.js r160 (the LAST UMD build exposing a
+  global `window.THREE`; r161+ are ESM-only) is vendored in ./vendor/. No CDN,
+  no web fonts, no network at runtime. Double-click the file.
+
+  Robustness baked in (copy these patterns):
+    * DPR capped at min(dpr, 1.75)         -> sane GPU/battery load
+    * prefers-reduced-motion               -> one static framed render, no loop
+    * pause on visibilitychange (tab hidden)
+    * webglcontextlost/restored handling   -> rebuild + resume
+    * CSS radial-gradient fallback if WebGL/THREE is unavailable (never blank)
+  ============================================================================
+-->
+
+<style>
+  :root {
+    --bg:      #06030d;   /* deep near-black                        */
+    --purple:  #8B5CF6;
+    --pink:    #D946EF;
+    --blue:    #38BDF8;
+    --orange:  #FF9900;   /* AWS accent, sparingly                  */
+    --ink:     #F5F3FF;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* WebGL canvas fills the viewport, opaque, behind the text overlay. */
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+
+  /* CSS fallback (shown only if THREE/WebGL is unavailable). */
+  .fallback {
+    position: fixed; inset: 0; z-index: 0; display: none;
+    background:
+      radial-gradient(ellipse 50% 55% at 60% 45%, rgba(139,92,246,0.45), transparent 62%),
+      radial-gradient(ellipse 38% 42% at 66% 58%, rgba(217,70,239,0.34), transparent 60%),
+      var(--bg);
+  }
+  body.no-3d #c { display: none; }
+  body.no-3d .fallback { display: block; }
+
+  /* ---------------- Cover text overlay ---------------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 8vw; pointer-events: none; user-select: none;
+  }
+  .overlay::before {   /* legibility scrim, biased to the text (left) side */
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(ellipse 72% 82% at 16% 50%,
+      rgba(6,3,13,0.74) 0%, rgba(6,3,13,0.30) 46%, transparent 76%);
+  }
+  .eyebrow {
+    font-size: clamp(11px,1.4vw,15px); letter-spacing: 0.42em; font-weight: 600;
+    text-transform: uppercase; color: rgba(255,255,255,0.80);
+    margin-bottom: 1.1rem; display: inline-flex; align-items: center; gap: .6em;
+  }
+  .eyebrow .odot { width:.5em; height:.5em; border-radius:50%;
+    background: var(--orange); box-shadow: 0 0 12px var(--orange); }
+  h1 {
+    font-size: clamp(40px,7.2vw,104px); line-height: 1.02; font-weight: 800;
+    letter-spacing: -0.02em; max-width: 16ch;
+    background: linear-gradient(100deg, #fff 0%, #d8c9ff 30%, var(--pink) 64%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 4px 30px rgba(139,92,246,0.25));
+  }
+  .subtitle {
+    margin-top: 1.5rem; font-size: clamp(14px,1.9vw,21px); font-weight: 400;
+    color: rgba(255,255,255,0.74); max-width: 42ch; line-height: 1.5;
+  }
+  .footer {
+    position: fixed; bottom: 16px; left: 8vw; z-index: 3;
+    font-size: 10.5px; letter-spacing: .04em; color: rgba(255,255,255,0.34);
+  }
+  .hint {
+    position: fixed; bottom: 16px; right: 8vw; z-index: 3;
+    font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(255,255,255,0.38);
+  }
+</style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="fallback"></div>
+
+  <div class="overlay">
+    <div class="eyebrow"><span class="odot"></span> Keynote · Main Stage</div>
+    <h1>The Compute Core</h1>
+    <p class="subtitle">A real-time 3D centerpiece — emissive core, fresnel shell, and bloom, rendered in WebGL and fully self-contained.</p>
+  </div>
+  <div class="footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  <div class="hint">Drag to orbit</div>
+
+  <!-- Three.js r160 — last UMD/global build. Vendored, offline. -->
+  <script src="./vendor/three.min.js"></script>
+
+  <script>
+  "use strict";
+  (function () {
+    // ===================================================================
+    //  Guard: THREE must have loaded from the local vendor file.
+    // ===================================================================
+    if (typeof THREE === "undefined") {
+      console.error("[hero] THREE failed to load from ./vendor/three.min.js");
+      document.body.classList.add("no-3d");
+      return;
+    }
+    console.log("[hero] THREE r" + THREE.REVISION);
+
+    var canvas = document.getElementById("c");
+    var REDUCE = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var DPR = Math.min(window.devicePixelRatio || 1, 1.75);
+
+    // ---- core scene objects (rebuilt on context restore) ----
+    var renderer, scene, camera, coreMesh, shellMesh, shellMat, ringGroup, starField;
+    var coreGroup;   // holds core+shell+ring
+    var TARGET = new THREE.Vector3(0, 0, 0);   // object stays centred in world; we slide
+                                               // the PROJECTION (setViewOffset) to push the
+                                               // rendered object into the right third so the
+                                               // left-aligned headline reads over clean black.
+    var rtScene, rtBright, rtBlurA, rtBlurB;   // render targets for bloom
+    var brightMat, blurMat, compositeMat, fsQuad, fsScene, fsCam;
+    var clock, rafId = 0, running = false;
+
+    // pointer-orbit state (eased)
+    var pointer = { x: 0, y: 0 };          // target, normalized -1..1
+    var orbit   = { x: 0, y: 0 };          // smoothed
+    var dragging = false, lastX = 0, lastY = 0, userYaw = 0, userPitch = 0;
+
+    // =================================================================
+    //  Shaders
+    // =================================================================
+
+    // Fresnel rim: emissive shell that glows brightest at grazing angles.
+    var SHELL_VERT = [
+      "varying vec3 vN; varying vec3 vView;",
+      "void main(){",
+      "  vec4 mv = modelViewMatrix * vec4(position,1.0);",
+      "  vN = normalize(normalMatrix * normal);",
+      "  vView = normalize(-mv.xyz);",
+      "  gl_Position = projectionMatrix * mv;",
+      "}"
+    ].join("\n");
+    var SHELL_FRAG = [
+      "varying vec3 vN; varying vec3 vView;",
+      "uniform vec3 cA; uniform vec3 cB; uniform float power; uniform float intensity;",
+      "void main(){",
+      "  float f = pow(1.0 - clamp(dot(normalize(vN), normalize(vView)), 0.0, 1.0), power);",
+      "  vec3 col = mix(cA, cB, f) * f * intensity;",
+      "  gl_FragColor = vec4(col, f);",   // additive-ish; alpha follows rim
+      "}"
+    ].join("\n");
+
+    // Fullscreen passes for bloom.
+    var FS_VERT = [
+      "varying vec2 vUv;",
+      "void main(){ vUv = uv; gl_Position = vec4(position,1.0); }"
+    ].join("\n");
+    // bright-pass: keep only luminance above a threshold
+    var BRIGHT_FRAG = [
+      "varying vec2 vUv; uniform sampler2D tDiffuse; uniform float threshold;",
+      "void main(){",
+      "  vec3 c = texture2D(tDiffuse, vUv).rgb;",
+      "  float l = dot(c, vec3(0.299,0.587,0.114));",
+      "  float k = smoothstep(threshold, threshold+0.35, l);",
+      "  gl_FragColor = vec4(c*k, 1.0);",
+      "}"
+    ].join("\n");
+    // separable gaussian blur (direction passed as uniform)
+    var BLUR_FRAG = [
+      "varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 res;",
+      "void main(){",
+      "  vec2 px = dir / res;",
+      "  vec3 sum = vec3(0.0);",
+      "  sum += texture2D(tDiffuse, vUv).rgb * 0.227027;",
+      "  sum += texture2D(tDiffuse, vUv + px*1.3846).rgb * 0.316216;",
+      "  sum += texture2D(tDiffuse, vUv - px*1.3846).rgb * 0.316216;",
+      "  sum += texture2D(tDiffuse, vUv + px*3.2308).rgb * 0.070270;",
+      "  sum += texture2D(tDiffuse, vUv - px*3.2308).rgb * 0.070270;",
+      "  gl_FragColor = vec4(sum, 1.0);",
+      "}"
+    ].join("\n");
+    // composite: base scene + additive bloom
+    var COMPOSITE_FRAG = [
+      "varying vec2 vUv; uniform sampler2D tBase; uniform sampler2D tBloom; uniform float strength;",
+      "void main(){",
+      "  vec3 base = texture2D(tBase, vUv).rgb;",
+      "  vec3 bloom = texture2D(tBloom, vUv).rgb;",
+      "  vec3 col = base + bloom * strength;",
+      "  // gentle filmic-ish shoulder so the glow doesn't clip harshly",
+      "  col = col / (col + vec3(0.6)) * 1.6;",
+      "  gl_FragColor = vec4(col, 1.0);",
+      "}"
+    ].join("\n");
+
+    // =================================================================
+    //  Build / rebuild everything
+    // =================================================================
+    function makeTargets(w, h) {
+      var half = { width: Math.max(2, w >> 1), height: Math.max(2, h >> 1),
+                   minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+                   type: THREE.UnsignedByteType };
+      rtScene = new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter,
+                   magFilter: THREE.LinearFilter, type: THREE.UnsignedByteType });
+      rtBright = new THREE.WebGLRenderTarget(half.width, half.height, half);
+      rtBlurA  = new THREE.WebGLRenderTarget(half.width, half.height, half);
+      rtBlurB  = new THREE.WebGLRenderTarget(half.width, half.height, half);
+    }
+
+    function build() {
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false,
+        powerPreference: "high-performance" });
+      renderer.setPixelRatio(DPR);
+      renderer.setClearColor(0x06030d, 1);
+      // filmic, colour-correct output — the difference between "flat" and "premium"
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.15;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+
+      // --- lights: keep core readable; emissive does most of the glow ---
+      scene.add(new THREE.AmbientLight(0x223046, 0.55));
+      var key = new THREE.PointLight(0x8B5CF6, 55, 50); key.position.set(4, 3, 5); scene.add(key);
+      var fill = new THREE.PointLight(0x38BDF8, 32, 50); fill.position.set(-5, -2, 3); scene.add(fill);
+      var rim = new THREE.PointLight(0xD946EF, 36, 50); rim.position.set(0, 4, -4); scene.add(rim);
+
+      // Everything 3D lives in coreGroup, offset RIGHT so the left-aligned
+      // headline reads over clean black. Scaled down so it doesn't dominate.
+      coreGroup = new THREE.Group();
+      coreGroup.position.copy(TARGET);
+      coreGroup.scale.setScalar(0.78);
+      scene.add(coreGroup);
+
+      // --- the emissive faceted core (icosahedron, flat-shaded) ---
+      var coreGeo = new THREE.IcosahedronGeometry(1.5, 1);
+      var coreMat = new THREE.MeshStandardMaterial({
+        color: 0x2a1a4a, emissive: 0x7c3aed, emissiveIntensity: 1.15,
+        metalness: 0.45, roughness: 0.28, flatShading: true });
+      coreMesh = new THREE.Mesh(coreGeo, coreMat);
+      coreGroup.add(coreMesh);
+
+      // --- counter-rotating fresnel shell. Lower intensity + higher power so
+      //     it's a RIM halo at the silhouette, not a solid magenta disc that
+      //     hides the facets underneath. ---
+      var shellGeo = new THREE.IcosahedronGeometry(2.05, 1);
+      shellMat = new THREE.ShaderMaterial({
+        uniforms: {
+          cA: { value: new THREE.Color(0x8B5CF6) },
+          cB: { value: new THREE.Color(0xD946EF) },
+          power: { value: 4.5 }, intensity: { value: 0.7 }
+        },
+        vertexShader: SHELL_VERT, fragmentShader: SHELL_FRAG,
+        transparent: true, blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide, depthWrite: false });
+      shellMesh = new THREE.Mesh(shellGeo, shellMat);
+      coreGroup.add(shellMesh);
+
+      // a crisp wireframe overlay on the shell for structure
+      var wire = new THREE.LineSegments(
+        new THREE.WireframeGeometry(shellGeo),
+        new THREE.LineBasicMaterial({ color: 0x9b7bff, transparent: true, opacity: 0.32 }));
+      shellMesh.add(wire);
+
+      // --- orbiting glow sprites (a ring of soft additive dots) ---
+      ringGroup = new THREE.Group();
+      var dotTex = makeDotTexture();
+      var COLORS = [0x8B5CF6, 0xD946EF, 0x38BDF8];
+      for (var i = 0; i < 26; i++) {
+        var m = new THREE.SpriteMaterial({ map: dotTex, color: COLORS[i % 3],
+          transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+        var s = new THREE.Sprite(m);
+        var a = (i / 26) * Math.PI * 2;
+        var rad = 2.8 + Math.sin(i * 1.7) * 0.18;
+        s.position.set(Math.cos(a) * rad, Math.sin(i * 0.9) * 0.5, Math.sin(a) * rad);
+        var sc = 0.16 + Math.random() * 0.12;
+        s.scale.set(sc, sc, sc);
+        s.userData.a = a; s.userData.rad = rad; s.userData.speed = 0.12 + (i % 5) * 0.015;
+        ringGroup.add(s);
+      }
+      coreGroup.add(ringGroup);
+
+      // --- parallax starfield ---
+      starField = makeStars(700, 40);
+      scene.add(starField);
+
+      // --- bloom plumbing ---
+      buildBloom();
+      resize();
+    }
+
+    // radial-gradient sprite texture for glow dots (canvas, no asset file)
+    function makeDotTexture() {
+      var s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s;
+      var g = cv.getContext("2d");
+      var grd = g.createRadialGradient(s/2, s/2, 0, s/2, s/2, s/2);
+      grd.addColorStop(0, "rgba(255,255,255,1)");
+      grd.addColorStop(0.3, "rgba(255,255,255,0.85)");
+      grd.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = grd; g.fillRect(0, 0, s, s);
+      var t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    }
+
+    function makeStars(count, spread) {
+      var pos = new Float32Array(count * 3);
+      for (var i = 0; i < count; i++) {
+        pos[i*3]   = (Math.random() - 0.5) * spread;
+        pos[i*3+1] = (Math.random() - 0.5) * spread;
+        pos[i*3+2] = (Math.random() - 0.5) * spread - 8;
+      }
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      var mat = new THREE.PointsMaterial({ color: 0xb6a8ff, size: 0.045,
+        transparent: true, opacity: 0.7, depthWrite: false });
+      return new THREE.Points(geo, mat);
+    }
+
+    function buildBloom() {
+      fsScene = new THREE.Scene();
+      fsCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      var quad = new THREE.PlaneGeometry(2, 2);
+      brightMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse:{value:null}, threshold:{value:0.55} },
+        vertexShader: FS_VERT, fragmentShader: BRIGHT_FRAG, depthTest:false, depthWrite:false });
+      blurMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse:{value:null}, dir:{value:new THREE.Vector2(1,0)}, res:{value:new THREE.Vector2(1,1)} },
+        vertexShader: FS_VERT, fragmentShader: BLUR_FRAG, depthTest:false, depthWrite:false });
+      compositeMat = new THREE.ShaderMaterial({ uniforms: { tBase:{value:null}, tBloom:{value:null}, strength:{value:0.9} },
+        vertexShader: FS_VERT, fragmentShader: COMPOSITE_FRAG, depthTest:false, depthWrite:false });
+      fsQuad = new THREE.Mesh(quad, brightMat);
+      fsScene.add(fsQuad);
+    }
+
+    function passFS(material, target) {
+      fsQuad.material = material;
+      renderer.setRenderTarget(target || null);
+      renderer.render(fsScene, fsCam);
+    }
+
+    // =================================================================
+    //  Resize
+    // =================================================================
+    function resize() {
+      var w = window.innerWidth, h = window.innerHeight;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h; camera.updateProjectionMatrix();
+      // Slide the PROJECTION so the (world-centred) object renders in the right
+      // third, leaving the left for the headline. A negative X view-offset shifts
+      // the frustum window left -> the object appears to move right. On narrow/
+      // portrait viewports we reduce the shift so it doesn't run off-screen.
+      var shift = w < 820 ? w * 0.06 : w * 0.22;
+      camera.setViewOffset(w, h, -shift, 0, w, h);
+      var pw = Math.floor(w * DPR), ph = Math.floor(h * DPR);
+      if (rtScene) { rtScene.dispose(); rtBright.dispose(); rtBlurA.dispose(); rtBlurB.dispose(); }
+      makeTargets(pw, ph);
+    }
+
+    // =================================================================
+    //  Render one frame (with the bloom pipeline)
+    // =================================================================
+    function renderFrame(dt, t) {
+      // animate
+      if (!REDUCE) {
+        coreMesh.rotation.y += dt * 0.25;
+        coreMesh.rotation.x += dt * 0.08;
+        shellMesh.rotation.y -= dt * 0.16;
+        shellMesh.rotation.x -= dt * 0.05;
+        ringGroup.rotation.y += dt * 0.15;
+        starField.rotation.y += dt * 0.01;
+        coreMesh.material.emissiveIntensity = 1.15 + Math.sin(t * 1.5) * 0.18; // gentle pulse
+        for (var i = 0; i < ringGroup.children.length; i++) {
+          var s = ringGroup.children[i];
+          s.userData.a += dt * s.userData.speed;
+          s.position.x = Math.cos(s.userData.a) * s.userData.rad;
+          s.position.z = Math.sin(s.userData.a) * s.userData.rad;
+        }
+      }
+
+      // ease pointer-orbit (auto-drift + user drag combined). The camera orbits
+      // around TARGET (the offset object centre) and frames it right-of-centre,
+      // leaving the left third clear for the headline.
+      orbit.x += (pointer.x - orbit.x) * 0.05;
+      orbit.y += (pointer.y - orbit.y) * 0.05;
+      var yaw = userYaw + orbit.x * 0.5;
+      var pitch = userPitch + orbit.y * 0.32;
+      var R = 6.6;
+      camera.position.x = TARGET.x + Math.sin(yaw) * R * Math.cos(pitch);
+      camera.position.z = TARGET.z + Math.cos(yaw) * R * Math.cos(pitch);
+      camera.position.y = TARGET.y + Math.sin(pitch) * R;
+      camera.lookAt(TARGET);
+
+      // (1) render scene to rtScene
+      renderer.setRenderTarget(rtScene);
+      renderer.clear();
+      renderer.render(scene, camera);
+
+      // (2) bright-pass -> rtBright
+      brightMat.uniforms.tDiffuse.value = rtScene.texture;
+      passFS(brightMat, rtBright);
+
+      // (3) separable blur: H (rtBright->rtBlurA), V (rtBlurA->rtBlurB), then H/V again
+      var rw = rtBright.width, rh = rtBright.height;
+      blurMat.uniforms.res.value.set(rw, rh);
+      blurMat.uniforms.tDiffuse.value = rtBright.texture;
+      blurMat.uniforms.dir.value.set(1, 0); passFS(blurMat, rtBlurA);
+      blurMat.uniforms.tDiffuse.value = rtBlurA.texture;
+      blurMat.uniforms.dir.value.set(0, 1); passFS(blurMat, rtBlurB);
+      blurMat.uniforms.tDiffuse.value = rtBlurB.texture;
+      blurMat.uniforms.dir.value.set(1.6, 0); passFS(blurMat, rtBlurA);
+      blurMat.uniforms.tDiffuse.value = rtBlurA.texture;
+      blurMat.uniforms.dir.value.set(0, 1.6); passFS(blurMat, rtBlurB);
+
+      // (4) composite base + bloom -> screen
+      compositeMat.uniforms.tBase.value = rtScene.texture;
+      compositeMat.uniforms.tBloom.value = rtBlurB.texture;
+      passFS(compositeMat, null);
+    }
+
+    // =================================================================
+    //  Loop / lifecycle
+    // =================================================================
+    function loop() {
+      if (!running) return;
+      rafId = requestAnimationFrame(loop);
+      var dt = Math.min(clock.getDelta(), 0.05);
+      renderFrame(dt, clock.elapsedTime);
+    }
+    function start() {
+      if (running || REDUCE) return;
+      running = true; clock.start(); rafId = requestAnimationFrame(loop);
+    }
+    function stop() { running = false; if (rafId) cancelAnimationFrame(rafId), rafId = 0; }
+
+    // =================================================================
+    //  Events
+    // =================================================================
+    window.addEventListener("resize", function () {
+      resize(); if (REDUCE) renderFrame(0, 0);
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) stop(); else if (!REDUCE) start();
+    });
+    // pointer move -> auto orbit target (when not dragging)
+    window.addEventListener("mousemove", function (e) {
+      if (dragging) return;
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = (e.clientY / window.innerHeight) * 2 - 1;
+    });
+    // drag -> manual orbit
+    window.addEventListener("mousedown", function (e) { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+    window.addEventListener("mouseup", function () { dragging = false; });
+    window.addEventListener("mouseleave", function () { dragging = false; });
+    window.addEventListener("mousemove", function (e) {
+      if (!dragging) return;
+      userYaw   += (e.clientX - lastX) * 0.005;
+      userPitch += (e.clientY - lastY) * 0.005;
+      userPitch = Math.max(-1.2, Math.min(1.2, userPitch));
+      lastX = e.clientX; lastY = e.clientY;
+    });
+
+    // context loss/restore: tear down + rebuild cleanly
+    canvas.addEventListener("webglcontextlost", function (e) {
+      e.preventDefault(); stop();
+    }, false);
+    canvas.addEventListener("webglcontextrestored", function () {
+      try { build(); clock = new THREE.Clock(); if (REDUCE) renderFrame(0,0); else start(); }
+      catch (err) { console.error(err); document.body.classList.add("no-3d"); }
+    }, false);
+
+    // =================================================================
+    //  Boot
+    // =================================================================
+    try {
+      build();
+      clock = new THREE.Clock();
+      if (REDUCE) renderFrame(0, 0);   // one static framed render
+      else start();
+    } catch (err) {
+      console.error("[hero] init failed:", err);
+      document.body.classList.add("no-3d");
+    }
+  })();
+  </script>
+</body>
+</html>

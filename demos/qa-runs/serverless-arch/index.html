@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Serverless Image Processing on AWS</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@500;700;800&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+/* === THEME — re:Invent Keynote (#13) === */
+:root {
+    --bg-primary: #0A0A0A;
+    --accent-purple: #8B5CF6;
+    --accent-pink: #D946EF;
+    --accent-orange: #FF9900;
+    --accent: #8B5CF6;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --glow-purple: rgba(139, 92, 246, 0.4);
+    --card-bg: rgba(139, 92, 246, 0.08);
+    --card-border: rgba(139, 92, 246, 0.25);
+    --chart-grid: rgba(139,92,246,0.10);
+    --font-display: 'Urbanist', sans-serif;
+    --font-body: 'Albert Sans', sans-serif;
+    --subtitle-size: clamp(0.9rem, 2vw, 1.35rem);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.7s;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* === viewport-base.css (full) === */
+html, body { height: 100%; overflow-x: hidden; scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+.slide { width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; scroll-snap-align: start; display: flex; flex-direction: column; position: relative; }
+.slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; max-height: 100%; overflow: hidden; padding: var(--slide-padding); }
+:root {
+    --title-size: clamp(1.5rem, 5vw, 4rem);
+    --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+    --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+    --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+    --small-size: clamp(0.65rem, 1vw, 0.875rem);
+    --slide-padding: clamp(1rem, 4vw, 4rem);
+    --content-gap: clamp(0.5rem, 2vw, 2rem);
+    --element-gap: clamp(0.25rem, 1vw, 1rem);
+}
+.card, .container, .content-box { max-width: min(90vw, 1000px); max-height: min(80vh, 700px); }
+.feature-list, .bullet-list { gap: clamp(0.4rem, 1vh, 1rem); }
+.feature-list li, .bullet-list li { font-size: var(--body-size); line-height: 1.4; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: clamp(0.5rem, 1.5vw, 1rem); }
+img, .image-container { max-width: 100%; max-height: min(50vh, 400px); object-fit: contain; }
+@media (max-height: 700px) { :root { --slide-padding: clamp(0.75rem,3vw,2rem); --content-gap: clamp(0.4rem,1.5vw,1rem); --title-size: clamp(1.25rem,4.5vw,2.5rem); --h2-size: clamp(1rem,3vw,1.75rem); } }
+@media (max-height: 600px) { :root { --slide-padding: clamp(0.5rem,2.5vw,1.5rem); --content-gap: clamp(0.3rem,1vw,0.75rem); --title-size: clamp(1.1rem,4vw,2rem); --body-size: clamp(0.7rem,1.2vw,0.95rem); } .nav-dots, .keyboard-hint, .decorative { display: none; } }
+@media (max-height: 500px) { :root { --slide-padding: clamp(0.4rem,2vw,1rem); --title-size: clamp(1rem,3.5vw,1.5rem); --h2-size: clamp(0.9rem,2.5vw,1.25rem); --body-size: clamp(0.65rem,1vw,0.85rem); } }
+@media (max-width: 600px) { :root { --title-size: clamp(1.25rem,7vw,2.5rem); } .grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; } html { scroll-behavior: auto; } }
+
+/* === REVEAL === */
+.reveal { opacity: 0; transform: translateY(25px); transition: opacity var(--duration-normal) var(--ease-out-expo), transform var(--duration-normal) var(--ease-out-expo); }
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal.d1 { transition-delay: 0.1s; }
+.slide.visible .reveal.d2 { transition-delay: 0.2s; }
+.slide.visible .reveal.d3 { transition-delay: 0.3s; }
+.slide.visible .reveal.d4 { transition-delay: 0.4s; }
+.slide.visible .reveal.d5 { transition-delay: 0.5s; }
+.slide.visible .reveal.d6 { transition-delay: 0.6s; }
+
+/* === SHARED === */
+.floating-orb { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(60px); }
+.orb-purple { background: radial-gradient(circle, rgba(139,92,246,0.35) 0%, rgba(139,92,246,0) 70%); }
+.orb-pink { background: radial-gradient(circle, rgba(217,70,239,0.3) 0%, rgba(217,70,239,0) 70%); }
+.orb-blue { background: radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0) 70%); }
+@keyframes orbFloat1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,-30px) scale(1.05); } }
+@keyframes orbFloat2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-25px,20px) scale(0.95); } }
+@keyframes orbFloat3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(15px,25px) scale(1.03); } }
+
+.section-label { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent-purple); margin-bottom: clamp(0.4rem,0.8vw,0.6rem); }
+.section-title { font-family: var(--font-display); font-size: var(--h2-size); font-weight: 800; line-height: 1.12; margin-bottom: clamp(0.5rem,1vw,0.9rem); letter-spacing: -0.01em; }
+.section-desc { font-size: var(--body-size); color: var(--text-secondary); line-height: 1.6; }
+
+/* === TITLE === */
+.title-slide { background: #0B0015; }
+.title-slide::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 90% 90% at 50% 50%, transparent 40%, rgba(11,0,21,0.6) 100%); pointer-events: none; z-index: 0; }
+.title-slide .slide-content { align-items: center; text-align: center; gap: clamp(0.6rem,1.5vw,1.2rem); }
+.title-label { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.35em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+.title-main { font-family: var(--font-display); font-size: var(--title-size); font-weight: 800; line-height: 1.05; letter-spacing: -0.025em; text-shadow: 0 0 30px rgba(139,92,246,0.3), 0 0 80px rgba(139,92,246,0.15); max-width: 16ch; }
+.title-main em { font-style: normal; background: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 25px rgba(217,70,239,0.5)) drop-shadow(0 0 60px rgba(139,92,246,0.3)); }
+.title-accent { width: clamp(40px,5vw,56px); height: 3px; background: linear-gradient(90deg, var(--accent-orange), var(--accent-pink)); border-radius: 2px; box-shadow: 0 0 12px rgba(255,153,0,0.4), 0 0 30px rgba(217,70,239,0.2); }
+.title-sub { font-size: var(--subtitle-size); color: rgba(255,255,255,0.65); max-width: min(90vw,640px); line-height: 1.6; }
+.blob-canvas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.blob { position: absolute; border-radius: 50%; filter: blur(80px); will-change: transform, opacity; }
+@keyframes blob1 { 0%{transform:translate(0,0) scale(1);background:rgba(139,92,246,0.55);}25%{transform:translate(8vw,-12vh) scale(1.2);background:rgba(217,70,239,0.6);}50%{transform:translate(-5vw,8vh) scale(0.9);background:rgba(59,130,246,0.5);}75%{transform:translate(12vw,5vh) scale(1.15);background:rgba(236,72,153,0.55);}100%{transform:translate(0,0) scale(1);background:rgba(139,92,246,0.55);} }
+@keyframes blob2 { 0%{transform:translate(0,0) scale(1);background:rgba(217,70,239,0.45);}33%{transform:translate(-10vw,10vh) scale(1.1);background:rgba(139,92,246,0.5);}66%{transform:translate(6vw,-8vh) scale(0.95);background:rgba(124,58,237,0.5);}100%{transform:translate(0,0) scale(1);background:rgba(217,70,239,0.45);} }
+@keyframes blob3 { 0%{transform:translate(0,0) scale(1);background:rgba(59,80,200,0.4);}50%{transform:translate(-8vw,-6vh) scale(1.18);background:rgba(168,85,247,0.45);}100%{transform:translate(0,0) scale(1);background:rgba(59,80,200,0.4);} }
+@keyframes blob4 { 0%{transform:translate(0,0) scale(1);background:rgba(236,72,153,0.3);}50%{transform:translate(7vw,9vh) scale(1.1);background:rgba(217,70,239,0.4);}100%{transform:translate(0,0) scale(1);background:rgba(236,72,153,0.3);} }
+
+/* === BULLETS (centered single column) === */
+.bullet-block { width: 100%; max-width: min(80vw, 760px); margin: 0 auto; }
+.dot-bullets { list-style: none; display: flex; flex-direction: column; gap: clamp(0.55rem,1.4vh,1rem); }
+.dot-bullets li { font-size: clamp(0.85rem,1.7vw,1.2rem); color: rgba(255,255,255,0.82); line-height: 1.5; padding-left: clamp(1.1rem,2vw,1.5rem); position: relative; }
+.dot-bullets li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: clamp(6px,0.7vw,8px); height: clamp(6px,0.7vw,8px); border-radius: 50%; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); box-shadow: 0 0 8px rgba(139,92,246,0.6); }
+
+/* === CHART (text + chart two-col) === */
+.chart-layout { display: grid; grid-template-columns: 1fr 1.15fr; gap: clamp(1.2rem,3vw,3rem); align-items: center; width: 100%; max-width: min(92vw,1180px); margin: 0 auto; }
+@media (max-width: 820px) { .chart-layout { grid-template-columns: 1fr; gap: clamp(0.8rem,2vh,1.2rem); } }
+.chart-bullets { list-style: none; display: flex; flex-direction: column; gap: clamp(0.5rem,1.2vh,0.9rem); margin-top: clamp(0.4rem,1vw,0.7rem); }
+.chart-bullets li { font-size: var(--body-size); color: var(--text-secondary); line-height: 1.45; padding-left: clamp(1rem,1.8vw,1.4rem); position: relative; }
+.chart-bullets li::before { content: ''; position: absolute; left: 0; top: 0.55em; width: clamp(5px,0.6vw,7px); height: clamp(5px,0.6vw,7px); border-radius: 50%; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); box-shadow: 0 0 8px rgba(139,92,246,0.6); }
+.chart-card { background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.2); border-radius: clamp(10px,1.2vw,16px); padding: clamp(14px,2vw,26px); box-shadow: 0 0 40px rgba(139,92,246,0.08), inset 0 0 60px rgba(139,92,246,0.03); width: 100%; }
+.chart-card h3 { font-family: var(--font-display); font-size: clamp(11px,1.2vw,15px); font-weight: 700; color: var(--accent-purple); margin-bottom: clamp(6px,1vh,12px); text-transform: uppercase; letter-spacing: 0.08em; }
+.chart-container { position: relative; width: 100%; height: clamp(150px,32vh,300px); }
+
+/* === DIAGRAM (draw.io PNG) === */
+.diagram-figure { display: flex; flex-direction: column; align-items: center; gap: clamp(0.4rem,1vh,0.8rem); width: 100%; max-width: min(1100px,92vw); margin: 0 auto; }
+.diagram-image { width: auto; max-width: 100%; max-height: min(60vh,560px); object-fit: contain; cursor: zoom-in; filter: drop-shadow(0 12px 40px rgba(139,92,246,0.18)); }
+.diagram-caption { font-family: var(--font-body); font-size: clamp(0.7rem,1.1vw,0.9rem); color: var(--text-secondary); text-align: center; }
+@media (max-height: 600px) { .diagram-image { max-height: 52vh; } }
+@media (max-height: 500px) { .diagram-image { max-height: 46vh; } }
+
+/* === NAV / CHROME === */
+.nav-dots { position: fixed; right: clamp(14px,2vw,26px); top: 50%; transform: translateY(-50%); z-index: 900; display: flex; flex-direction: column; gap: 12px; }
+.nav-dots button { width: 10px; height: 10px; border-radius: 50%; border: none; cursor: pointer; padding: 0; background: rgba(255,255,255,0.22); transition: all 0.3s; }
+.nav-dots button.active { background: var(--accent-purple); box-shadow: 0 0 12px var(--glow-purple); transform: scale(1.35); }
+.progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0%; z-index: 1000; background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink), var(--accent-orange)); transition: width 0.25s ease; }
+.slide-footer { position: fixed; bottom: clamp(8px,1.2vh,16px); left: clamp(12px,2vw,24px); z-index: 999; font-size: clamp(0.6rem,1vw,0.78rem); letter-spacing: 0.02em; color: rgba(255,255,255,0.42); }
+.page-number { position: fixed; bottom: clamp(8px,1.2vh,16px); right: clamp(12px,2vw,24px); z-index: 999; font-family: var(--font-body); font-size: clamp(0.6rem,0.9vw,0.75rem); letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
+@media (max-height: 600px) { .slide-footer, .page-number { display: none; } }
+.kbd-hint { position: fixed; bottom: clamp(8px,1.2vh,16px); left: 50%; transform: translateX(-50%); z-index: 800; font-size: clamp(0.6rem,0.9vw,0.72rem); color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
+@media (max-height: 600px) { .kbd-hint { display: none; } }
+
+/* === LIGHTBOX (diagrams are zoomable) === */
+.lightbox { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.92); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; cursor: zoom-out; }
+.lightbox.active { opacity: 1; pointer-events: auto; }
+.lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 8px; transform: scale(0.9); transition: transform 0.3s var(--ease-out-expo); }
+.lightbox.active img { transform: scale(1); }
+.lightbox-close { position: absolute; top: clamp(12px,2vh,24px); right: clamp(12px,2vw,24px); font-size: clamp(1.2rem,2vw,1.8rem); color: rgba(255,255,255,0.6); background: none; border: none; cursor: pointer; transition: color 0.2s; }
+.lightbox-close:hover { color: var(--accent-purple); }
+.lightbox-hint { position: absolute; bottom: clamp(12px,2vh,24px); left: 50%; transform: translateX(-50%); font-size: var(--small-size); color: rgba(255,255,255,0.3); }
+
+/* === OVERVIEW === */
+.overview-overlay { position: fixed; inset: 0; z-index: 9998; background: rgba(8,4,16,0.94); backdrop-filter: blur(14px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; overflow-y: auto; }
+.overview-overlay.active { opacity: 1; pointer-events: auto; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: clamp(16px,2.5vw,32px); padding: clamp(48px,6vh,80px) clamp(24px,5vw,72px); max-width: 1600px; margin: 0 auto; }
+.overview-card { position: relative; aspect-ratio: 16/9; background: var(--bg-primary); border: 2px solid rgba(255,255,255,0.12); border-radius: 10px; overflow: hidden; cursor: pointer; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; padding: 0; }
+.overview-card:hover, .overview-card:focus-visible { border-color: var(--accent-purple); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.5); outline: none; }
+.overview-card.current { border-color: var(--accent-purple); box-shadow: 0 0 0 3px rgba(139,92,246,0.4); }
+.overview-thumb { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.overview-page-number { position: absolute; bottom: 8px; right: 10px; padding: 2px 8px; font-family: var(--font-body); font-size: 0.75rem; font-variant-numeric: tabular-nums; color: #fff; background: rgba(0,0,0,0.65); border-radius: 4px; z-index: 2; }
+.overview-hint { position: fixed; top: clamp(12px,2vh,20px); right: clamp(16px,2vw,24px); font-size: 0.8rem; color: rgba(255,255,255,0.55); z-index: 10003; }
+.overview-hint kbd { background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.75rem; }
+body.overview-open { overflow: hidden; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<nav class="nav-dots" id="navDots"></nav>
+<div class="slide-footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+<div class="page-number" id="pageNumber">1</div>
+<div class="kbd-hint">↑ ↓ / Space to navigate · click diagrams to zoom · Esc for overview</div>
+
+<!-- SLIDE 1 — TITLE -->
+<section class="slide title-slide">
+    <div class="blob-canvas">
+        <div class="blob" style="width:55vw;height:55vw;top:-10%;left:40%;background:rgba(139,92,246,0.5);animation:blob1 14s ease-in-out infinite;"></div>
+        <div class="blob" style="width:50vw;height:50vw;bottom:-5%;left:-10%;background:rgba(217,70,239,0.45);animation:blob2 17s ease-in-out infinite;"></div>
+        <div class="blob" style="width:40vw;height:40vw;top:20%;left:10%;background:rgba(59,80,200,0.4);animation:blob3 20s ease-in-out infinite;"></div>
+        <div class="blob" style="width:35vw;height:35vw;bottom:10%;right:5%;background:rgba(236,72,153,0.3);animation:blob4 22s ease-in-out infinite;"></div>
+    </div>
+    <div class="slide-content">
+        <div class="title-label reveal d1">AWS RE:INVENT · ARCHITECTURE</div>
+        <h1 class="title-main reveal d2">Serverless Image<br><em>Processing on AWS</em></h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="title-sub reveal d4">A reference architecture for ingesting, analyzing, and serving images at scale — without managing a single server.</p>
+    </div>
+</section>
+
+<!-- SLIDE 2 — PROBLEM (bullets) -->
+<section class="slide">
+    <div class="floating-orb orb-purple" style="width:30vw;height:30vw;top:8%;right:5%;animation:orbFloat2 15s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink" style="width:22vw;height:22vw;bottom:10%;left:4%;animation:orbFloat3 17s ease-in-out infinite;"></div>
+    <div class="slide-content" style="align-items:center;gap:var(--content-gap);">
+        <div class="section-label reveal d1" style="text-align:center;">THE PROBLEM</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">Why Serverless for Media</h2>
+        <div class="bullet-block reveal d3">
+            <ul class="dot-bullets">
+                <li>Image workloads are spiky — traffic arrives in unpredictable bursts</li>
+                <li>Provisioning for peak wastes money; provisioning for average drops requests</li>
+                <li>Pay-per-request services absorb the spikes automatically</li>
+                <li>The team should write handlers, not babysit fleets</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 3 — AWS ARCHITECTURE DIAGRAM -->
+<section class="slide">
+    <div class="floating-orb orb-blue" style="width:28vw;height:28vw;top:6%;left:8%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+    <div class="slide-content" style="align-items:center;gap:clamp(0.6rem,1.5vh,1.1rem);">
+        <div class="section-label reveal d1" style="text-align:center;">ARCHITECTURE</div>
+        <h2 class="section-title reveal d2" style="text-align:center;margin-bottom:0;">End-to-End Architecture</h2>
+        <figure class="diagram-figure reveal d3">
+            <img class="slide-image diagram-image" src="assets/diagram-1.png" alt="Event-driven serverless image pipeline: users upload to S3, which triggers Lambda; Lambda calls Rekognition and writes to DynamoDB; CloudFront delivers images back to users.">
+            <figcaption class="diagram-caption">Event-driven pipeline — upload to delivery, fully managed</figcaption>
+        </figure>
+    </div>
+</section>
+
+<!-- SLIDE 4 — FLOWCHART DIAGRAM -->
+<section class="slide">
+    <div class="floating-orb orb-pink" style="width:26vw;height:26vw;bottom:8%;right:6%;animation:orbFloat2 15s ease-in-out infinite;"></div>
+    <div class="slide-content" style="align-items:center;gap:clamp(0.6rem,1.5vh,1.1rem);">
+        <div class="section-label reveal d1" style="text-align:center;">REQUEST FLOW</div>
+        <h2 class="section-title reveal d2" style="text-align:center;margin-bottom:0;">What Happens on Upload</h2>
+        <figure class="diagram-figure reveal d3">
+            <img class="slide-image diagram-image" src="assets/diagram-2.png" alt="Upload decision flow: validate the file; if invalid, reject; if valid, store and analyze with Rekognition; if flagged, quarantine; otherwise publish to the CDN." style="max-height:min(58vh,540px);">
+            <figcaption class="diagram-caption">The processing decision path for a single upload</figcaption>
+        </figure>
+    </div>
+</section>
+
+<!-- SLIDE 5 — WHY IT SCALES (bullets) -->
+<section class="slide">
+    <div class="floating-orb orb-purple" style="width:28vw;height:28vw;top:10%;left:6%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+    <div class="slide-content" style="align-items:center;gap:var(--content-gap);">
+        <div class="section-label reveal d1" style="text-align:center;">ELASTICITY</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">Scales to Zero, Scales to Peak</h2>
+        <div class="bullet-block reveal d3">
+            <ul class="dot-bullets">
+                <li>Every component is pay-per-use — idle cost trends to zero</li>
+                <li>Lambda concurrency absorbs bursts without pre-warming fleets</li>
+                <li>DynamoDB on-demand matches throughput to actual traffic</li>
+                <li>CloudFront caches at the edge, shielding the origin</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 6 — COST CHART -->
+<section class="slide">
+    <div class="floating-orb orb-blue" style="width:26vw;height:26vw;bottom:10%;right:6%;animation:orbFloat3 16s ease-in-out infinite;"></div>
+    <div class="slide-content">
+        <div class="chart-layout">
+            <div>
+                <div class="section-label reveal d1">COST PROFILE</div>
+                <h2 class="section-title reveal d2">The Numbers<br>Behind It</h2>
+                <ul class="chart-bullets">
+                    <li class="reveal d3">No idle servers means no idle bill</li>
+                    <li class="reveal d4">Cost grows linearly and predictably with real usage</li>
+                    <li class="reveal d5">Edge caching cuts origin requests by the majority of traffic</li>
+                </ul>
+            </div>
+            <div class="chart-card reveal d3">
+                <h3>Monthly cost by traffic level ($)</h3>
+                <div class="chart-container"><canvas id="chartCost"></canvas></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 7 — CLOSING -->
+<section class="slide title-slide">
+    <div class="blob-canvas">
+        <div class="blob" style="width:50vw;height:50vw;top:-8%;left:35%;background:rgba(139,92,246,0.5);animation:blob1 15s ease-in-out infinite;"></div>
+        <div class="blob" style="width:46vw;height:46vw;bottom:-6%;left:-8%;background:rgba(217,70,239,0.45);animation:blob2 18s ease-in-out infinite;"></div>
+        <div class="blob" style="width:36vw;height:36vw;bottom:8%;right:6%;background:rgba(236,72,153,0.3);animation:blob4 21s ease-in-out infinite;"></div>
+    </div>
+    <div class="slide-content">
+        <div class="title-label reveal d1">THANK YOU</div>
+        <h1 class="title-main reveal d2">Build the Pipeline,<br><em>Not the Plumbing</em></h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="title-sub reveal d4">Questions welcome.</p>
+    </div>
+</section>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+    <button class="lightbox-close" aria-label="Close">&times;</button>
+    <img src="" alt="">
+    <span class="lightbox-hint">Click anywhere or press Esc to close</span>
+</div>
+
+<!-- OVERVIEW -->
+<div class="overview-overlay" id="overviewOverlay" role="dialog" aria-label="Slide overview" aria-hidden="true">
+    <div class="overview-hint">Click a slide or press <kbd>Esc</kbd> to close</div>
+    <div class="overview-grid" id="overviewGrid"></div>
+</div>
+
+<script>
+/* === SLIDE CONTROLLER === */
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('body > .slide'));
+        this.current = 0;
+        this.pageNum = document.getElementById('pageNumber');
+        this.progress = document.getElementById('progressBar');
+        this.setupObserver(); this.setupNavDots(); this.setupKeyboard(); this.setupWheel(); this.setupTouch(); this.updateUI(0);
+    }
+    setupObserver() {
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); const i = this.slides.indexOf(e.target); if (i>=0) this.updateUI(i); } });
+        }, { threshold: 0.55 });
+        this.slides.forEach(s => io.observe(s));
+    }
+    setupNavDots() {
+        const nav = document.getElementById('navDots');
+        this.slides.forEach((_, i) => { const b = document.createElement('button'); b.setAttribute('aria-label','Go to slide '+(i+1)); b.addEventListener('click', () => this.slides[i].scrollIntoView({behavior:'smooth'})); nav.appendChild(b); });
+        this.dots = Array.from(nav.children);
+    }
+    updateUI(i) { this.current = i; if (this.pageNum) this.pageNum.textContent = (i+1); if (this.progress) this.progress.style.width = ((i+1)/this.slides.length*100)+'%'; if (this.dots) this.dots.forEach((d,k) => d.classList.toggle('active', k===i)); }
+    go(dir) { const t = Math.max(0, Math.min(this.slides.length-1, this.current+dir)); this.slides[t].scrollIntoView({behavior:'smooth'}); }
+    setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (window.__overview && window.__overview.isOpen) return;
+            if (window.__lightbox && window.__lightbox.isOpen) return;
+            if (['ArrowDown','ArrowRight','PageDown',' '].includes(e.key)) { e.preventDefault(); this.go(1); }
+            else if (['ArrowUp','ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); this.go(-1); }
+            else if (e.key === 'Home') { e.preventDefault(); this.slides[0].scrollIntoView({behavior:'smooth'}); }
+            else if (e.key === 'End') { e.preventDefault(); this.slides[this.slides.length-1].scrollIntoView({behavior:'smooth'}); }
+        });
+    }
+    setupWheel() {
+        let lock = false;
+        window.addEventListener('wheel', (e) => {
+            if (window.__overview && window.__overview.isOpen) return;
+            if (window.__lightbox && window.__lightbox.isOpen) return;
+            if (lock) return; if (Math.abs(e.deltaY) < 24) return;
+            lock = true; this.go(e.deltaY>0?1:-1); setTimeout(() => lock=false, 700);
+        }, { passive: true });
+    }
+    setupTouch() {
+        let y0 = null;
+        window.addEventListener('touchstart', e => y0 = e.touches[0].clientY, { passive: true });
+        window.addEventListener('touchend', e => { if (y0===null) return; const dy = y0 - e.changedTouches[0].clientY; if (Math.abs(dy)>50) this.go(dy>0?1:-1); y0 = null; }, { passive: true });
+    }
+}
+window.__slides = new SlidePresentation();
+
+/* === LIGHTBOX === */
+class Lightbox {
+    constructor() {
+        this.overlay = document.getElementById('lightbox');
+        this.img = this.overlay.querySelector('img');
+        this.isOpen = false;
+        document.querySelectorAll('.slide-image').forEach(img => { img.addEventListener('click', (e) => { e.stopPropagation(); this.open(img.src, img.alt); }); });
+        this.overlay.addEventListener('click', () => this.close());
+        this.overlay.querySelector('.lightbox-close').addEventListener('click', (e) => { e.stopPropagation(); this.close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.isOpen) { e.stopPropagation(); this.close(); } }, true);
+    }
+    open(src, alt) { this.img.src = src; this.img.alt = alt; this.overlay.classList.add('active'); this.isOpen = true; }
+    close() { this.overlay.classList.remove('active'); this.isOpen = false; }
+}
+window.__lightbox = new Lightbox();
+
+/* === OVERVIEW === */
+class Overview {
+    constructor() {
+        this.overlay = document.getElementById('overviewOverlay'); this.grid = document.getElementById('overviewGrid');
+        this.isOpen = false; this.focusedIndex = 0;
+        this._setupKeyboard();
+        this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay || e.target === this.grid) this.close(); });
+        window.addEventListener('resize', () => { if (this.isOpen) this._rescaleAll(); });
+    }
+    _setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') {
+                if (!this.isOpen) return;
+                const cards = this.grid.querySelectorAll('.overview-card'); if (!cards.length) return;
+                const cols = this._currentColumns(); let next = this.focusedIndex;
+                if (e.key === 'ArrowRight') next = Math.min(cards.length-1, next+1);
+                else if (e.key === 'ArrowLeft') next = Math.max(0, next-1);
+                else if (e.key === 'ArrowDown') next = Math.min(cards.length-1, next+cols);
+                else if (e.key === 'ArrowUp') next = Math.max(0, next-cols);
+                else if (e.key === 'Enter') { e.preventDefault(); this._jumpTo(this.focusedIndex); return; }
+                else return;
+                e.preventDefault(); this.focusedIndex = next; cards[next].focus(); return;
+            }
+            if (window.__lightbox && window.__lightbox.isOpen) return;  // lightbox owns Esc when open
+            const a = document.activeElement; const isTyping = a && (a.isContentEditable || a.tagName==='INPUT' || a.tagName==='TEXTAREA');
+            if (isTyping) return;
+            e.preventDefault(); this.toggle();
+        });
+    }
+    _currentColumns() { const cards = this.grid.querySelectorAll('.overview-card'); if (cards.length<2) return 1; const t0 = cards[0].offsetTop; let c=1; for (let i=1;i<cards.length;i++){ if (cards[i].offsetTop!==t0) break; c++; } return c; }
+    toggle() { this.isOpen ? this.close() : this.open(); }
+    open() { this._build(); this.overlay.classList.add('active'); this.overlay.setAttribute('aria-hidden','false'); document.body.classList.add('overview-open'); this.isOpen = true; this._highlightCurrent(); this._rescaleAll(); const cards = this.grid.querySelectorAll('.overview-card'); if (cards[this.focusedIndex]) cards[this.focusedIndex].focus(); }
+    close() { this.overlay.classList.remove('active'); this.overlay.setAttribute('aria-hidden','true'); document.body.classList.remove('overview-open'); this.isOpen = false; }
+    _build() {
+        this.grid.innerHTML = '';
+        const slides = document.querySelectorAll('body > .slide');
+        slides.forEach((slide, i) => {
+            const card = document.createElement('button'); card.type='button'; card.className='overview-card'; card.setAttribute('aria-label','Go to slide '+(i+1)); card.dataset.index=i;
+            const thumb = document.createElement('div'); thumb.className='overview-thumb';
+            const clone = slide.cloneNode(true);
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('script').forEach(s => s.remove());
+            const liveC = slide.querySelectorAll('canvas'); const cloneC = clone.querySelectorAll('canvas');
+            liveC.forEach((lv, idx) => { const c = cloneC[idx]; if (!c) return; try { const img = document.createElement('img'); img.src = lv.toDataURL('image/png'); img.style.width = lv.offsetWidth+'px'; img.style.height = lv.offsetHeight+'px'; img.style.display='block'; c.replaceWith(img); } catch(_){} });
+            clone.style.width = slide.offsetWidth+'px'; clone.style.height = slide.offsetHeight+'px'; clone.style.minHeight='auto'; clone.style.transform='none';
+            thumb.appendChild(clone);
+            const pn = document.createElement('span'); pn.className='overview-page-number'; pn.textContent=(i+1)+' / '+slides.length;
+            card.appendChild(thumb); card.appendChild(pn);
+            card.addEventListener('click', () => this._jumpTo(i));
+            card.addEventListener('focus', () => { this.focusedIndex = i; });
+            this.grid.appendChild(card);
+        });
+    }
+    _rescaleAll() {
+        this.grid.querySelectorAll('.overview-card').forEach((card) => {
+            const thumb = card.querySelector('.overview-thumb'); const clone = thumb.firstElementChild; if (!clone) return;
+            const cardW = card.clientWidth, cardH = card.clientHeight;
+            const slideW = parseFloat(clone.style.width) || window.innerWidth;
+            const slideH = parseFloat(clone.style.height) || window.innerHeight;
+            const scale = Math.min(cardW/slideW, cardH/slideH);
+            clone.style.transform = 'scale('+scale+')'; clone.style.transformOrigin='top left'; clone.style.position='absolute';
+            clone.style.left = ((cardW - slideW*scale)/2)+'px'; clone.style.top = ((cardH - slideH*scale)/2)+'px';
+        });
+    }
+    _currentSlideIndex() { const slides = document.querySelectorAll('body > .slide'); const y = window.scrollY + window.innerHeight/2; let best=0,bd=Infinity; slides.forEach((s,i)=>{ const m = s.offsetTop + s.offsetHeight/2; const d = Math.abs(m-y); if (d<bd){bd=d;best=i;} }); return best; }
+    _highlightCurrent() { const cur = this._currentSlideIndex(); this.focusedIndex = cur; this.grid.querySelectorAll('.overview-card').forEach((c,i)=>c.classList.toggle('current', i===cur)); }
+    _jumpTo(i) { const s = document.querySelectorAll('body > .slide')[i]; if (!s) return; this.close(); requestAnimationFrame(() => s.scrollIntoView({behavior:'smooth', block:'start'})); }
+}
+window.__overview = new Overview();
+
+/* === CHART === */
+const C = { purple:'#8B5CF6', pink:'#D946EF', orange:'#FF9900', cyan:'#06B6D4', green:'#34D399', rose:'#F472B6', grid:'rgba(139,92,246,0.10)', text:'rgba(255,255,255,0.55)', bg:'#0A0A0A' };
+function initCharts() {
+    if (typeof Chart === 'undefined') return;
+    Chart.defaults.font.family = "'Albert Sans', sans-serif"; Chart.defaults.color = C.text;
+    new Chart(document.getElementById('chartCost'), {
+        type: 'bar',
+        data: { labels: ['Idle','Low','Average','Peak'],
+            datasets: [
+                { label: 'Serverless', data: [2,40,180,520], backgroundColor: C.purple, borderRadius: 6, maxBarThickness: 46 },
+                { label: 'Always-on fleet', data: [600,600,700,900], backgroundColor: 'rgba(244,114,182,0.55)', borderRadius: 6, maxBarThickness: 46 }
+            ] },
+        options: { responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { usePointStyle: true, pointStyleWidth: 8, padding: 14, font: { size: 11 } } } },
+            scales: { x: { grid: { display:false }, ticks: { font:{size:11} } }, y: { grid: { color: C.grid }, ticks: { font:{size:11} }, beginAtZero: true } }
+        }
+    });
+}
+
+window.addEventListener('load', () => {
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    initCharts();
+    const first = document.querySelector('body > .slide'); if (first) first.classList.add('visible');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AWS re:Invent Keynote — All Effects (Integration Test)</title>
+
+<!--
+  ============================================================================
+  ALL-EFFECTS INTEGRATION TEST DECK
+  ----------------------------------------------------------------------------
+  A single self-contained, OFFLINE, zero-CDN deck that runs EVERY effect from
+  the effects-reference catalog together in one document, to prove they
+  coexist without conflict:
+
+    SLIDE 1  Cover      — WebGL nebula shader background  +  GSAP kinetic title
+    SLIDE 2  Cube hero  — pure CSS 3D rotating cube + stage light-pool
+    SLIDE 3  Parallax   — pure CSS 2.5D depth title (layered translateZ)
+    SLIDE 4  Cards      — GSAP timeline: staggered feature cards + gradient ring
+    SLIDE 5  Closing    — CSS aurora blobs + @property conic halo
+
+  Real slide engine: arrow keys / Space / nav dots / wheel. Each slide is
+  100vh, overflow hidden. Per-slide entrance: GSAP timelines replay on enter;
+  the nebula loop starts on slide 1 and PAUSES on every other slide (GPU).
+
+  Offline: GSAP 3.13 + SplitText + DrawSVG are vendored in ./vendor/. Icons are
+  inline Lucide SVG (ISC). No web fonts, no network at runtime. Double-click it.
+
+  The three "flattening gotcha" preserve-3d parents (.cube, .scene) carry NO
+  opacity/filter/overflow — glow lives on their children. The slide engine
+  toggles display (not opacity) so an ancestor never flattens the 3D.
+  ============================================================================
+-->
+
+<style>
+  /* ================================================================ *
+   *  Tokens — re:Invent Keynote palette                              *
+   * ================================================================ */
+  :root {
+    --bg:        #06030d;   /* deep near-black (matches the shader)    */
+    --purple:    #8B5CF6;
+    --pink:      #D946EF;
+    --magenta:   #EC4899;
+    --blue:      #38BDF8;
+    --aws-orange:#FF9900;
+    --ink:       #F5F3FF;
+    --muted:     rgba(255,255,255,0.60);
+    --card-bg:   rgba(139,92,246,0.07);
+    --card-bd:   rgba(139,92,246,0.22);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+            Arial, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;             /* the deck never scrolls; nav is by index */
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ================================================================ *
+   *  Slide engine — each slide is 100vh, only .active is displayed.  *
+   *  display toggle (NOT opacity) => never flattens nested 3D, and   *
+   *  display:none->block RESTARTS the CSS entrance animations below. *
+   * ================================================================ */
+  .deck { position: relative; width: 100%; height: 100vh; height: 100dvh; }
+
+  .slide {
+    position: absolute; inset: 0;
+    width: 100%; height: 100vh; height: 100dvh;
+    overflow: hidden;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;
+  }
+  .slide.active { display: flex; }
+
+  /* ---- shared ambient blobs (pure CSS, safe to filter — not 3D parents) ---- */
+  .blobs { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .blob  { position: absolute; border-radius: 50%; filter: blur(80px); will-change: transform; }
+  .blob.p { width: 46vmax; height: 46vmax; top: -14vmax; left: -10vmax;
+            background: radial-gradient(circle, rgba(139,92,246,0.40), transparent 68%);
+            animation: drift1 19s ease-in-out infinite alternate; }
+  .blob.m { width: 42vmax; height: 42vmax; bottom: -16vmax; right: -12vmax;
+            background: radial-gradient(circle, rgba(217,70,239,0.32), transparent 68%);
+            animation: drift2 23s ease-in-out infinite alternate; }
+  .blob.b { width: 34vmax; height: 34vmax; top: 38%; left: 56%;
+            background: radial-gradient(circle, rgba(56,189,248,0.22), transparent 70%);
+            animation: drift3 27s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform: translate(8vmax,6vmax) scale(1.15);  } }
+  @keyframes drift2 { to { transform: translate(-7vmax,-5vmax) scale(1.2); } }
+  @keyframes drift3 { to { transform: translate(-6vmax,4vmax) scale(1.05); } }
+
+  /* faint dotted grid for the "platform" feel */
+  .grid-overlay {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background-image: radial-gradient(rgba(139,92,246,0.10) 1px, transparent 1px);
+    background-size: 38px 38px;
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 28%, transparent 80%);
+            mask-image: radial-gradient(circle at 50% 50%, #000 28%, transparent 80%);
+  }
+
+  /* ================================================================ *
+   *  DECK CHROME — fixed, above slides (eyebrow, dots, page #, foot) *
+   * ================================================================ */
+  .chrome-eyebrow {
+    position: fixed; top: 26px; left: 40px; z-index: 30;
+    font-size: 12px; letter-spacing: 0.4em; font-weight: 600;
+    text-transform: uppercase; color: rgba(255,255,255,0.70);
+  }
+  .chrome-eyebrow .tick { color: var(--pink); }
+
+  /* nav dots, vertical right-center */
+  .dots {
+    position: fixed; right: 30px; top: 50%; transform: translateY(-50%);
+    z-index: 30; display: flex; flex-direction: column; gap: 14px;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%; cursor: pointer;
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.30);
+    transition: background .25s, transform .25s, box-shadow .25s;
+  }
+  .dot:hover { transform: scale(1.25); }
+  .dot.on {
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    border-color: transparent;
+    box-shadow: 0 0 14px rgba(217,70,239,0.7);
+    transform: scale(1.2);
+  }
+
+  .page-number {
+    position: fixed; top: 26px; right: 40px; z-index: 30;
+    font-size: 13px; letter-spacing: 0.18em; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .page-number b { color: var(--ink); font-weight: 700; }
+
+  .slide-footer {
+    position: fixed; bottom: 16px; left: 40px; z-index: 30;
+    font-size: 10.5px; letter-spacing: 0.04em; color: rgba(255,255,255,0.34);
+  }
+  .nav-hint {
+    position: fixed; bottom: 16px; right: 40px; z-index: 30;
+    font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(255,255,255,0.34);
+  }
+
+  /* ================================================================ *
+   *  SLIDE 1 — COVER: WebGL nebula + GSAP kinetic title             *
+   * ================================================================ */
+  #slide1 { background: var(--bg); }
+
+  /* the nebula canvas fills the slide, opaque, behind the text */
+  #gl { position: absolute; inset: 0; width: 100%; height: 100%;
+        display: block; z-index: 0; }
+  /* CSS fallback (right-biased mass), shown when WebGL is unavailable */
+  #slide1.no-webgl #gl { display: none; }
+  #slide1 .nebula-fallback {
+    position: absolute; inset: 0; z-index: 0; display: none;
+    background:
+      radial-gradient(ellipse 55% 60% at 72% 42%, rgba(139,92,246,0.42), transparent 62%),
+      radial-gradient(ellipse 40% 45% at 80% 58%, rgba(217,70,239,0.34), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 64% 64%, rgba(59,130,246,0.22), transparent 66%),
+      var(--bg);
+  }
+  #slide1.no-webgl .nebula-fallback { display: block; }
+
+  .cover {
+    position: relative; z-index: 2;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 8vw;
+  }
+  /* dark scrim under the text so it reads over the brightest nebula */
+  .cover::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: radial-gradient(ellipse 70% 80% at 18% 50%,
+      rgba(6,3,13,0.70) 0%, rgba(6,3,13,0.30) 46%, transparent 76%);
+  }
+  .cover .eyebrow {
+    font-size: clamp(11px,1.4vw,15px); letter-spacing: 0.42em; font-weight: 600;
+    text-transform: uppercase; color: rgba(255,255,255,0.78);
+    margin-bottom: 1.1rem;
+    display: inline-flex; align-items: center; gap: .6em;
+  }
+  .cover .eyebrow .odot { width:.5em; height:.5em; border-radius:50%;
+    background: var(--aws-orange); box-shadow: 0 0 12px var(--aws-orange); }
+
+  /* gradient-ink headline — applied to BOTH the h1 and the split .char spans
+     (SplitText moves the glyphs into children, so the clip must live there). */
+  .cover h1, .cover h1 .char {
+    background: linear-gradient(100deg, #fff 0%, #d8c9ff 30%, var(--pink) 64%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .cover h1 {
+    font-size: clamp(38px,7.4vw,104px); line-height: 1.02; font-weight: 800;
+    letter-spacing: -0.02em; max-width: 17ch;
+    filter: drop-shadow(0 4px 30px rgba(139,92,246,0.25));
+  }
+  .cover h1 .char { display: inline-block; will-change: transform, opacity, filter; }
+  .cover h1 .char.is-space { width: .28em; background: none; }
+
+  .cover .underline-wrap { width: clamp(220px,34vw,520px); margin-top: 2.4vmin; line-height: 0; }
+  .cover .underline-wrap svg { width: 100%; height: 20px; display: block; overflow: visible; }
+  .cover .underline-wrap path {
+    fill: none; stroke: url(#coverGrad); stroke-width: 4; stroke-linecap: round;
+    filter: drop-shadow(0 0 8px rgba(217,70,239,0.55));
+  }
+  .cover .subtitle {
+    margin-top: 1.5rem; font-size: clamp(14px,1.9vw,21px); font-weight: 400;
+    color: rgba(255,255,255,0.74); max-width: 44ch; line-height: 1.5;
+  }
+
+  /* ================================================================ *
+   *  SLIDE 2 — CSS 3D ROTATING CUBE + STAGE LIGHT-POOL              *
+   * ================================================================ */
+  #slide2 { --cube: 240px; --half: 120px; }
+
+  /* stage light-pool + reflection echo: grounds the cube. Slide-level
+     children (NOT 3D) so filter/opacity here can't flatten the cube. */
+  .floor { position: absolute; left: 50%; z-index: 1; pointer-events: none;
+           transform: translateX(-50%); will-change: transform; }
+  .floor.pool { top: 62%; width: 520px; height: 145px; filter: blur(26px);
+    background: radial-gradient(ellipse at center,
+      rgba(217,70,239,0.40) 0%, rgba(139,92,246,0.30) 35%, transparent 72%);
+    animation: poolPulse 22s linear infinite; }
+  .floor.echo { top: 71%; width: 350px; height: 86px; filter: blur(30px); opacity: .7;
+    background: radial-gradient(ellipse at center, rgba(56,189,248,0.22) 0%, transparent 70%); }
+  @keyframes poolPulse {
+    0%,100% { opacity:.85; transform: translateX(-50%) scaleX(1);    }
+    50%     { opacity:1;   transform: translateX(-50%) scaleX(1.12); }
+  }
+
+  .stage {
+    position: relative; z-index: 2;
+    perspective: 1100px; perspective-origin: 50% 45%;
+    display: flex; flex-direction: column; align-items: center; gap: 48px;
+    transform: translateY(-5%);
+  }
+  /* // KEEP CLEAN: preserve-3d, NO opacity/filter/overflow here */
+  .cube {
+    position: relative; width: var(--cube); height: var(--cube);
+    transform-style: preserve-3d; transform: rotateX(-22deg) rotateY(-32deg);
+    animation: spin 22s linear infinite; will-change: transform;
+  }
+  @keyframes spin {
+    0%   { transform: rotateX(-22deg) rotateY(0deg);   }
+    50%  { transform: rotateX(-14deg) rotateY(180deg); }
+    100% { transform: rotateX(-22deg) rotateY(360deg); }
+  }
+  .face {
+    position: absolute; width: var(--cube); height: var(--cube);
+    backface-visibility: hidden; border: 2px solid var(--purple); border-radius: 14px;
+    background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(217,70,239,0.14));
+    box-shadow: inset 0 0 40px rgba(217,70,239,0.45),
+                inset 0 0 12px rgba(139,92,246,0.65),
+                0 0 22px rgba(139,92,246,0.55);
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    color: var(--ink); text-shadow: 0 0 10px rgba(217,70,239,0.9);
+  }
+  /* inline Lucide SVG glyphs (ISC), never emoji. glow on the child = safe. */
+  .face .glyph { line-height: 0; filter: drop-shadow(0 0 12px var(--pink)); }
+  .face .glyph svg { width: 56px; height: 56px; stroke: #fff; fill: none;
+    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .face .cap { position: absolute; bottom: 14px; font-size: 12px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.55); text-shadow: none; }
+  .front  { transform: rotateY(  0deg) translateZ(var(--half)); }
+  .back   { transform: rotateY(180deg) translateZ(var(--half)); }
+  .right  { transform: rotateY( 90deg) translateZ(var(--half)); }
+  .left   { transform: rotateY(-90deg) translateZ(var(--half)); }
+  .top    { transform: rotateX( 90deg) translateZ(var(--half)); }
+  .bottom { transform: rotateX(-90deg) translateZ(var(--half)); }
+  .right,.left { border-color: var(--pink);
+    box-shadow: inset 0 0 40px rgba(139,92,246,0.45), inset 0 0 12px rgba(217,70,239,0.65),
+                0 0 22px rgba(217,70,239,0.55); }
+  .top,.bottom { border-color: var(--blue);
+    box-shadow: inset 0 0 40px rgba(56,189,248,0.40), inset 0 0 12px rgba(139,92,246,0.55),
+                0 0 22px rgba(56,189,248,0.45); }
+
+  .cube-caption { text-align: center; }
+  .cube-caption .kicker {
+    display: inline-block; font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--blue); border: 1px solid rgba(56,189,248,0.4);
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 14px;
+  }
+  .cube-caption h2 {
+    font-size: clamp(24px,3.4vw,36px); font-weight: 800; letter-spacing: .5px;
+    background: linear-gradient(90deg, var(--purple), var(--pink), var(--blue));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .cube-caption p { margin-top: 8px; color: var(--muted); font-size: clamp(13px,1.4vw,15px); }
+
+  /* ================================================================ *
+   *  SLIDE 3 — CSS 2.5D PARALLAX TITLE                              *
+   * ================================================================ */
+  .parallax {
+    position: relative; z-index: 2; width: min(900px,86vw); height: 64vh;
+    perspective: 900px; perspective-origin: 50% 50%;
+    animation: ambient 14s ease-in-out infinite alternate;
+  }
+  @keyframes ambient { from { perspective-origin: 42% 44%; } to { perspective-origin: 58% 56%; } }
+  /* // KEEP CLEAN */
+  .scene { position: absolute; inset: 0; transform-style: preserve-3d;
+           display: flex; align-items: center; justify-content: center; }
+  .layer { position: absolute; display: flex; align-items: center; justify-content: center;
+           text-align: center; }
+  .layer.far { transform: translateZ(-400px) scale(1.44);
+    font-size: clamp(90px,17vw,180px); font-weight: 900; letter-spacing: 6px;
+    color: rgba(139,92,246,0.10); text-shadow: 0 0 40px rgba(139,92,246,0.25); white-space: nowrap; }
+  .layer.mid { transform: translateZ(-180px) scale(1.20);
+    width: min(620px,72vw); height: 240px; border-radius: 28px;
+    background: radial-gradient(ellipse at center,
+      rgba(217,70,239,0.30), rgba(139,92,246,0.10) 60%, transparent 75%);
+    box-shadow: 0 0 80px rgba(217,70,239,0.35); }
+  .layer.fore { transform: translateZ(60px) scale(0.93); flex-direction: column; gap: 16px; }
+  .layer.fore .eyebrow { font-size: 13px; letter-spacing: 6px; text-transform: uppercase;
+    color: var(--blue); text-shadow: 0 0 12px rgba(56,189,248,0.8); }
+  .layer.fore h1 { font-size: clamp(46px,7vw,72px); line-height: 1.02; font-weight: 900; letter-spacing: 1px;
+    background: linear-gradient(100deg, var(--purple) 0%, var(--pink) 45%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 18px rgba(217,70,239,0.55)) drop-shadow(0 0 36px rgba(139,92,246,0.35)); }
+  .layer.fore .sub { font-size: clamp(14px,1.6vw,17px); color: var(--ink); opacity: .85; letter-spacing: 1px; }
+
+  /* ================================================================ *
+   *  SLIDE 4 — GSAP STAGGERED FEATURE CARDS                         *
+   * ================================================================ */
+  .s4-wrap { position: relative; z-index: 2; width: 100%; display: flex;
+             flex-direction: column; align-items: center; padding: 0 6vw; }
+  .s4-wrap .eyebrow { font-size: clamp(11px,1.4vw,14px); letter-spacing: .36em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 1rem;
+    display: inline-flex; align-items: center; gap: .55em; }
+  .s4-wrap .eyebrow .odot { width:.5em; height:.5em; border-radius:50%;
+    background: var(--aws-orange); box-shadow: 0 0 12px var(--aws-orange); }
+  .s4-wrap h2 { font-size: clamp(28px,4.6vw,56px); font-weight: 800; letter-spacing: -.01em;
+    text-align: center; margin-bottom: 1.4rem;
+    background: linear-gradient(120deg,#fff 0%, #e9d5ff 45%, #fbcfe8 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cards { display: flex; gap: clamp(14px,2.4vw,30px); flex-wrap: wrap; justify-content: center;
+           margin-top: 1.4vmin; }
+  .card {
+    position: relative; width: clamp(180px,24vw,256px); padding: 24px 24px 26px;
+    border-radius: 16px; text-align: left; background: rgba(255,255,255,0.045);
+    border: 1px solid transparent; backdrop-filter: blur(6px); will-change: transform, opacity;
+  }
+  /* premium gradient hairline (two-mask exclude trick) */
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(150deg, rgba(139,92,246,0.65) 0%, rgba(236,72,153,0.25) 38%, rgba(255,255,255,0.06) 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+  }
+  .card .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+    margin-bottom: 16px; background: linear-gradient(135deg, var(--purple), var(--magenta));
+    box-shadow: 0 6px 18px rgba(139,92,246,0.35); }
+  .card .ic svg { width: 20px; height: 20px; stroke: #fff; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .card h3 { font-size: clamp(15px,1.6vw,17px); font-weight: 650; margin-bottom: 7px; }
+  .card p  { font-size: clamp(12px,1.3vw,14px); color: var(--muted); line-height: 1.45; }
+
+  /* ================================================================ *
+   *  SLIDE 5 — CLOSING: aurora + @property conic halo               *
+   * ================================================================ */
+  /* @property lets us animate the conic gradient angle smoothly. Degrades to
+     a static ring where unsupported (still looks intentional). */
+  @property --halo { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+  .closing { position: relative; z-index: 2; text-align: center; padding: 0 8vw; }
+  /* The spinning conic RING lives on ::before so its radial mask (which hollows
+     out the centre) does NOT clip the .core icon — the icon is a separate child
+     that stays fully painted. Masking the .halo itself would erase the icon. */
+  .halo {
+    position: relative; width: clamp(150px,18vw,220px); height: clamp(150px,18vw,220px);
+    margin: 0 auto 3vmin;
+  }
+  .halo::before {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; z-index: 0;
+    background: conic-gradient(from var(--halo),
+      var(--purple), var(--pink), var(--blue), var(--purple));
+    animation: spinHalo 6s linear infinite;
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 14px), #000 calc(100% - 13px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 14px), #000 calc(100% - 13px));
+    filter: drop-shadow(0 0 22px rgba(217,70,239,0.55));
+  }
+  @keyframes spinHalo { to { --halo: 360deg; } }
+  /* center mark inside the ring (sits above the masked ::before ring) */
+  .halo .core { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; }
+  .halo .core svg { width: 40%; height: 40%; stroke: #fff; fill: none;
+    stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+    filter: drop-shadow(0 0 10px var(--pink)); }
+  .closing h2 { font-size: clamp(30px,5.2vw,64px); font-weight: 800; letter-spacing: -.01em;
+    background: linear-gradient(100deg, var(--purple), var(--pink), var(--blue));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .closing p { margin-top: 1.1rem; color: var(--muted); font-size: clamp(14px,1.8vw,20px); }
+
+  /* ================================================================ *
+   *  CSS entrance reveals for the NON-GSAP slides (2,3,5).          *
+   *  display:none -> flex on .active restarts these animations.     *
+   * ================================================================ */
+  .slide .reveal { opacity: 0; transform: translateY(22px); }
+  .slide.active .reveal { animation: riseIn .8s cubic-bezier(.2,.7,.2,1) forwards; }
+  .slide.active .reveal.d1 { animation-delay: .10s; }
+  .slide.active .reveal.d2 { animation-delay: .22s; }
+  .slide.active .reveal.d3 { animation-delay: .34s; }
+  @keyframes riseIn { to { opacity: 1; transform: translateY(0); } }
+
+  /* ================================================================ *
+   *  Viewport-fit breakpoints                                        *
+   * ================================================================ */
+  @media (max-height: 700px) {
+    #slide2 { --cube: 200px; --half: 100px; }
+    .face .glyph svg { width: 46px; height: 46px; }
+  }
+  @media (max-height: 600px) {
+    #slide2 { --cube: 168px; --half: 84px; }
+    .parallax { height: 70vh; }
+    .chrome-eyebrow, .page-number, .slide-footer, .nav-hint { display: none; }
+  }
+
+  /* ================================================================ *
+   *  REDUCED MOTION — kill all looping/auto motion; static states.  *
+   * ================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .floor.pool, .nav-hint { animation: none !important; }
+    .cube { animation: none !important; transform: rotateX(-24deg) rotateY(-34deg); }
+    .parallax { animation: none !important; perspective-origin: 50% 50%; }
+    .halo { animation: none !important; }
+    .slide .reveal { opacity: 1 !important; transform: none !important; animation: none !important; }
+  }
+
+  /* ================================================================ *
+   *  GRACEFUL 3D DEGRADATION — engines without preserve-3d           *
+   * ================================================================ */
+  @supports not (transform-style: preserve-3d) {
+    .cube { transform: none; animation: none; }
+    .face { position: relative; display: none; }
+    .front { display: flex; }
+    .scene { transform: none; }
+    .layer.far, .layer.mid { display: none; }
+    .layer.fore { transform: none; position: relative; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ===================== DECK CHROME (fixed) ===================== -->
+  <div class="chrome-eyebrow">AWS RE<span class="tick">:</span>INVENT</div>
+  <div class="page-number"><b id="pgCur">1</b> / <span id="pgTot">5</span></div>
+  <nav class="dots" id="dots" aria-label="Slides"></nav>
+  <div class="slide-footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  <div class="nav-hint">← →&nbsp;&nbsp;or&nbsp;&nbsp;Space</div>
+
+  <div class="deck" id="deck">
+
+    <!-- ============================ SLIDE 1 — COVER ============================ -->
+    <section class="slide active" id="slide1" aria-label="Cover">
+      <canvas id="gl"></canvas>
+      <div class="nebula-fallback"></div>
+      <div class="cover">
+        <div class="eyebrow"><span class="odot"></span> Keynote · Main Stage</div>
+        <h1 data-headline>Powered by the Cloud</h1>
+        <div class="underline-wrap">
+          <svg viewBox="0 0 600 20" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="coverGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#8B5CF6"/><stop offset="0.5" stop-color="#D946EF"/><stop offset="1" stop-color="#FF9900"/>
+              </linearGradient>
+            </defs>
+            <path data-underline d="M6 13 C 150 3, 450 3, 594 11" />
+          </svg>
+        </div>
+        <p class="subtitle" data-subtitle>Reimagining what's possible — generative AI, serverless, and the infrastructure powering the next generation of builders.</p>
+      </div>
+    </section>
+
+    <!-- ============================ SLIDE 2 — CUBE ============================ -->
+    <section class="slide" id="slide2" aria-label="CSS 3D cube hero">
+      <div class="blobs"><div class="blob p"></div><div class="blob m"></div><div class="blob b"></div></div>
+      <div class="grid-overlay"></div>
+      <div class="floor pool"></div>
+      <div class="floor echo"></div>
+      <div class="stage">
+        <div class="cube" role="img" aria-label="Rotating 3D platform cube">
+          <div class="face front"><span class="glyph"><!-- lucide: cloud --><svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 0-9h-1.8A7 7 0 1 0 4 16.3"/></svg></span><span class="cap">CORE PLATFORM</span></div>
+          <div class="face back"><span class="glyph"><!-- lucide: zap --><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span><span class="cap">EDGE</span></div>
+          <div class="face right"><span class="glyph"><!-- lucide: cpu --><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg></span><span class="cap">COMPUTE</span></div>
+          <div class="face left"><span class="glyph"><!-- lucide: database --><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></span><span class="cap">DATA</span></div>
+          <div class="face top"><span class="glyph"><!-- lucide: sparkles --><svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/></svg></span><span class="cap">AI / ML</span></div>
+          <div class="face bottom"><span class="glyph"><!-- lucide: hard-drive --><svg viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></span><span class="cap">STORAGE</span></div>
+        </div>
+        <div class="cube-caption">
+          <span class="kicker reveal d1">The Core Platform</span>
+          <h2 class="reveal d2">One Cloud. Every Dimension.</h2>
+          <p class="reveal d3">Compute · Data · AI · Edge · Storage — rendered in pure CSS 3D.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SLIDE 3 — PARALLAX ============================ -->
+    <section class="slide" id="slide3" aria-label="2.5D parallax title">
+      <div class="blobs"><div class="blob p"></div><div class="blob m"></div><div class="blob b"></div></div>
+      <div class="grid-overlay"></div>
+      <div class="parallax">
+        <div class="scene">
+          <div class="layer far">REINVENT</div>
+          <div class="layer mid"></div>
+          <div class="layer fore">
+            <span class="eyebrow reveal">Depth · Layered translateZ</span>
+            <h1 class="reveal d1">Build the<br>Impossible.</h1>
+            <span class="sub reveal d2">A 2.5D parallax title — pure CSS depth, no library.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SLIDE 4 — GSAP CARDS ============================ -->
+    <section class="slide" id="slide4" aria-label="Feature cards">
+      <div class="blobs"><div class="blob p"></div><div class="blob m"></div></div>
+      <div class="s4-wrap">
+        <div class="eyebrow" data-s4-eyebrow><span class="odot"></span> What's new</div>
+        <h2 data-s4-title>Built for builders.</h2>
+        <div class="cards" data-s4-cards>
+          <div class="card">
+            <div class="ic"><!-- lucide: zap --><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+            <h3>Serverless Scale</h3><p>Spin to zero, burst to millions. Pay only for what runs.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><!-- lucide: cpu --><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg></div>
+            <h3>Generative AI</h3><p>Foundation models and agents, built right into the cloud.</p>
+          </div>
+          <div class="card">
+            <div class="ic"><!-- lucide: shield-check --><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <h3>Security First</h3><p>Defense in depth, encrypted by default, everywhere.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SLIDE 5 — CLOSING ============================ -->
+    <section class="slide" id="slide5" aria-label="Closing">
+      <div class="blobs"><div class="blob p"></div><div class="blob m"></div><div class="blob b"></div></div>
+      <div class="closing">
+        <div class="halo reveal"><span class="core"><!-- lucide: sparkles --><svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/></svg></span></div>
+        <h2 class="reveal d1">Thank you.</h2>
+        <p class="reveal d2">Every effect on these slides is self-contained and runs offline.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===================== VENDORED GSAP (offline) ===================== -->
+  <script src="./vendor/gsap.min.js"></script>
+  <script src="./vendor/SplitText.min.js"></script>
+  <script src="./vendor/DrawSVGPlugin.min.js"></script>
+
+  <script>
+  "use strict";
+  /* =====================================================================
+     The combined deck controller. Three independent modules:
+       (A) reduced-motion flag (shared)
+       (B) Nebula  — WebGL1 shader, starts on slide 1, pauses elsewhere
+       (C) GSAP    — per-slide intro timelines, replayed on slide enter
+       (D) Engine  — slide index navigation + dots + page number
+     ===================================================================== */
+
+  var REDUCE = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ===================================================================
+     (B) NEBULA MODULE — the same WebGL1 shader as demos/webgl-nebula,
+     wrapped so the deck can start()/stop() it as slide 1 enters/leaves.
+     =================================================================== */
+  var Nebula = (function () {
+    var canvas = document.getElementById("gl");
+    var slide1 = document.getElementById("slide1");
+    var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+    var FRAME_MS = 1000 / 30;
+
+    var VERT = [
+      "attribute vec2 a_pos;",
+      "void main(){ gl_Position = vec4(a_pos,0.0,1.0); }"
+    ].join("\n");
+
+    var FRAG = [
+      "precision highp float;",
+      "uniform vec2 u_res; uniform float u_time; uniform vec2 u_mouse;",
+      // ---- Ashima/Gustavson 2D simplex noise (MIT). Header kept per license. ----
+      "// GLSL 2D simplex noise — Ian McEwan, Ashima Arts. MIT License.",
+      "// https://github.com/ashima/webgl-noise  /  https://github.com/stegu/webgl-noise",
+      "vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}",
+      "vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}",
+      "vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}",
+      "float snoise(vec2 v){",
+      "  const vec4 C=vec4(0.211324865405187,0.366025403784439,-0.577350269189626,0.024390243902439);",
+      "  vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx);",
+      "  vec2 i1=(x0.x>x0.y)?vec2(1.0,0.0):vec2(0.0,1.0);",
+      "  vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=mod289(i);",
+      "  vec3 p=permute(permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));",
+      "  vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0);",
+      "  m=m*m; m=m*m; vec3 x=2.0*fract(p*C.www)-1.0; vec3 h=abs(x)-0.5;",
+      "  vec3 ox=floor(x+0.5); vec3 a0=x-ox;",
+      "  m*=1.79284291400159-0.85373472095314*(a0*a0+h*h);",
+      "  vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw;",
+      "  return 130.0*dot(m,g);",
+      "}",
+      "float fbm(vec2 p){",
+      "  float val=0.0, amp=0.5, freq=1.0; const int OCT=4;",
+      "  for(int i=0;i<OCT;i++){ val+=amp*snoise(p*freq); freq*=1.9; amp*=0.52; }",
+      "  return val;",
+      "}",
+      "void main(){",
+      "  vec2 uv=(gl_FragCoord.xy-0.5*u_res)/u_res.y;",
+      "  float t=u_time*0.04;",
+      "  vec2 mouseShift=(u_mouse-0.5)*0.4;",
+      "  vec2 p=uv*0.7+mouseShift;",                       // low base freq -> soft forms
+      "  vec2 q=vec2(fbm(p+t), fbm(p+vec2(5.2,1.3)-t*0.75));",
+      "  float f=fbm(p+0.9*q);",                            // single low-gain warp (no marble)
+      "  float cloud=clamp(f*0.45+0.5,0.0,1.0);",
+      "  vec2 c=vec2(0.5,0.0);",                            // right-biased nebula mass
+      "  float rad=length((uv-c)*vec2(0.58,1.05));",
+      "  float mass=smoothstep(1.05,0.08,rad);",
+      "  float density=cloud*mass; density=smoothstep(0.18,0.98,density); density=pow(density,1.35);",
+      "  vec3 cDeep=vec3(0.024,0.010,0.051), cPurple=vec3(0.545,0.361,0.965);",
+      "  vec3 cMag=vec3(0.851,0.275,0.937), cBlue=vec3(0.231,0.510,0.965);",
+      "  float hueMix=clamp(0.35+0.45*(q.x-q.y),0.0,1.0);",
+      "  vec3 base=mix(cPurple,cBlue,hueMix);",
+      "  vec3 col=cDeep;",
+      "  col=mix(col,base,smoothstep(0.18,0.82,density));",
+      "  col=mix(col,cMag,smoothstep(0.62,1.0,density)*0.55);",
+      "  float glow=smoothstep(0.45,1.0,density);",
+      "  col+=base*glow*0.45; col+=cMag*pow(glow,2.4)*0.30;",
+      "  vec2 vp=gl_FragCoord.xy/u_res; float vig=smoothstep(1.2,0.4,length(vp-0.5));",
+      "  col*=mix(0.5,1.0,vig);",
+      "  col=col/(col+vec3(0.85)); col=pow(col,vec3(0.88)); col+=vec3(0.010,0.005,0.018);",
+      "  gl_FragColor=vec4(col,1.0);",
+      "}"
+    ].join("\n");
+
+    var gl=null, prog=null, u_res=null, u_time=null, u_mouse=null;
+    var rafId=0, running=false, start0=0, last=0, ok=false;
+    var mTarget={x:.5,y:.5}, mSmooth={x:.5,y:.5};
+
+    function compile(type,src){
+      var s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+      if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(s)); return null; }
+      return s;
+    }
+    function build(){
+      var vs=compile(gl.VERTEX_SHADER,VERT), fs=compile(gl.FRAGMENT_SHADER,FRAG);
+      if(!vs||!fs) return null;
+      var p=gl.createProgram(); gl.attachShader(p,vs); gl.attachShader(p,fs); gl.linkProgram(p);
+      if(!gl.getProgramParameter(p,gl.LINK_STATUS)){ console.error(gl.getProgramInfoLog(p)); return null; }
+      return p;
+    }
+    function init(){
+      var o={antialias:false,alpha:false,depth:false,stencil:false,powerPreference:"low-power"};
+      gl=canvas.getContext("webgl",o)||canvas.getContext("experimental-webgl",o);
+      if(!gl) return false;
+      prog=build(); if(!prog) return false;
+      var buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+      var loc=gl.getAttribLocation(prog,"a_pos");
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+      gl.useProgram(prog);
+      u_res=gl.getUniformLocation(prog,"u_res"); u_time=gl.getUniformLocation(prog,"u_time");
+      u_mouse=gl.getUniformLocation(prog,"u_mouse");
+      resize(); return true;
+    }
+    function resize(){
+      var w=Math.floor((canvas.clientWidth||window.innerWidth)*DPR);
+      var h=Math.floor((canvas.clientHeight||window.innerHeight)*DPR);
+      if(w<2||h<2){ w=Math.floor(window.innerWidth*DPR); h=Math.floor(window.innerHeight*DPR); }
+      if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; }
+      if(gl) gl.viewport(0,0,canvas.width,canvas.height);
+    }
+    function draw(now){
+      if(!gl||!prog) return;
+      mSmooth.x+=(mTarget.x-mSmooth.x)*0.08; mSmooth.y+=(mTarget.y-mSmooth.y)*0.08;
+      gl.useProgram(prog);
+      gl.uniform2f(u_res,canvas.width,canvas.height);
+      gl.uniform1f(u_time,(now-start0)/1000);
+      gl.uniform2f(u_mouse,mSmooth.x,mSmooth.y);
+      gl.drawArrays(gl.TRIANGLES,0,3);
+    }
+    function loop(now){
+      if(!running) return;
+      rafId=requestAnimationFrame(loop);
+      if(now-last>=FRAME_MS){ last=now-((now-last)%FRAME_MS); draw(now); }
+    }
+
+    window.addEventListener("mousemove",function(e){
+      mTarget.x=e.clientX/window.innerWidth; mTarget.y=1-e.clientY/window.innerHeight;
+    });
+    window.addEventListener("resize",function(){ if(ok){ resize(); if(REDUCE) draw(performance.now()); } });
+    canvas.addEventListener("webglcontextlost",function(e){ e.preventDefault(); running=false; if(rafId)cancelAnimationFrame(rafId); prog=null; },false);
+    canvas.addEventListener("webglcontextrestored",function(){ if(init()){ start0=performance.now(); if(REDUCE) draw(performance.now()); else start(); } },false);
+
+    function start(){
+      if(!ok || REDUCE){ if(ok&&REDUCE){ resize(); draw(performance.now()); } return; }
+      if(running) return;
+      running=true; last=0;
+      if(!start0) start0=performance.now();
+      rafId=requestAnimationFrame(loop);
+    }
+    function stop(){ running=false; if(rafId){ cancelAnimationFrame(rafId); rafId=0; } }
+
+    return {
+      boot: function(){
+        if(!init()){ slide1.classList.add("no-webgl"); return; }
+        ok=true; start0=performance.now();
+        // slide 1 is active on load, give layout a frame then size + run
+        requestAnimationFrame(function(){ resize(); if(REDUCE) draw(performance.now()); else start(); });
+      },
+      onEnter: function(){ if(!ok) return; requestAnimationFrame(function(){ resize(); REDUCE?draw(performance.now()):start(); }); },
+      onLeave: stop,
+      available: function(){ return ok; }
+    };
+  })();
+
+  /* ===================================================================
+     (C) GSAP MODULE — register plugins (feature-detected), define the
+     per-slide intro timelines. Each returns a function we call on enter.
+     =================================================================== */
+  var GsapIntros = (function () {
+    if(!window.gsap){ console.error("[deck] GSAP failed to load"); return {1:noop,4:noop}; }
+    function noop(){}
+    console.log("[deck] GSAP", gsap.version);
+    var hasSplit = typeof window.SplitText!=="undefined";
+    var hasDraw  = typeof window.DrawSVGPlugin!=="undefined";
+    if(hasSplit) gsap.registerPlugin(SplitText);
+    if(hasDraw)  gsap.registerPlugin(DrawSVGPlugin);
+    console.log("[deck] plugins → SplitText:",hasSplit," DrawSVG:",hasDraw);
+
+    // ---- split a headline into .char spans (SplitText or manual fallback) ----
+    function splitChars(el){
+      if(hasSplit){ return new SplitText(el,{type:"chars",charsClass:"char"}).chars; }
+      var txt=el.textContent; el.textContent=""; var out=[];
+      for(var i=0;i<txt.length;i++){
+        var s=document.createElement("span"); s.className="char";
+        if(txt[i]===" "){ s.classList.add("is-space"); s.innerHTML="&nbsp;"; } else { s.textContent=txt[i]; }
+        el.appendChild(s); out.push(s);
+      }
+      return out;
+    }
+
+    // ---------- Slide 1 intro: kinetic title + underline draw + subtitle ----------
+    var s1chars=null, s1built=false, underline=document.querySelector("[data-underline]");
+    function buildS1(){
+      if(s1built) return;
+      s1chars=splitChars(document.querySelector("[data-headline]"));
+      if(hasDraw) gsap.set(underline,{drawSVG:"0%"});
+      else { var L=underline.getTotalLength(); gsap.set(underline,{strokeDasharray:L,strokeDashoffset:L}); }
+      s1built=true;
+    }
+    function introS1(){
+      buildS1();
+      var sub=document.querySelector("[data-subtitle]");
+      if(REDUCE){
+        gsap.set(s1chars,{opacity:1,yPercent:0,filter:"blur(0px)"});
+        gsap.set(sub,{opacity:1,y:0});
+        if(hasDraw) gsap.set(underline,{drawSVG:"100%"}); else gsap.set(underline,{strokeDashoffset:0});
+        return;
+      }
+      gsap.set(s1chars,{opacity:0,yPercent:120,filter:"blur(10px)"});
+      gsap.set(sub,{opacity:0,y:16});
+      if(hasDraw) gsap.set(underline,{drawSVG:"0%"});
+      else { var L=underline.getTotalLength(); gsap.set(underline,{strokeDashoffset:L}); }
+      var tl=gsap.timeline({defaults:{ease:"power3.out"}});
+      tl.to(s1chars,{opacity:1,yPercent:0,filter:"blur(0px)",duration:.8,ease:"back.out(1.7)",stagger:{each:.035}},0.1);
+      if(hasDraw) tl.to(underline,{drawSVG:"100%",duration:.85,ease:"power2.inOut"},"-=0.35");
+      else        tl.to(underline,{strokeDashoffset:0,duration:.85,ease:"power2.inOut"},"-=0.35");
+      tl.to(sub,{opacity:1,y:0,duration:.6},"-=0.4");
+    }
+
+    // ---------- Slide 4 intro: eyebrow + title + staggered cards ----------
+    function introS4(){
+      var eb=document.querySelector("[data-s4-eyebrow]");
+      var ti=document.querySelector("[data-s4-title]");
+      var cards=gsap.utils.toArray("[data-s4-cards] .card");
+      if(REDUCE){ gsap.set([eb,ti],{opacity:1,y:0}); gsap.set(cards,{opacity:1,y:0}); return; }
+      gsap.set(eb,{opacity:0,y:-14}); gsap.set(ti,{opacity:0,y:18}); gsap.set(cards,{opacity:0,y:32});
+      var tl=gsap.timeline({defaults:{ease:"power3.out"}});
+      tl.to(eb,{opacity:1,y:0,duration:.5},0.05)
+        .to(ti,{opacity:1,y:0,duration:.6},"-=0.25")
+        .to(cards,{opacity:1,y:0,duration:.7,stagger:.12},"-=0.3");
+    }
+
+    return { 1: introS1, 4: introS4 };
+  })();
+
+  /* ===================================================================
+     (D) SLIDE ENGINE — index navigation, dots, page number, hooks.
+     =================================================================== */
+  (function () {
+    var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+    var dotsWrap = document.getElementById("dots");
+    var pgCur = document.getElementById("pgCur");
+    document.getElementById("pgTot").textContent = slides.length;
+    var idx = 0, locked = false;
+
+    // build nav dots
+    slides.forEach(function(_,i){
+      var d=document.createElement("button");
+      d.className="dot"+(i===0?" on":""); d.setAttribute("aria-label","Go to slide "+(i+1));
+      d.addEventListener("click",function(){ go(i); });
+      dotsWrap.appendChild(d);
+    });
+    var dots = Array.prototype.slice.call(dotsWrap.children);
+
+    // per-slide enter hooks (effects that must (re)start on enter)
+    function onEnter(i){
+      var n=i+1;
+      if(n===1) Nebula.onEnter(); else Nebula.onLeave();
+      if(GsapIntros[n]) GsapIntros[n]();   // replay GSAP intro for slides 1 & 4
+    }
+
+    function go(i){
+      if(i<0||i>=slides.length||i===idx) return;
+      slides[idx].classList.remove("active");
+      dots[idx].classList.remove("on");
+      idx=i;
+      slides[idx].classList.add("active");   // display:flex -> restarts CSS reveals
+      dots[idx].classList.add("on");
+      pgCur.textContent=idx+1;
+      onEnter(idx);
+    }
+    function next(){ go(idx+1); }
+    function prev(){ go(idx-1); }
+
+    document.addEventListener("keydown",function(e){
+      if(e.key==="ArrowRight"||e.key==="ArrowDown"||e.key===" "||e.key==="PageDown"){ next(); e.preventDefault(); }
+      else if(e.key==="ArrowLeft"||e.key==="ArrowUp"||e.key==="PageUp"){ prev(); e.preventDefault(); }
+      else if(e.key==="Home"){ go(0); e.preventDefault(); }
+      else if(e.key==="End"){ go(slides.length-1); e.preventDefault(); }
+    });
+    // wheel nav with a short lock so one flick = one slide
+    window.addEventListener("wheel",function(e){
+      if(locked) return; if(Math.abs(e.deltaY)<12) return;
+      locked=true; (e.deltaY>0?next:prev)();
+      setTimeout(function(){ locked=false; },700);
+    },{passive:true});
+
+    // BOOT: start nebula + play slide-1 intro
+    Nebula.boot();
+    if(GsapIntros[1]) GsapIntros[1]();
+  })();
+  </script>
+</body>
+</html>

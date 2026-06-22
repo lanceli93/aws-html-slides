@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Introducing Nova Core</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@500;700;800&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<!-- Three.js r160 — last UMD/global build (window.THREE). Vendored, offline. -->
+<script src="./vendor/three.min.js"></script>
+
+<style>
+:root {
+    --bg-primary: #0A0A0A;
+    --accent-purple: #8B5CF6;
+    --accent-pink: #D946EF;
+    --accent-orange: #FF9900;
+    --accent-blue: #38BDF8;
+    --accent: #8B5CF6;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --glow-purple: rgba(139, 92, 246, 0.4);
+    --card-bg: rgba(139, 92, 246, 0.08);
+    --card-border: rgba(139, 92, 246, 0.25);
+    --font-display: 'Urbanist', sans-serif;
+    --font-body: 'Albert Sans', sans-serif;
+    --subtitle-size: clamp(0.9rem, 2vw, 1.35rem);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.7s;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+html, body { height: 100%; overflow-x: hidden; scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+/* Slides sit above the two fixed background canvases (z-index 0).
+   Content + hero slides are TRANSPARENT so a background canvas shows through;
+   only one canvas is active (opaque) at a time per the slide observer.
+   The closing slide is opaque (#0B0015) with its own in-slide blobs. */
+.slide { width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; scroll-snap-align: start; display: flex; flex-direction: column; position: relative; z-index: 1; background: transparent; }
+.slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; max-height: 100%; overflow: hidden; padding: var(--slide-padding); }
+:root {
+    --title-size: clamp(1.5rem, 5vw, 4rem);
+    --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+    --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+    --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+    --small-size: clamp(0.65rem, 1vw, 0.875rem);
+    --slide-padding: clamp(1rem, 4vw, 4rem);
+    --content-gap: clamp(0.5rem, 2vw, 2rem);
+}
+@media (max-height: 700px) { :root { --slide-padding: clamp(0.75rem,3vw,2rem); --content-gap: clamp(0.4rem,1.5vw,1rem); --title-size: clamp(1.25rem,4.5vw,2.5rem); --h2-size: clamp(1rem,3vw,1.75rem); } }
+@media (max-height: 600px) { :root { --slide-padding: clamp(0.5rem,2.5vw,1.5rem); --content-gap: clamp(0.3rem,1vw,0.75rem); --title-size: clamp(1.1rem,4vw,2rem); --body-size: clamp(0.7rem,1.2vw,0.95rem); } .nav-dots, .kbd-hint { display: none; } }
+@media (max-height: 500px) { :root { --slide-padding: clamp(0.4rem,2vw,1rem); --title-size: clamp(1rem,3.5vw,1.5rem); --h2-size: clamp(0.9rem,2.5vw,1.25rem); --body-size: clamp(0.65rem,1vw,0.85rem); } }
+@media (max-width: 600px) { :root { --title-size: clamp(1.25rem,7vw,2.5rem); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; } html { scroll-behavior: auto; } }
+
+.reveal { opacity: 0; transform: translateY(25px); transition: opacity var(--duration-normal) var(--ease-out-expo), transform var(--duration-normal) var(--ease-out-expo); }
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal.d1 { transition-delay: 0.1s; }
+.slide.visible .reveal.d2 { transition-delay: 0.2s; }
+.slide.visible .reveal.d3 { transition-delay: 0.3s; }
+.slide.visible .reveal.d4 { transition-delay: 0.4s; }
+.slide.visible .reveal.d5 { transition-delay: 0.5s; }
+.slide.visible .reveal.d6 { transition-delay: 0.6s; }
+
+/* === Two fixed background canvases (z-index 0, behind slides) === */
+#hero3d, #netbg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; }
+#hero3d.active, #netbg.active { opacity: 1; }
+.hero3d-fallback { position: fixed; inset: 0; z-index: 0; display: none; opacity: 0; transition: opacity 0.6s ease; background: radial-gradient(ellipse 50% 55% at 70% 45%, rgba(139,92,246,0.45), transparent 62%), radial-gradient(ellipse 38% 42% at 76% 58%, rgba(217,70,239,0.34), transparent 60%), var(--bg-primary); }
+body.no-3d #hero3d { display: none; }
+body.no-3d .hero3d-fallback.active { display: block; opacity: 1; }
+
+/* === HERO 3D SLIDE (text left, 3D right) === */
+.title-3d-slide .slide-content { align-items: flex-start; text-align: left; gap: clamp(0.6rem,1.5vw,1.2rem); max-width: min(58vw, 760px); }
+.title-3d-slide::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 72% 86% at 14% 50%, rgba(10,10,10,0.82) 0%, rgba(10,10,10,0.32) 46%, transparent 78%); }
+@media (max-width: 820px) { .title-3d-slide .slide-content { max-width: 90vw; } .title-3d-slide::before { background: linear-gradient(180deg, rgba(10,10,10,0.6), rgba(10,10,10,0.2) 55%, rgba(10,10,10,0.72)); } }
+.eyebrow { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.35em; text-transform: uppercase; color: rgba(255,255,255,0.78); display: inline-flex; align-items: center; gap: 0.6em; }
+.eyebrow .odot { width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--accent-orange); box-shadow: 0 0 12px var(--accent-orange); }
+.hero-title { font-family: var(--font-display); font-size: clamp(2.6rem,9vw,7rem); font-weight: 800; line-height: 1.0; letter-spacing: -0.025em; }
+.hero-title em { font-style: normal; background: linear-gradient(120deg, #fff 0%, #d8c9ff 30%, var(--accent-pink) 64%, var(--accent-blue) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; filter: drop-shadow(0 0 25px rgba(217,70,239,0.45)); }
+.hero-sub { font-size: var(--subtitle-size); color: rgba(255,255,255,0.74); max-width: 40ch; line-height: 1.55; }
+.title-accent { width: clamp(40px,5vw,56px); height: 3px; background: linear-gradient(90deg, var(--accent-orange), var(--accent-pink)); border-radius: 2px; box-shadow: 0 0 12px rgba(255,153,0,0.4), 0 0 30px rgba(217,70,239,0.2); }
+.hero-hint { position: fixed; bottom: clamp(8px,1.2vh,16px); right: clamp(70px,8vw,120px); z-index: 3; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.38); opacity: 0; transition: opacity 0.5s; }
+.hero-hint.active { opacity: 1; }
+
+/* === CONTENT scrim for legibility over the constellation === */
+.content-scrim { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 90% 80% at 50% 50%, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.25) 55%, rgba(10,10,10,0.7) 100%); }
+
+.section-label { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent-purple); margin-bottom: clamp(0.4rem,0.8vw,0.6rem); }
+.section-title { font-family: var(--font-display); font-size: var(--h2-size); font-weight: 800; line-height: 1.12; margin-bottom: clamp(0.5rem,1vw,0.9rem); letter-spacing: -0.01em; }
+.section-desc { font-size: var(--body-size); color: var(--text-secondary); line-height: 1.6; }
+
+/* === regular TITLE (closing) — opaque, own blobs === */
+.title-slide { background: #0B0015; }
+.title-slide .slide-content { align-items: center; text-align: center; gap: clamp(0.6rem,1.5vw,1.2rem); }
+.title-label { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.35em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+.title-main { font-family: var(--font-display); font-size: var(--title-size); font-weight: 800; line-height: 1.05; letter-spacing: -0.025em; text-shadow: 0 0 30px rgba(139,92,246,0.3); max-width: 16ch; }
+.title-main em { font-style: normal; background: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.title-sub { font-size: var(--subtitle-size); color: rgba(255,255,255,0.65); max-width: min(90vw,560px); line-height: 1.6; }
+.blob-canvas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.blob { position: absolute; border-radius: 50%; filter: blur(80px); }
+@keyframes blob1 { 0%{transform:translate(0,0) scale(1);background:rgba(139,92,246,0.55);}50%{transform:translate(-5vw,8vh) scale(0.9);background:rgba(59,130,246,0.5);}100%{transform:translate(0,0) scale(1);background:rgba(139,92,246,0.55);} }
+@keyframes blob2 { 0%{transform:translate(0,0) scale(1);background:rgba(217,70,239,0.45);}50%{transform:translate(6vw,-8vh) scale(0.95);background:rgba(124,58,237,0.5);}100%{transform:translate(0,0) scale(1);background:rgba(217,70,239,0.45);} }
+
+/* === BIG NUMBER === */
+.bignumber-slide .slide-content { align-items: center; text-align: center; gap: clamp(0.4rem,1vw,0.8rem); }
+.bignumber { font-family: var(--font-display); font-size: clamp(4rem,14vw,12rem); font-weight: 800; line-height: 1; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink), var(--accent-orange)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 40px rgba(139,92,246,0.3)); }
+.bignumber-desc { font-size: var(--subtitle-size); color: var(--text-secondary); max-width: min(80vw,620px); line-height: 1.6; }
+
+/* === PROCESS === */
+.process-slide .slide-content { align-items: center; gap: var(--content-gap); }
+.process-row { display: flex; align-items: flex-start; width: 100%; max-width: min(92vw,1000px); position: relative; }
+.process-step { flex: 1; text-align: center; position: relative; padding: 0 clamp(0.3rem,0.8vw,0.6rem); }
+.step-num { width: clamp(32px,4vw,48px); height: clamp(32px,4vw,48px); border-radius: 50%; margin: 0 auto clamp(0.4rem,0.8vw,0.6rem); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: var(--body-size); font-weight: 800; background: linear-gradient(135deg, rgba(139,92,246,0.32), rgba(217,70,239,0.22)); border: 1px solid var(--card-border); position: relative; z-index: 1; }
+.process-step:not(:last-child)::after { content: ''; position: absolute; top: clamp(16px,2vw,24px); left: calc(50% + clamp(20px,2.5vw,30px)); width: calc(100% - clamp(40px,5vw,60px)); height: 1px; background: linear-gradient(90deg, rgba(139,92,246,0.4), rgba(217,70,239,0.25)); z-index: 0; }
+.step-title { font-family: var(--font-display); font-size: var(--h3-size); font-weight: 700; margin-bottom: clamp(0.15rem,0.3vw,0.25rem); }
+.step-desc { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.4; }
+@media (max-width: 768px) { .process-row { flex-direction: column; gap: clamp(0.5rem,1.5vw,1rem); align-items: center; } .process-step { width: 100%; max-width: 300px; } .process-step:not(:last-child)::after { display: none; } }
+
+/* === PILL CARDS === */
+.content-layout { display: grid; grid-template-columns: 2fr 3fr; gap: clamp(1.5rem,4vw,3.5rem); align-items: center; width: 100%; max-width: min(92vw,1150px); margin: 0 auto; }
+@media (max-width: 768px) { .content-layout { grid-template-columns: 1fr; gap: clamp(0.8rem,2vh,1.2rem); } }
+.pill-cards { display: flex; flex-direction: column; gap: clamp(0.45rem,1vw,0.7rem); }
+.pill-card { display: flex; align-items: center; gap: clamp(0.7rem,1.3vw,1.1rem); padding: clamp(0.7rem,1.4vw,1rem) clamp(0.9rem,1.6vw,1.3rem); background: rgba(20,12,38,0.62); border: 1px solid var(--card-border); border-radius: clamp(10px,1.2vw,14px); backdrop-filter: blur(6px); transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s; }
+.pill-card:hover { border-color: rgba(139,92,246,0.5); box-shadow: 0 0 28px rgba(139,92,246,0.18); transform: translateX(4px); }
+.pill-icon { width: clamp(30px,3vw,40px); height: clamp(30px,3vw,40px); border-radius: clamp(7px,0.9vw,11px); flex-shrink: 0; background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(217,70,239,0.14)); display: flex; align-items: center; justify-content: center; }
+.pill-icon svg { width: 54%; height: 54%; stroke: var(--accent-purple); fill: none; stroke-width: 2; }
+.pill-text { font-size: var(--body-size); font-weight: 600; line-height: 1.3; }
+.pill-text span { color: var(--text-secondary); font-weight: 400; }
+
+/* === CSS 3D ROTATING CUBE (pure CSS preserve-3d; "// KEEP CLEAN" = no opacity/filter/overflow on the preserve-3d cube) === */
+.cube-slide .slide-content { align-items: center; justify-content: center; }
+.css3d-stage { position: relative; z-index: 2; perspective: 1100px; perspective-origin: 50% 45%; display: flex; flex-direction: column; align-items: center; gap: clamp(1.4rem, 3.5vh, 3rem); --cube-size: clamp(140px, 21vh, 230px); --half: calc(var(--cube-size) / 2); }
+.floor-pool { position: absolute; left: 50%; top: 54%; z-index: 0; pointer-events: none; transform: translateX(-50%); width: min(520px, 70vw); height: clamp(70px, 13vh, 140px); background: radial-gradient(ellipse at center, rgba(217,70,239,0.40) 0%, rgba(139,92,246,0.30) 35%, transparent 72%); filter: blur(26px); animation: poolPulse 22s linear infinite; }
+@keyframes poolPulse { 0%,100% { opacity: 0.85; transform: translateX(-50%) scaleX(1); } 50% { opacity: 1; transform: translateX(-50%) scaleX(1.12); } }
+.cube { position: relative; width: var(--cube-size); height: var(--cube-size); transform-style: preserve-3d; transform: rotateX(-22deg) rotateY(-32deg); animation: cubeSpin 22s linear infinite; will-change: transform; }
+@keyframes cubeSpin { 0%{transform:rotateX(-22deg) rotateY(0deg);} 50%{transform:rotateX(-14deg) rotateY(180deg);} 100%{transform:rotateX(-22deg) rotateY(360deg);} }
+.face { position: absolute; width: var(--cube-size); height: var(--cube-size); backface-visibility: hidden; border: 2px solid var(--accent-purple); border-radius: 14px; background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(217,70,239,0.14)); box-shadow: inset 0 0 40px rgba(217,70,239,0.45), inset 0 0 12px rgba(139,92,246,0.65), 0 0 22px rgba(139,92,246,0.55); display: flex; align-items: center; justify-content: center; }
+.face .glyph { line-height: 0; filter: drop-shadow(0 0 12px var(--accent-pink)); }
+.face .glyph svg { width: clamp(36px,4.6vw,56px); height: clamp(36px,4.6vw,56px); stroke: #fff; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.face .cap { position: absolute; bottom: 13px; font-size: clamp(9px,1vw,12px); letter-spacing: 2px; color: rgba(255,255,255,0.7); }
+.front{transform:rotateY(0deg) translateZ(var(--half));}
+.back{transform:rotateY(180deg) translateZ(var(--half));}
+.right{transform:rotateY(90deg) translateZ(var(--half));}
+.left{transform:rotateY(-90deg) translateZ(var(--half));}
+.top{transform:rotateX(90deg) translateZ(var(--half));}
+.bottom{transform:rotateX(-90deg) translateZ(var(--half));}
+.right,.left{border-color:var(--accent-pink); box-shadow: inset 0 0 40px rgba(139,92,246,0.45), inset 0 0 12px rgba(217,70,239,0.65), 0 0 22px rgba(217,70,239,0.55);}
+.top,.bottom{border-color:var(--accent-blue); box-shadow: inset 0 0 40px rgba(56,189,248,0.40), inset 0 0 12px rgba(139,92,246,0.55), 0 0 22px rgba(56,189,248,0.45);}
+.cube-caption { text-align: center; }
+@media (prefers-reduced-motion: reduce){ .cube{animation:none !important; transform:rotateX(-24deg) rotateY(-34deg);} .floor-pool{animation:none;} }
+@supports not (transform-style: preserve-3d){ .cube{transform:none;animation:none;} .face{position:relative;display:none;} .front{display:flex;} }
+
+/* === POINTER-TILT CARDS (interactive CSS 3D; cards tilt toward cursor, parallax layers) === */
+/* 4 cards in ONE row (grid, not flex-wrap) so none wraps off-screen.
+   Drops to 2x2 under 880px width. */
+.tilt-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(12px,1.6vw,22px); justify-content: center; width: 100%; max-width: min(94vw, 1180px); perspective: 1100px; perspective-origin: 50% 50%; }
+@media (max-width: 880px) { .tilt-grid { grid-template-columns: repeat(2, 1fr); } }
+.tilt-card { position: relative; width: 100%; min-height: clamp(170px, 30vh, 250px); transform-style: preserve-3d; transform: translateZ(var(--lift,0px)) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); transition: transform 0.18s ease-out; will-change: transform; }
+.tilt-face { position: absolute; inset: 0; z-index: 0; border-radius: clamp(14px,1.8vw,20px); overflow: hidden; border: 1px solid rgba(139,92,246,0.40); background: linear-gradient(160deg, rgba(139,92,246,0.16), rgba(10,10,10,0.5) 72%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 22px 50px rgba(0,0,0,0.5), 0 0 34px rgba(139,92,246,0.22); transition: box-shadow 0.25s ease, border-color 0.25s ease; }
+.tilt-card:hover .tilt-face { border-color: rgba(217,70,239,0.65); box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 30px 64px rgba(0,0,0,0.6), 0 0 48px rgba(217,70,239,0.40); }
+.tilt-face .sheen { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(150px 150px at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.26), transparent 60%); mix-blend-mode: screen; opacity: 0; transition: opacity 0.3s ease; }
+.tilt-card:hover .tilt-face .sheen { opacity: 1; }
+.tilt-content { position: relative; z-index: 2; padding: clamp(18px,2.4vw,28px); transform-style: preserve-3d; }
+.tilt-icon { transform: translateZ(44px); width: clamp(40px,4.6vw,54px); height: clamp(40px,4.6vw,54px); border-radius: 13px; display: flex; align-items: center; justify-content: center; background: linear-gradient(150deg, rgba(217,70,239,0.30), rgba(139,92,246,0.20)); border: 1px solid rgba(217,70,239,0.5); box-shadow: 0 10px 26px rgba(217,70,239,0.35); margin-bottom: clamp(12px,2vh,18px); }
+.tilt-icon svg { width: 54%; height: 54%; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tilt-text { transform: translateZ(18px); }
+.tilt-text h3 { margin: 0; font-family: var(--font-display); font-size: clamp(16px,1.9vw,21px); font-weight: 800; }
+.tilt-text p { margin: clamp(6px,1.2vh,10px) 0 0; color: var(--text-secondary); font-size: clamp(12px,1.3vw,14px); line-height: 1.5; }
+@media (prefers-reduced-motion: reduce){ .tilt-card{ transition:none !important; transform: rotateX(4deg) rotateY(-8deg) !important; } .tilt-face .sheen{display:none;} }
+@supports not (transform-style: preserve-3d){ .tilt-card{transform:none !important;} .tilt-icon,.tilt-text{transform:none;} }
+
+/* === NAV / CHROME === */
+.nav-dots { position: fixed; right: clamp(14px,2vw,26px); top: 50%; transform: translateY(-50%); z-index: 900; display: flex; flex-direction: column; gap: 12px; }
+.nav-dots button { width: 10px; height: 10px; border-radius: 50%; border: none; cursor: pointer; padding: 0; background: rgba(255,255,255,0.22); transition: all 0.3s; }
+.nav-dots button.active { background: var(--accent-purple); box-shadow: 0 0 12px var(--glow-purple); transform: scale(1.35); }
+.progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0%; z-index: 1000; background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink), var(--accent-orange)); transition: width 0.25s ease; }
+.slide-footer { position: fixed; bottom: clamp(8px,1.2vh,16px); left: clamp(12px,2vw,24px); z-index: 999; font-size: clamp(0.6rem,1vw,0.78rem); letter-spacing: 0.02em; color: rgba(255,255,255,0.42); }
+.page-number { position: fixed; bottom: clamp(8px,1.2vh,16px); right: clamp(12px,2vw,24px); z-index: 999; font-family: var(--font-body); font-size: clamp(0.6rem,0.9vw,0.75rem); letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
+@media (max-height: 600px) { .slide-footer, .page-number { display: none; } }
+.kbd-hint { position: fixed; bottom: clamp(8px,1.2vh,16px); left: 50%; transform: translateX(-50%); z-index: 800; font-size: clamp(0.6rem,0.9vw,0.72rem); color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
+
+/* === OVERVIEW === */
+.overview-overlay { position: fixed; inset: 0; z-index: 9998; background: rgba(8,4,16,0.94); backdrop-filter: blur(14px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; overflow-y: auto; }
+.overview-overlay.active { opacity: 1; pointer-events: auto; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: clamp(16px,2.5vw,32px); padding: clamp(48px,6vh,80px) clamp(24px,5vw,72px); max-width: 1600px; margin: 0 auto; }
+.overview-card { position: relative; aspect-ratio: 16/9; background: var(--bg-primary); border: 2px solid rgba(255,255,255,0.12); border-radius: 10px; overflow: hidden; cursor: pointer; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; padding: 0; }
+.overview-card:hover, .overview-card:focus-visible { border-color: var(--accent-purple); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.5); outline: none; }
+.overview-card.current { border-color: var(--accent-purple); box-shadow: 0 0 0 3px rgba(139,92,246,0.4); }
+.overview-thumb { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.overview-page-number { position: absolute; bottom: 8px; right: 10px; padding: 2px 8px; font-family: var(--font-body); font-size: 0.75rem; font-variant-numeric: tabular-nums; color: #fff; background: rgba(0,0,0,0.65); border-radius: 4px; z-index: 2; }
+.overview-hint { position: fixed; top: clamp(12px,2vh,20px); right: clamp(16px,2vw,24px); font-size: 0.8rem; color: rgba(255,255,255,0.55); z-index: 10003; }
+.overview-hint kbd { background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.75rem; }
+body.overview-open { overflow: hidden; }
+</style>
+</head>
+<body>
+
+<!-- Two fixed background canvases + CSS fallback -->
+<canvas id="netbg"></canvas>
+<canvas id="hero3d"></canvas>
+<div class="hero3d-fallback"></div>
+
+<div class="progress-bar" id="progressBar"></div>
+<nav class="nav-dots" id="navDots"></nav>
+<div class="slide-footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+<div class="page-number" id="pageNumber">1</div>
+<div class="kbd-hint">↑ ↓ navigate · Esc overview</div>
+<div class="hero-hint" id="heroHint">Drag to orbit</div>
+
+<!-- SLIDE 1 — 3D HERO -->
+<section class="slide title-3d-slide" data-bg="hero">
+    <div class="slide-content">
+        <div class="eyebrow reveal d1"><span class="odot"></span> AWS RE:INVENT · KEYNOTE</div>
+        <h1 class="hero-title reveal d2">Nova <em>Core</em></h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="hero-sub reveal d4">A real-time inference engine that thinks at the speed of your request — rendered live in WebGL.</p>
+    </div>
+</section>
+
+<!-- SLIDE 2 — WHAT IT IS -->
+<section class="slide" data-bg="net">
+    <div class="content-scrim"></div>
+    <div class="slide-content">
+        <div class="content-layout">
+            <div>
+                <div class="section-label reveal d1">THE ENGINE</div>
+                <h2 class="section-title reveal d2">One Engine,<br>Every Modality</h2>
+                <p class="section-desc reveal d3">One low-latency runtime for text, vision, and audio.</p>
+            </div>
+            <div class="pill-cards">
+                <div class="pill-card reveal d2"><div class="pill-icon"><i data-lucide="layers"></i></div><div class="pill-text">Shared runtime<br><span>Text, vision, and audio on one path</span></div></div>
+                <div class="pill-card reveal d3"><div class="pill-icon"><i data-lucide="git-branch"></i></div><div class="pill-text">Smart routing<br><span>Picks the smallest model that can answer</span></div></div>
+                <div class="pill-card reveal d4"><div class="pill-icon"><i data-lucide="zap"></i></div><div class="pill-text">Sub-50ms first token<br><span>Streams the moment it can</span></div></div>
+                <div class="pill-card reveal d5"><div class="pill-icon"><i data-lucide="scaling"></i></div><div class="pill-text">Laptop to fleet<br><span>Scales without code changes</span></div></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 3 — BIG NUMBER -->
+<section class="slide bignumber-slide" data-bg="net">
+    <div class="content-scrim"></div>
+    <div class="slide-content">
+        <div class="section-label reveal d1">MEASURED AT PEAK</div>
+        <div class="bignumber reveal d2">47 ms</div>
+        <p class="bignumber-desc reveal d3">Median time to first token, measured across the global fleet at peak load.</p>
+    </div>
+</section>
+
+<!-- SLIDE 3b — CSS 3D ROTATING CUBE -->
+<section class="slide cube-slide" data-bg="net">
+    <div class="content-scrim"></div>
+    <div class="slide-content">
+        <div class="css3d-stage">
+            <div class="floor-pool"></div>
+            <div class="cube" role="img" aria-label="Rotating 3D platform cube">
+                <div class="face front"><span class="glyph"><svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 0-9h-1.8A7 7 0 1 0 4 16.3"></path></svg></span><span class="cap">RUNTIME</span></div>
+                <div class="face back"><span class="glyph"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span><span class="cap">INFERENCE</span></div>
+                <div class="face right"><span class="glyph"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"></path></svg></span><span class="cap">COMPUTE</span></div>
+                <div class="face left"><span class="glyph"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg></span><span class="cap">DATA</span></div>
+                <div class="face top"><span class="glyph"><svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"></path></svg></span><span class="cap">AI / ML</span></div>
+                <div class="face bottom"><span class="glyph"><svg viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"></line><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="10.01" y2="16"></line></svg></span><span class="cap">STORAGE</span></div>
+            </div>
+            <div class="cube-caption">
+                <div class="section-label reveal d1" style="text-align:center;">THE STACK</div>
+                <h2 class="section-title reveal d2" style="text-align:center;margin-bottom:0.3rem;">One Cloud, Every Layer</h2>
+                <p class="section-desc reveal d3" style="text-align:center;">Runtime · Inference · Compute · Data · AI · Storage — pure CSS 3D.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 4 — PROCESS -->
+<section class="slide process-slide" data-bg="net">
+    <div class="content-scrim"></div>
+    <div class="slide-content">
+        <div class="section-label reveal d1" style="text-align:center;">HOW IT WORKS</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">Request to Response</h2>
+        <div class="process-row">
+            <div class="process-step reveal d3"><div class="step-num">1</div><div class="step-title">Receive</div><div class="step-desc">Accept text, image, or audio</div></div>
+            <div class="process-step reveal d4"><div class="step-num">2</div><div class="step-title">Route</div><div class="step-desc">Pick the cheapest capable model</div></div>
+            <div class="process-step reveal d5"><div class="step-num">3</div><div class="step-title">Infer</div><div class="step-desc">Stream tokens as they generate</div></div>
+            <div class="process-step reveal d6"><div class="step-num">4</div><div class="step-title">Trace</div><div class="step-desc">Log every hop for replay</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 5 — WHY IT MATTERS (pointer-tilt cards: move cursor over a card to tilt it in 3D) -->
+<section class="slide" data-bg="net" id="tiltSlide">
+    <div class="content-scrim"></div>
+    <div class="slide-content" style="align-items:center;gap:var(--content-gap);">
+        <div class="section-label reveal d1" style="text-align:center;">PRODUCTION-READY</div>
+        <h2 class="section-title reveal d2" style="text-align:center;">Built for the Production Floor</h2>
+        <p class="section-desc reveal d3" style="text-align:center;margin-bottom:clamp(0.4rem,1.2vw,1rem);">Hover a card — it tilts toward your cursor, icon floating forward.</p>
+        <div class="tilt-grid" id="tiltGrid">
+            <article class="tilt-card reveal d3">
+                <div class="tilt-face"><div class="sheen"></div></div>
+                <div class="tilt-content">
+                    <div class="tilt-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+                    <div class="tilt-text"><h3>Predictable latency</h3><p>Under real, bursty production traffic.</p></div>
+                </div>
+            </article>
+            <article class="tilt-card reveal d4">
+                <div class="tilt-face"><div class="sheen"></div></div>
+                <div class="tilt-content">
+                    <div class="tilt-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"></circle><path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path><path d="M7 6h1v4"></path><path d="m16.71 13.88.7.71-2.82 2.82"></path></svg></div>
+                    <div class="tilt-text"><h3>Cost scales with tokens</h3><p>You pay for work done, not idle capacity.</p></div>
+                </div>
+            </article>
+            <article class="tilt-card reveal d5">
+                <div class="tilt-face"><div class="sheen"></div></div>
+                <div class="tilt-content">
+                    <div class="tilt-icon"><svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+                    <div class="tilt-text"><h3>Observable + reversible</h3><p>Every routing decision is traced and replayable.</p></div>
+                </div>
+            </article>
+            <article class="tilt-card reveal d6">
+                <div class="tilt-face"><div class="sheen"></div></div>
+                <div class="tilt-content">
+                    <div class="tilt-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
+                    <div class="tilt-text"><h3>Your account, your controls</h3><p>Runs in your account, under your IAM.</p></div>
+                </div>
+            </article>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 6 — CLOSING -->
+<section class="slide title-slide" data-bg="none">
+    <div class="blob-canvas">
+        <div class="blob" style="width:50vw;height:50vw;top:-8%;left:35%;background:rgba(139,92,246,0.5);animation:blob1 15s ease-in-out infinite;"></div>
+        <div class="blob" style="width:46vw;height:46vw;bottom:-6%;left:-8%;background:rgba(217,70,239,0.45);animation:blob2 18s ease-in-out infinite;"></div>
+    </div>
+    <div class="slide-content">
+        <div class="title-label reveal d1">GENERALLY AVAILABLE TODAY</div>
+        <h1 class="title-main reveal d2">Think<br><em>Faster</em></h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="title-sub reveal d4">Nova Core — thank you.</p>
+    </div>
+</section>
+
+<!-- OVERVIEW -->
+<div class="overview-overlay" id="overviewOverlay" role="dialog" aria-label="Slide overview" aria-hidden="true">
+    <div class="overview-hint">Click a slide or press <kbd>Esc</kbd> to close</div>
+    <div class="overview-grid" id="overviewGrid"></div>
+</div>
+
+<script>
+"use strict";
+/* ====================================================================
+   REAL-3D HERO — "Nova Core": a smooth high-res sphere displaced every
+   frame by layered 3D noise (normals recomputed so light sweeps across
+   the morphing surface), orbiting colored lights, a 1600-point swirling
+   particle cloud, a counter-rotating wireframe cage, and hand-rolled
+   bloom. This is what makes it read as a living 3D object, not a flat
+   polygon. Loop runs ONLY while the hero slide is on-screen.
+   ==================================================================== */
+const Hero3D = (function () {
+    let renderer, scene, camera, core, coreGeo, basePos, nVerts, cage, swarm, starField;
+    let rtScene, rtBright, rtBlurA, rtBlurB, brightMat, blurMat, compositeMat, fsQuad, fsScene, fsCam;
+    let L1, L2, L3, clock, rafId = 0, running = false, ok = false;
+    const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const DPR = Math.min(window.devicePixelRatio || 1, 1.75);
+    let canvas;
+    const TARGET = (typeof THREE !== 'undefined') ? new THREE.Vector3(0,0,0) : null;
+    const orbit = { x:0, y:0 }, pointer = { x:0, y:0 };
+    let dragging = false, lastX = 0, lastY = 0, userYaw = 0, userPitch = 0;
+
+    // displacement field: sum of sines along random directions → organic morph
+    const DIRS = [
+        { d:[ 0.92, 0.21, 0.33], f:1.7, a:0.16, s:0.65 },
+        { d:[-0.40, 0.88, 0.26], f:2.3, a:0.12, s:0.85 },
+        { d:[ 0.18,-0.55, 0.81], f:3.1, a:0.09, s:1.15 },
+        { d:[-0.74,-0.31, 0.59], f:2.0, a:0.11, s:0.50 },
+        { d:[ 0.55, 0.62,-0.56], f:3.8, a:0.07, s:1.35 }
+    ].map(o => { const n = Math.hypot(o.d[0],o.d[1],o.d[2]); o.d = o.d.map(v=>v/n); return o; });
+    const R0 = 1.45;
+
+    const FS_VERT = "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position,1.0); }";
+    const BRIGHT_FRAG = "varying vec2 vUv; uniform sampler2D tDiffuse; uniform float threshold; void main(){ vec3 c = texture2D(tDiffuse,vUv).rgb; float l = dot(c,vec3(0.299,0.587,0.114)); float k = smoothstep(threshold,threshold+0.4,l); gl_FragColor = vec4(c*k,1.0); }";
+    const BLUR_FRAG = "varying vec2 vUv; uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 res; void main(){ vec2 px = dir/res; vec3 s = vec3(0.0); s += texture2D(tDiffuse,vUv).rgb*0.227027; s += texture2D(tDiffuse,vUv+px*1.3846).rgb*0.316216; s += texture2D(tDiffuse,vUv-px*1.3846).rgb*0.316216; s += texture2D(tDiffuse,vUv+px*3.2308).rgb*0.070270; s += texture2D(tDiffuse,vUv-px*3.2308).rgb*0.070270; gl_FragColor = vec4(s,1.0); }";
+    const COMPOSITE_FRAG = "varying vec2 vUv; uniform sampler2D tBase; uniform sampler2D tBloom; uniform float strength; void main(){ vec3 base = texture2D(tBase,vUv).rgb; vec3 bloom = texture2D(tBloom,vUv).rgb; vec3 col = base + bloom*strength; col = col/(col+vec3(0.55))*1.7; gl_FragColor = vec4(col,1.0); }";
+
+    function makeTargets(w, h) {
+        const half = { width: Math.max(2,w>>1), height: Math.max(2,h>>1), minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.UnsignedByteType };
+        rtScene = new THREE.WebGLRenderTarget(w, h, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.UnsignedByteType });
+        rtBright = new THREE.WebGLRenderTarget(half.width, half.height, half);
+        rtBlurA = new THREE.WebGLRenderTarget(half.width, half.height, half);
+        rtBlurB = new THREE.WebGLRenderTarget(half.width, half.height, half);
+    }
+    function dotTexture() {
+        const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
+        const g = cv.getContext('2d'), grd = g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+        grd.addColorStop(0,'rgba(255,255,255,1)'); grd.addColorStop(0.35,'rgba(255,255,255,0.7)'); grd.addColorStop(1,'rgba(255,255,255,0)');
+        g.fillStyle = grd; g.fillRect(0,0,s,s);
+        const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+    }
+    function buildBloom() {
+        fsScene = new THREE.Scene(); fsCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+        const quad = new THREE.PlaneGeometry(2,2);
+        brightMat = new THREE.ShaderMaterial({ uniforms:{ tDiffuse:{value:null}, threshold:{value:0.52} }, vertexShader:FS_VERT, fragmentShader:BRIGHT_FRAG, depthTest:false, depthWrite:false });
+        blurMat = new THREE.ShaderMaterial({ uniforms:{ tDiffuse:{value:null}, dir:{value:new THREE.Vector2(1,0)}, res:{value:new THREE.Vector2(1,1)} }, vertexShader:FS_VERT, fragmentShader:BLUR_FRAG, depthTest:false, depthWrite:false });
+        compositeMat = new THREE.ShaderMaterial({ uniforms:{ tBase:{value:null}, tBloom:{value:null}, strength:{value:1.35} }, vertexShader:FS_VERT, fragmentShader:COMPOSITE_FRAG, depthTest:false, depthWrite:false });
+        fsQuad = new THREE.Mesh(quad, brightMat); fsScene.add(fsQuad);
+    }
+    function passFS(material, target) { fsQuad.material = material; renderer.setRenderTarget(target||null); renderer.render(fsScene, fsCam); }
+
+    function build() {
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+        renderer.setPixelRatio(DPR); renderer.setClearColor(0x05030a, 1);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2; renderer.outputColorSpace = THREE.SRGBColorSpace;
+        scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+
+        // ambient gives a base read; orbiting lights (further out, brighter, linear
+        // decay) sweep a clear terminator across the surface = the cue for "3D".
+        scene.add(new THREE.AmbientLight(0x2a2150, 0.7));
+        L1 = new THREE.PointLight(0x9b7bff, 220, 30, 2.0); scene.add(L1);
+        L2 = new THREE.PointLight(0xe879f9, 200, 30, 2.0); scene.add(L2);
+        L3 = new THREE.PointLight(0x57c8ff, 150, 30, 2.0); scene.add(L3);
+
+        // --- the morphing core: SMOOTH sphere (shared verts) displaced per-frame.
+        //     Lighter base + brighter emissive + lower roughness so light actually
+        //     reads across the surface instead of being swallowed. ---
+        coreGeo = new THREE.SphereGeometry(R0, 96, 64);
+        basePos = Float32Array.from(coreGeo.attributes.position.array);
+        nVerts = basePos.length / 3;
+        const coreMat = new THREE.MeshStandardMaterial({
+            color: 0x4a2f8c, emissive: 0x5a2da0, emissiveIntensity: 0.85,
+            metalness: 0.5, roughness: 0.22, flatShading: false });
+        core = new THREE.Mesh(coreGeo, coreMat); scene.add(core);
+
+        // --- fresnel rim shell: a thin additive halo that glows at the silhouette,
+        //     giving the core a lit edge against the black (reads as volume). ---
+        const rimGeo = new THREE.SphereGeometry(R0*1.06, 96, 64);
+        const rimMat = new THREE.ShaderMaterial({
+            uniforms: { cA:{value:new THREE.Color(0x8B5CF6)}, cB:{value:new THREE.Color(0xD946EF)} },
+            vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix*vec4(position,1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }",
+            fragmentShader: "varying vec3 vN; varying vec3 vV; uniform vec3 cA; uniform vec3 cB; void main(){ float f = pow(1.0-clamp(dot(normalize(vN),normalize(vV)),0.0,1.0), 3.2); gl_FragColor = vec4(mix(cA,cB,f)*f*1.4, f); }",
+            transparent: true, blending: THREE.AdditiveBlending, side: THREE.FrontSide, depthWrite: false });
+        const rim = new THREE.Mesh(rimGeo, rimMat); core.add(rim);
+
+        // --- counter-rotating wireframe containment cage (structure) ---
+        const cageGeo = new THREE.IcosahedronGeometry(2.35, 2);
+        cage = new THREE.LineSegments(new THREE.WireframeGeometry(cageGeo),
+            new THREE.LineBasicMaterial({ color: 0x7c5cff, transparent: true, opacity: 0.22 }));
+        scene.add(cage);
+
+        // --- swirling particle cloud (1600 points in a shell) ---
+        const N = 1600, pos = new Float32Array(N*3), col = new Float32Array(N*3);
+        const PAL = [[0.55,0.36,0.96],[0.85,0.27,0.94],[0.22,0.74,0.97]];
+        for (let i=0;i<N;i++){
+            const u = Math.random(), v = Math.random();
+            const th = Math.acos(2*u-1), ph = 2*Math.PI*v;
+            const rr = 2.0 + Math.random()*1.7;
+            pos[i*3] = rr*Math.sin(th)*Math.cos(ph);
+            pos[i*3+1] = rr*Math.cos(th)*0.7;
+            pos[i*3+2] = rr*Math.sin(th)*Math.sin(ph);
+            const c = PAL[i%3]; col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2];
+        }
+        const sg = new THREE.BufferGeometry();
+        sg.setAttribute('position', new THREE.BufferAttribute(pos,3));
+        sg.setAttribute('color', new THREE.BufferAttribute(col,3));
+        swarm = new THREE.Points(sg, new THREE.PointsMaterial({ size:0.07, map:dotTexture(), vertexColors:true, transparent:true, opacity:0.95, blending:THREE.AdditiveBlending, depthWrite:false }));
+        scene.add(swarm);
+
+        // --- parallax starfield ---
+        const SN = 600, sp = new Float32Array(SN*3);
+        for (let i=0;i<SN;i++){ sp[i*3]=(Math.random()-0.5)*44; sp[i*3+1]=(Math.random()-0.5)*44; sp[i*3+2]=(Math.random()-0.5)*44-6; }
+        const stg = new THREE.BufferGeometry(); stg.setAttribute('position', new THREE.BufferAttribute(sp,3));
+        starField = new THREE.Points(stg, new THREE.PointsMaterial({ color:0xb6a8ff, size:0.05, transparent:true, opacity:0.6, depthWrite:false }));
+        scene.add(starField);
+
+        buildBloom(); resize(); ok = true;
+    }
+
+    function morph(t) {
+        const p = coreGeo.attributes.position.array;
+        for (let i=0;i<nVerts;i++){
+            const ix=i*3, bx=basePos[ix], by=basePos[ix+1], bz=basePos[ix+2];
+            let d=0;
+            for (let k=0;k<DIRS.length;k++){ const o=DIRS[k]; d += o.a*Math.sin((bx*o.d[0]+by*o.d[1]+bz*o.d[2])*o.f + t*o.s); }
+            const s = (R0 + d + 0.05*Math.sin(t*0.9)) / R0;   // radial displacement + breathing
+            p[ix]=bx*s; p[ix+1]=by*s; p[ix+2]=bz*s;
+        }
+        coreGeo.attributes.position.needsUpdate = true;
+        coreGeo.computeVertexNormals();
+    }
+
+    function resize() {
+        const w = window.innerWidth, h = window.innerHeight;
+        renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix();
+        const shift = w < 820 ? w*0.05 : w*0.20;
+        camera.setViewOffset(w, h, -shift, 0, w, h);
+        const pw = Math.floor(w*DPR), ph = Math.floor(h*DPR);
+        if (rtScene) { rtScene.dispose(); rtBright.dispose(); rtBlurA.dispose(); rtBlurB.dispose(); }
+        makeTargets(pw, ph);
+    }
+
+    function renderFrame(dt, t) {
+        if (!REDUCE) {
+            morph(t);
+            core.rotation.y += dt*0.18; core.rotation.x += dt*0.05;
+            cage.rotation.y -= dt*0.12; cage.rotation.x += dt*0.06;
+            swarm.rotation.y += dt*0.09; swarm.rotation.x = Math.sin(t*0.2)*0.15;
+            starField.rotation.y += dt*0.008;
+            // orbiting lights → moving terminator across the morphing surface
+            L1.position.set(Math.cos(t*0.7)*5.5, 3.2, Math.sin(t*0.7)*5.5);
+            L2.position.set(Math.cos(t*0.5+2.1)*5.5, -2.4, Math.sin(t*0.5+2.1)*5.5);
+            L3.position.set(Math.sin(t*0.9)*4.5, Math.cos(t*0.6)*4.5, 4.5);
+        } else if (coreGeo.attributes.position.array[0] === basePos[0]) {
+            morph(0); // one static morphed frame for reduced-motion
+        }
+        orbit.x += (pointer.x-orbit.x)*0.05; orbit.y += (pointer.y-orbit.y)*0.05;
+        const yaw = userYaw + orbit.x*0.5 + (REDUCE?0:t*0.05), pitch = userPitch + orbit.y*0.3 + Math.sin(t*0.25)*0.05, R = 6.6;
+        camera.position.x = TARGET.x + Math.sin(yaw)*R*Math.cos(pitch);
+        camera.position.z = TARGET.z + Math.cos(yaw)*R*Math.cos(pitch);
+        camera.position.y = TARGET.y + Math.sin(pitch)*R;
+        camera.lookAt(TARGET);
+
+        renderer.setRenderTarget(rtScene); renderer.clear(); renderer.render(scene, camera);
+        brightMat.uniforms.tDiffuse.value = rtScene.texture; passFS(brightMat, rtBright);
+        const rw = rtBright.width, rh = rtBright.height; blurMat.uniforms.res.value.set(rw,rh);
+        blurMat.uniforms.tDiffuse.value = rtBright.texture; blurMat.uniforms.dir.value.set(1,0); passFS(blurMat, rtBlurA);
+        blurMat.uniforms.tDiffuse.value = rtBlurA.texture; blurMat.uniforms.dir.value.set(0,1); passFS(blurMat, rtBlurB);
+        blurMat.uniforms.tDiffuse.value = rtBlurB.texture; blurMat.uniforms.dir.value.set(1.7,0); passFS(blurMat, rtBlurA);
+        blurMat.uniforms.tDiffuse.value = rtBlurA.texture; blurMat.uniforms.dir.value.set(0,1.7); passFS(blurMat, rtBlurB);
+        blurMat.uniforms.tDiffuse.value = rtBlurB.texture; blurMat.uniforms.dir.value.set(2.4,0); passFS(blurMat, rtBlurA);
+        blurMat.uniforms.tDiffuse.value = rtBlurA.texture; blurMat.uniforms.dir.value.set(0,2.4); passFS(blurMat, rtBlurB);
+        compositeMat.uniforms.tBase.value = rtScene.texture; compositeMat.uniforms.tBloom.value = rtBlurB.texture; passFS(compositeMat, null);
+    }
+    function loop() { if (!running) return; rafId = requestAnimationFrame(loop); const dt = Math.min(clock.getDelta(), 0.05); renderFrame(dt, clock.elapsedTime); }
+    function start() { if (running || REDUCE || !ok) return; running = true; clock.start(); rafId = requestAnimationFrame(loop); }
+    function stop() { running = false; if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } }
+
+    function init() {
+        canvas = document.getElementById('hero3d');
+        if (typeof THREE === 'undefined') { console.error('[hero3d] THREE failed to load'); document.body.classList.add('no-3d'); return; }
+        console.log('[hero3d] THREE r' + THREE.REVISION);
+        try {
+            build(); clock = new THREE.Clock();
+            if (REDUCE) renderFrame(0, 0);
+            window.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+            window.addEventListener('mouseup', () => dragging = false);
+            window.addEventListener('mouseleave', () => dragging = false);
+            window.addEventListener('mousemove', e => {
+                if (dragging) { userYaw += (e.clientX-lastX)*0.005; userPitch += (e.clientY-lastY)*0.005; userPitch = Math.max(-1.2, Math.min(1.2, userPitch)); lastX = e.clientX; lastY = e.clientY; }
+                else { pointer.x = (e.clientX/window.innerWidth)*2-1; pointer.y = (e.clientY/window.innerHeight)*2-1; }
+            });
+            window.addEventListener('resize', () => { if (ok) { resize(); if (REDUCE) renderFrame(0,0); } });
+            document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (window.__heroActive && !REDUCE) start(); });
+            canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); stop(); ok = false; }, false);
+            canvas.addEventListener('webglcontextrestored', () => { try { build(); clock = new THREE.Clock(); if (window.__heroActive){ if (REDUCE) renderFrame(0,0); else start(); } } catch(err){ console.error(err); document.body.classList.add('no-3d'); } }, false);
+        } catch (err) { console.error('[hero3d] init failed:', err); document.body.classList.add('no-3d'); }
+    }
+    function setActive(on) {
+        window.__heroActive = on;
+        const cv = document.getElementById('hero3d'), fb = document.querySelector('.hero3d-fallback'), hint = document.getElementById('heroHint');
+        if (document.body.classList.contains('no-3d')) { if (fb) fb.classList.toggle('active', on); return; }
+        if (cv) cv.classList.toggle('active', on);
+        if (hint) hint.classList.toggle('active', on);
+        if (on) { if (REDUCE) { if (ok) renderFrame(0,0); } else start(); } else stop();
+    }
+    return { init, setActive };
+})();
+
+/* ====================================================================
+   CONSTELLATION — hand-written 2D-canvas network behind ALL content
+   slides (2-5), so the deck moves everywhere, not just the hero. Cheap,
+   throttled, paused when no content slide is on-screen.
+   ==================================================================== */
+const NetBg = (function () {
+    let cv, ctx, W=0, H=0, dots=[], rafId=0, running=false, last=0, built=false;
+    const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+    const LINK2 = 150*150, GRAB2 = 200*200, MAXD = 90, FPS = 40, FRAME = 1000/FPS;
+    const COLORS = [[139,92,246],[217,70,239],[56,189,248]];
+    const mouse = { x:-9999, y:-9999, on:false };
+
+    function dot(x,y){ const c=COLORS[(Math.random()*3)|0]; const sp=REDUCE?0:0.32; return { x:x==null?Math.random()*W:x, y:y==null?Math.random()*H:y, vx:(Math.random()-0.5)*sp, vy:(Math.random()-0.5)*sp, r:1.4+Math.random()*1.8, a:0.5+Math.random()*0.5, c }; }
+    function seed(){ let t=Math.round(MAXD*Math.min(1,(W*H)/(1920*1080))); t=Math.max(34,t); if(REDUCE)t=Math.min(t,60); dots=[]; for(let i=0;i<t;i++)dots.push(dot()); }
+    function resize(){ W=window.innerWidth; H=window.innerHeight; cv.width=Math.floor(W*DPR); cv.height=Math.floor(H*DPR); cv.style.width=W+'px'; cv.style.height=H+'px'; ctx.setTransform(DPR,0,0,DPR,0,0); }
+    function draw(){
+        ctx.clearRect(0,0,W,H);
+        for(let i=0;i<dots.length;i++){ const d=dots[i]; d.x+=d.vx; d.y+=d.vy; if(d.x<0||d.x>W)d.vx*=-1; if(d.y<0||d.y>H)d.vy*=-1; }
+        for(let a=0;a<dots.length;a++){ const p=dots[a]; for(let b=a+1;b<dots.length;b++){ const q=dots[b]; const dx=p.x-q.x,dy=p.y-q.y,d2=dx*dx+dy*dy; if(d2<LINK2){ const tt=1-Math.sqrt(d2)/150; ctx.globalAlpha=tt*0.45; ctx.strokeStyle='rgba(155,123,255,1)'; ctx.lineWidth=1.1; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke(); } } }
+        if(mouse.on&&!REDUCE){ for(let k=0;k<dots.length;k++){ const d=dots[k]; const mx=d.x-mouse.x,my=d.y-mouse.y,m2=mx*mx+my*my; if(m2<GRAB2){ const mt=1-Math.sqrt(m2)/200; ctx.globalAlpha=mt*0.6; ctx.strokeStyle='rgba(217,70,239,1)'; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(mouse.x,mouse.y); ctx.stroke(); } } }
+        ctx.globalCompositeOperation='lighter';
+        for(let n=0;n<dots.length;n++){ const e=dots[n],c=e.c; const g=ctx.createRadialGradient(e.x,e.y,0,e.x,e.y,e.r*4); g.addColorStop(0,'rgba('+c[0]+','+c[1]+','+c[2]+','+e.a+')'); g.addColorStop(1,'rgba('+c[0]+','+c[1]+','+c[2]+',0)'); ctx.globalAlpha=1; ctx.fillStyle=g; ctx.beginPath(); ctx.arc(e.x,e.y,e.r*4,0,Math.PI*2); ctx.fill(); ctx.fillStyle='rgba(255,255,255,'+(e.a*0.85)+')'; ctx.beginPath(); ctx.arc(e.x,e.y,e.r*0.6,0,Math.PI*2); ctx.fill(); }
+        ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+    }
+    function loop(now){ if(!running)return; rafId=requestAnimationFrame(loop); if(now-last>=FRAME){ last=now-((now-last)%FRAME); draw(); } }
+    function start(){ if(running||REDUCE)return; running=true; last=0; rafId=requestAnimationFrame(loop); }
+    function stop(){ running=false; if(rafId){cancelAnimationFrame(rafId);rafId=0;} }
+    function init(){
+        cv=document.getElementById('netbg'); ctx=cv.getContext('2d'); if(!ctx)return;
+        try { resize(); seed(); built=true; if(REDUCE)draw(); } catch(e){ console.error('netbg init',e); return; }
+        window.addEventListener('resize', ()=>{ if(built){ resize(); seed(); if(REDUCE)draw(); } });
+        window.addEventListener('mousemove', e=>{ mouse.x=e.clientX; mouse.y=e.clientY; mouse.on=true; });
+        window.addEventListener('mouseout', ()=>mouse.on=false);
+        document.addEventListener('visibilitychange', ()=>{ if(document.hidden)stop(); else if(window.__netActive&&!REDUCE)start(); });
+    }
+    function setActive(on){ window.__netActive=on; if(!built)return; const el=document.getElementById('netbg'); if(el)el.classList.toggle('active',on); if(on){ if(REDUCE)draw(); else start(); } else stop(); }
+    return { init, setActive };
+})();
+
+/* === SLIDE CONTROLLER === */
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('body > .slide'));
+        this.current = 0;
+        this.pageNum = document.getElementById('pageNumber');
+        this.progress = document.getElementById('progressBar');
+        this.setupObserver(); this.setupNavDots(); this.setupKeyboard(); this.setupWheel(); this.setupTouch(); this.updateUI(0);
+    }
+    setupObserver() {
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) { e.target.classList.add('visible'); const i = this.slides.indexOf(e.target); if (i>=0) this.updateUI(i); }
+                if (e.intersectionRatio > 0.5) {
+                    const bg = e.target.dataset.bg;
+                    Hero3D.setActive(bg === 'hero');
+                    NetBg.setActive(bg === 'net');
+                }
+            });
+        }, { threshold: [0, 0.5, 0.55] });
+        this.slides.forEach(s => io.observe(s));
+    }
+    setupNavDots() {
+        const nav = document.getElementById('navDots');
+        this.slides.forEach((_, i) => { const b = document.createElement('button'); b.setAttribute('aria-label','Go to slide '+(i+1)); b.addEventListener('click', () => this.slides[i].scrollIntoView({behavior:'smooth'})); nav.appendChild(b); });
+        this.dots = Array.from(nav.children);
+    }
+    updateUI(i) { this.current = i; if (this.pageNum) this.pageNum.textContent = (i+1); if (this.progress) this.progress.style.width = ((i+1)/this.slides.length*100)+'%'; if (this.dots) this.dots.forEach((d,k) => d.classList.toggle('active', k===i)); }
+    go(dir) { const t = Math.max(0, Math.min(this.slides.length-1, this.current+dir)); this.slides[t].scrollIntoView({behavior:'smooth'}); }
+    setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (window.__overview && window.__overview.isOpen) return;
+            if (['ArrowDown','ArrowRight','PageDown',' '].includes(e.key)) { e.preventDefault(); this.go(1); }
+            else if (['ArrowUp','ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); this.go(-1); }
+            else if (e.key === 'Home') { e.preventDefault(); this.slides[0].scrollIntoView({behavior:'smooth'}); }
+            else if (e.key === 'End') { e.preventDefault(); this.slides[this.slides.length-1].scrollIntoView({behavior:'smooth'}); }
+        });
+    }
+    setupWheel() {
+        let lock = false;
+        window.addEventListener('wheel', (e) => {
+            if (window.__overview && window.__overview.isOpen) return;
+            if (lock) return; if (Math.abs(e.deltaY) < 24) return;
+            lock = true; this.go(e.deltaY>0?1:-1); setTimeout(() => lock=false, 700);
+        }, { passive: true });
+    }
+    setupTouch() {
+        let y0 = null;
+        window.addEventListener('touchstart', e => y0 = e.touches[0].clientY, { passive: true });
+        window.addEventListener('touchend', e => { if (y0===null) return; const dy = y0 - e.changedTouches[0].clientY; if (Math.abs(dy)>50) this.go(dy>0?1:-1); y0 = null; }, { passive: true });
+    }
+}
+
+/* === OVERVIEW === */
+class Overview {
+    constructor() {
+        this.overlay = document.getElementById('overviewOverlay'); this.grid = document.getElementById('overviewGrid');
+        this.isOpen = false; this.focusedIndex = 0;
+        this._setupKeyboard();
+        this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay || e.target === this.grid) this.close(); });
+        window.addEventListener('resize', () => { if (this.isOpen) this._rescaleAll(); });
+    }
+    _setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') {
+                if (!this.isOpen) return;
+                const cards = this.grid.querySelectorAll('.overview-card'); if (!cards.length) return;
+                const cols = this._currentColumns(); let next = this.focusedIndex;
+                if (e.key === 'ArrowRight') next = Math.min(cards.length-1, next+1);
+                else if (e.key === 'ArrowLeft') next = Math.max(0, next-1);
+                else if (e.key === 'ArrowDown') next = Math.min(cards.length-1, next+cols);
+                else if (e.key === 'ArrowUp') next = Math.max(0, next-cols);
+                else if (e.key === 'Enter') { e.preventDefault(); this._jumpTo(this.focusedIndex); return; }
+                else return;
+                e.preventDefault(); this.focusedIndex = next; cards[next].focus(); return;
+            }
+            const a = document.activeElement; const isTyping = a && (a.isContentEditable || a.tagName==='INPUT' || a.tagName==='TEXTAREA');
+            if (isTyping) return;
+            e.preventDefault(); this.toggle();
+        });
+    }
+    _currentColumns() { const cards = this.grid.querySelectorAll('.overview-card'); if (cards.length<2) return 1; const t0 = cards[0].offsetTop; let c=1; for (let i=1;i<cards.length;i++){ if (cards[i].offsetTop!==t0) break; c++; } return c; }
+    toggle() { this.isOpen ? this.close() : this.open(); }
+    open() { this._build(); this.overlay.classList.add('active'); this.overlay.setAttribute('aria-hidden','false'); document.body.classList.add('overview-open'); this.isOpen = true; this._highlightCurrent(); this._rescaleAll(); const cards = this.grid.querySelectorAll('.overview-card'); if (cards[this.focusedIndex]) cards[this.focusedIndex].focus(); }
+    close() { this.overlay.classList.remove('active'); this.overlay.setAttribute('aria-hidden','true'); document.body.classList.remove('overview-open'); this.isOpen = false; }
+    _build() {
+        this.grid.innerHTML = '';
+        const slides = document.querySelectorAll('body > .slide');
+        slides.forEach((slide, i) => {
+            const card = document.createElement('button'); card.type='button'; card.className='overview-card'; card.setAttribute('aria-label','Go to slide '+(i+1)); card.dataset.index=i;
+            const thumb = document.createElement('div'); thumb.className='overview-thumb';
+            const clone = slide.cloneNode(true);
+            clone.querySelectorAll('script').forEach(s => s.remove());
+            clone.classList.add('visible');
+            clone.querySelectorAll('.reveal').forEach(el => { el.style.opacity = '1'; el.style.transform = 'none'; });
+            // transparent bg slides get a synthetic backdrop so thumbnails aren't blank
+            if (slide.dataset.bg === 'hero') clone.style.background = 'radial-gradient(ellipse 60% 70% at 72% 50%, rgba(139,92,246,0.4), transparent 64%), #07040f';
+            else if (slide.dataset.bg === 'net') clone.style.background = 'radial-gradient(ellipse 90% 80% at 50% 50%, rgba(20,12,38,0.5), #07040f)';
+            clone.style.width = slide.offsetWidth+'px'; clone.style.height = slide.offsetHeight+'px'; clone.style.minHeight='auto'; clone.style.transform='none';
+            thumb.appendChild(clone);
+            const pn = document.createElement('span'); pn.className='overview-page-number'; pn.textContent=(i+1)+' / '+slides.length;
+            card.appendChild(thumb); card.appendChild(pn);
+            card.addEventListener('click', () => this._jumpTo(i));
+            card.addEventListener('focus', () => { this.focusedIndex = i; });
+            this.grid.appendChild(card);
+        });
+    }
+    _rescaleAll() {
+        this.grid.querySelectorAll('.overview-card').forEach((card) => {
+            const thumb = card.querySelector('.overview-thumb'); const clone = thumb.firstElementChild; if (!clone) return;
+            const cardW = card.clientWidth, cardH = card.clientHeight;
+            const slideW = parseFloat(clone.style.width) || window.innerWidth;
+            const slideH = parseFloat(clone.style.height) || window.innerHeight;
+            const scale = Math.min(cardW/slideW, cardH/slideH);
+            clone.style.transform = 'scale('+scale+')'; clone.style.transformOrigin='top left'; clone.style.position='absolute';
+            clone.style.left = ((cardW - slideW*scale)/2)+'px'; clone.style.top = ((cardH - slideH*scale)/2)+'px';
+        });
+    }
+    _currentSlideIndex() { const slides = document.querySelectorAll('body > .slide'); const y = window.scrollY + window.innerHeight/2; let best=0,bd=Infinity; slides.forEach((s,i)=>{ const m = s.offsetTop + s.offsetHeight/2; const d = Math.abs(m-y); if (d<bd){bd=d;best=i;} }); return best; }
+    _highlightCurrent() { const cur = this._currentSlideIndex(); this.focusedIndex = cur; this.grid.querySelectorAll('.overview-card').forEach((c,i)=>c.classList.toggle('current', i===cur)); }
+    _jumpTo(i) { const s = document.querySelectorAll('body > .slide')[i]; if (!s) return; this.close(); requestAnimationFrame(() => s.scrollIntoView({behavior:'smooth', block:'start'})); }
+}
+
+/* === POINTER-TILT ENGINE — each card tilts toward the cursor (capped, eased),
+   icon floats forward (translateZ) for parallax. One shared rAF loop. === */
+function initTilt() {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const coarse = window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    if (reduce || coarse) return;
+    const MAX = 12, LIFT = 34, EASE = 0.12;
+    const cards = document.querySelectorAll('#tiltGrid .tilt-card');
+    if (!cards.length) return;
+    const tilters = [];
+    cards.forEach(card => {
+        const t = { el: card, curRX:0, curRY:0, curLift:0, curMX:50, curMY:50, tgtRX:0, tgtRY:0, tgtLift:0, tgtMX:50, tgtMY:50 };
+        card.addEventListener('pointermove', e => {
+            const r = card.getBoundingClientRect(), hw = r.width/2, hh = r.height/2;
+            const nx = Math.max(-1, Math.min(1, (e.clientX - (r.left+hw))/hw));
+            const ny = Math.max(-1, Math.min(1, (e.clientY - (r.top+hh))/hh));
+            t.tgtRY = nx*MAX; t.tgtRX = -ny*MAX; t.tgtLift = LIFT;
+            t.tgtMX = (nx*0.5+0.5)*100; t.tgtMY = (ny*0.5+0.5)*100;
+        });
+        card.addEventListener('pointerleave', () => { t.tgtRX=0; t.tgtRY=0; t.tgtLift=0; t.tgtMX=50; t.tgtMY=50; });
+        tilters.push(t);
+    });
+    (function loop(){
+        for (const t of tilters) {
+            t.curRX += (t.tgtRX-t.curRX)*EASE; t.curRY += (t.tgtRY-t.curRY)*EASE; t.curLift += (t.tgtLift-t.curLift)*EASE;
+            t.curMX += (t.tgtMX-t.curMX)*EASE; t.curMY += (t.tgtMY-t.curMY)*EASE;
+            const s = t.el.style;
+            s.setProperty('--rx', t.curRX.toFixed(2)+'deg'); s.setProperty('--ry', t.curRY.toFixed(2)+'deg');
+            s.setProperty('--lift', t.curLift.toFixed(2)+'px'); s.setProperty('--mx', t.curMX.toFixed(1)+'%'); s.setProperty('--my', t.curMY.toFixed(1)+'%');
+        }
+        requestAnimationFrame(loop);
+    })();
+}
+
+window.addEventListener('load', () => {
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    Hero3D.init();
+    NetBg.init();
+    initTilt();
+    window.__slides = new SlidePresentation();
+    window.__overview = new Overview();
+    const first = document.querySelector('body > .slide');
+    if (first) { first.classList.add('visible'); Hero3D.setActive(true); }
+});
+</script>
+</body>
+</html>

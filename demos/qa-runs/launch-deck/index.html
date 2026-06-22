@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Introducing Amazon Q Flow</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@500;700;800&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+<style>
+/* === THEME — re:Invent Keynote (#13) === */
+:root {
+    --bg-primary: #0A0A0A;
+    --accent-purple: #8B5CF6;
+    --accent-pink: #D946EF;
+    --accent-orange: #FF9900;
+    --accent: #8B5CF6;
+    --text-primary: #FFFFFF;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --glow-purple: rgba(139, 92, 246, 0.4);
+    --card-bg: rgba(139, 92, 246, 0.08);
+    --card-border: rgba(139, 92, 246, 0.25);
+    --bg-primary: #0A0A0A;
+    --font-display: 'Urbanist', sans-serif;
+    --font-body: 'Albert Sans', sans-serif;
+    --subtitle-size: clamp(0.9rem, 2vw, 1.35rem);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.7s;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* === viewport-base.css (full) === */
+html, body { height: 100%; overflow-x: hidden; scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+.slide { width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; scroll-snap-align: start; display: flex; flex-direction: column; position: relative; }
+.slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; max-height: 100%; overflow: hidden; padding: var(--slide-padding); }
+:root {
+    --title-size: clamp(1.5rem, 5vw, 4rem);
+    --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+    --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+    --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+    --small-size: clamp(0.65rem, 1vw, 0.875rem);
+    --slide-padding: clamp(1rem, 4vw, 4rem);
+    --content-gap: clamp(0.5rem, 2vw, 2rem);
+    --element-gap: clamp(0.25rem, 1vw, 1rem);
+}
+.card, .container, .content-box { max-width: min(90vw, 1000px); max-height: min(80vh, 700px); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: clamp(0.5rem, 1.5vw, 1rem); }
+img, .image-container { max-width: 100%; max-height: min(50vh, 400px); object-fit: contain; }
+@media (max-height: 700px) { :root { --slide-padding: clamp(0.75rem,3vw,2rem); --content-gap: clamp(0.4rem,1.5vw,1rem); --title-size: clamp(1.25rem,4.5vw,2.5rem); --h2-size: clamp(1rem,3vw,1.75rem); } }
+@media (max-height: 600px) { :root { --slide-padding: clamp(0.5rem,2.5vw,1.5rem); --content-gap: clamp(0.3rem,1vw,0.75rem); --title-size: clamp(1.1rem,4vw,2rem); --body-size: clamp(0.7rem,1.2vw,0.95rem); } .nav-dots, .keyboard-hint, .decorative { display: none; } }
+@media (max-height: 500px) { :root { --slide-padding: clamp(0.4rem,2vw,1rem); --title-size: clamp(1rem,3.5vw,1.5rem); --h2-size: clamp(0.9rem,2.5vw,1.25rem); --body-size: clamp(0.65rem,1vw,0.85rem); } }
+@media (max-width: 600px) { :root { --title-size: clamp(1.25rem,7vw,2.5rem); } .grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; } html { scroll-behavior: auto; } }
+
+/* === REVEAL === */
+.reveal { opacity: 0; transform: translateY(25px); transition: opacity var(--duration-normal) var(--ease-out-expo), transform var(--duration-normal) var(--ease-out-expo); }
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal.d1 { transition-delay: 0.1s; }
+.slide.visible .reveal.d2 { transition-delay: 0.2s; }
+.slide.visible .reveal.d3 { transition-delay: 0.3s; }
+.slide.visible .reveal.d4 { transition-delay: 0.4s; }
+.slide.visible .reveal.d5 { transition-delay: 0.5s; }
+.slide.visible .reveal.d6 { transition-delay: 0.6s; }
+.slide.visible .reveal.d7 { transition-delay: 0.7s; }
+
+/* === SHARED === */
+.floating-orb { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(60px); }
+.orb-purple { background: radial-gradient(circle, rgba(139,92,246,0.35) 0%, rgba(139,92,246,0) 70%); }
+.orb-pink { background: radial-gradient(circle, rgba(217,70,239,0.3) 0%, rgba(217,70,239,0) 70%); }
+.orb-blue { background: radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0) 70%); }
+@keyframes orbFloat1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(20px,-30px) scale(1.05); } }
+@keyframes orbFloat2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-25px,20px) scale(0.95); } }
+@keyframes orbFloat3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(15px,25px) scale(1.03); } }
+
+.section-label { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent-purple); margin-bottom: clamp(0.4rem,0.8vw,0.6rem); }
+.section-title { font-family: var(--font-display); font-size: var(--h2-size); font-weight: 800; line-height: 1.12; margin-bottom: clamp(0.5rem,1vw,0.9rem); letter-spacing: -0.01em; }
+
+/* === TITLE === */
+.title-slide { background: #0B0015; }
+.title-slide::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 90% 90% at 50% 50%, transparent 40%, rgba(11,0,21,0.6) 100%); pointer-events: none; z-index: 0; }
+.title-slide .slide-content { align-items: center; text-align: center; gap: clamp(0.6rem,1.5vw,1.2rem); }
+.title-label { font-family: var(--font-body); font-size: var(--small-size); font-weight: 600; letter-spacing: 0.35em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+.title-main { font-family: var(--font-display); font-size: var(--title-size); font-weight: 800; line-height: 1.05; letter-spacing: -0.025em; text-shadow: 0 0 30px rgba(139,92,246,0.3), 0 0 80px rgba(139,92,246,0.15); max-width: 16ch; }
+.title-main em { font-style: normal; background: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 25px rgba(217,70,239,0.5)) drop-shadow(0 0 60px rgba(139,92,246,0.3)); }
+.title-accent { width: clamp(40px,5vw,56px); height: 3px; background: linear-gradient(90deg, var(--accent-orange), var(--accent-pink)); border-radius: 2px; box-shadow: 0 0 12px rgba(255,153,0,0.4), 0 0 30px rgba(217,70,239,0.2); }
+.title-sub { font-size: var(--subtitle-size); color: rgba(255,255,255,0.65); max-width: min(90vw,620px); line-height: 1.6; }
+.blob-canvas { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.blob { position: absolute; border-radius: 50%; filter: blur(80px); will-change: transform, opacity; }
+@keyframes blob1 { 0%{transform:translate(0,0) scale(1);background:rgba(139,92,246,0.55);}25%{transform:translate(8vw,-12vh) scale(1.2);background:rgba(217,70,239,0.6);}50%{transform:translate(-5vw,8vh) scale(0.9);background:rgba(59,130,246,0.5);}75%{transform:translate(12vw,5vh) scale(1.15);background:rgba(236,72,153,0.55);}100%{transform:translate(0,0) scale(1);background:rgba(139,92,246,0.55);} }
+@keyframes blob2 { 0%{transform:translate(0,0) scale(1);background:rgba(217,70,239,0.45);}33%{transform:translate(-10vw,10vh) scale(1.1);background:rgba(139,92,246,0.5);}66%{transform:translate(6vw,-8vh) scale(0.95);background:rgba(124,58,237,0.5);}100%{transform:translate(0,0) scale(1);background:rgba(217,70,239,0.45);} }
+@keyframes blob3 { 0%{transform:translate(0,0) scale(1);background:rgba(59,80,200,0.4);}50%{transform:translate(-8vw,-6vh) scale(1.18);background:rgba(168,85,247,0.45);}100%{transform:translate(0,0) scale(1);background:rgba(59,80,200,0.4);} }
+@keyframes blob4 { 0%{transform:translate(0,0) scale(1);background:rgba(236,72,153,0.3);}50%{transform:translate(7vw,9vh) scale(1.1);background:rgba(217,70,239,0.4);}100%{transform:translate(0,0) scale(1);background:rgba(236,72,153,0.3);} }
+
+/* === BIG NUMBER === */
+.bignumber-slide .slide-content { align-items: center; text-align: center; gap: clamp(0.4rem,1vw,0.8rem); }
+.bignumber { font-family: var(--font-display); font-size: clamp(4rem,14vw,12rem); font-weight: 800; line-height: 1; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink), var(--accent-orange)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; filter: drop-shadow(0 0 40px rgba(139,92,246,0.3)); }
+.bignumber-desc { font-size: var(--subtitle-size); color: var(--text-secondary); max-width: min(80vw,640px); line-height: 1.6; }
+
+/* === TIMELINE ZIGZAG === */
+.timeline { width: 100%; max-width: min(92vw,1100px); display: grid; grid-template-rows: auto auto auto; grid-template-columns: repeat(5, 1fr); }
+.tl-top { grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.tl-top .tl-card { margin-bottom: clamp(0.5rem,1.2vw,1rem); }
+.tl-top.empty { visibility: hidden; }
+.tl-mid { grid-row: 2; display: flex; align-items: center; justify-content: center; position: relative; height: clamp(20px,2.5vw,30px); }
+.tl-mid::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 3px; transform: translateY(-50%); background: rgba(139,92,246,0.3); }
+.tl-dot { width: clamp(14px,1.6vw,20px); height: clamp(14px,1.6vw,20px); border-radius: 50%; border: 2.5px solid currentColor; background: var(--bg-primary); position: relative; z-index: 1; box-shadow: 0 0 14px currentColor; }
+.tl-bot { grid-row: 3; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
+.tl-bot .tl-card { margin-top: clamp(0.5rem,1.2vw,1rem); }
+.tl-bot.empty { visibility: hidden; }
+.tl-stem-up { width: 2px; height: clamp(16px,3vh,30px); background: linear-gradient(180deg, transparent, currentColor); }
+.tl-stem-down { width: 2px; height: clamp(16px,3vh,30px); background: linear-gradient(180deg, currentColor, transparent); }
+.tl-card { text-align: center; padding: 0 clamp(0.2rem,0.5vw,0.4rem); }
+.tl-year { font-family: var(--font-display); font-size: var(--h3-size); font-weight: 800; color: currentColor; }
+.tl-desc { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.35; }
+.tl-col1 { color: #3b82f6; } .tl-col2 { color: #8b5cf6; } .tl-col3 { color: #a855f7; } .tl-col4 { color: #d946ef; } .tl-col5 { color: #ec4899; }
+
+/* === PROCESS FLOW === */
+.process-slide .slide-content { align-items: center; gap: var(--content-gap); }
+.process-row { display: flex; align-items: flex-start; width: 100%; max-width: min(92vw,1150px); gap: 0; position: relative; }
+.process-step { flex: 1; text-align: center; position: relative; padding: 0 clamp(0.3rem,0.8vw,0.6rem); }
+.step-num { width: clamp(32px,4vw,48px); height: clamp(32px,4vw,48px); border-radius: 50%; margin: 0 auto clamp(0.4rem,0.8vw,0.6rem); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: var(--body-size); font-weight: 800; background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(217,70,239,0.15)); border: 1px solid var(--card-border); position: relative; z-index: 1; }
+.process-step:not(:last-child)::after { content: ''; position: absolute; top: clamp(16px,2vw,24px); left: calc(50% + clamp(20px,2.5vw,30px)); width: calc(100% - clamp(40px,5vw,60px)); height: 1px; background: linear-gradient(90deg, rgba(139,92,246,0.3), rgba(217,70,239,0.2)); z-index: 0; }
+.step-title { font-family: var(--font-display); font-size: var(--h3-size); font-weight: 700; margin-bottom: clamp(0.15rem,0.3vw,0.25rem); }
+.step-desc { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.4; }
+@media (max-width: 768px) { .process-row { flex-direction: column; gap: clamp(0.5rem,1.5vw,1rem); align-items: center; } .process-step { width: 100%; max-width: 300px; } .process-step:not(:last-child)::after { display: none; } }
+
+/* === COMPARISON === */
+.compare-slide .slide-content { align-items: center; gap: var(--content-gap); }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.8rem,2vw,1.5rem); width: 100%; max-width: min(92vw,1000px); }
+.compare-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: clamp(10px,1.2vw,16px); padding: clamp(1rem,2.5vw,2rem); }
+.compare-card-title { font-family: var(--font-display); font-size: var(--h3-size); font-weight: 700; margin-bottom: clamp(0.5rem,1vw,0.8rem); display: flex; align-items: center; gap: clamp(0.3rem,0.6vw,0.5rem); }
+.compare-dot { width: clamp(8px,1vw,12px); height: clamp(8px,1vw,12px); border-radius: 50%; flex-shrink: 0; }
+.compare-list { list-style: none; display: flex; flex-direction: column; gap: clamp(0.3rem,0.7vw,0.5rem); }
+.compare-list li { font-size: var(--body-size); color: var(--text-secondary); padding-left: clamp(0.8rem,1.5vw,1.2rem); position: relative; }
+.compare-list li::before { content: ''; position: absolute; left: 0; top: clamp(0.35rem,0.7vw,0.5rem); width: clamp(4px,0.5vw,6px); height: clamp(4px,0.5vw,6px); border-radius: 50%; background: var(--accent-purple); }
+@media (max-width: 768px) { .compare-grid { grid-template-columns: 1fr; } }
+
+/* === QUOTE === */
+.quote-slide .slide-content { align-items: center; text-align: center; gap: var(--content-gap); }
+.quote-mark { font-family: var(--font-display); font-size: clamp(3rem,8vw,6rem); line-height: 1; font-weight: 800; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; opacity: 0.5; }
+.quote-text { font-family: var(--font-display); font-size: clamp(1.1rem,2.5vw,2rem); font-weight: 500; line-height: 1.5; max-width: min(85vw,820px); color: rgba(255,255,255,0.92); }
+.quote-attr { font-size: var(--body-size); color: var(--text-secondary); }
+.quote-attr strong { color: var(--text-primary); font-weight: 600; }
+
+/* === PILL CARDS (why-it-matters) === */
+.content-layout { display: grid; grid-template-columns: 2fr 3fr; gap: clamp(1.5rem,4vw,3.5rem); align-items: center; width: 100%; max-width: min(92vw,1150px); margin: 0 auto; }
+@media (max-width: 768px) { .content-layout { grid-template-columns: 1fr; gap: clamp(0.8rem,2vh,1.2rem); } }
+.content-layout .section-desc { font-size: var(--body-size); color: var(--text-secondary); line-height: 1.6; }
+.pill-cards { display: flex; flex-direction: column; gap: clamp(0.45rem,1vw,0.7rem); }
+.pill-card { display: flex; align-items: center; gap: clamp(0.7rem,1.3vw,1.1rem); padding: clamp(0.7rem,1.4vw,1rem) clamp(0.9rem,1.6vw,1.3rem); background: var(--card-bg); border: 1px solid var(--card-border); border-radius: clamp(10px,1.2vw,14px); transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s; }
+.pill-card:hover { border-color: rgba(139,92,246,0.5); box-shadow: 0 0 28px rgba(139,92,246,0.18); transform: translateX(4px); }
+.pill-icon { width: clamp(30px,3vw,40px); height: clamp(30px,3vw,40px); border-radius: clamp(7px,0.9vw,11px); flex-shrink: 0; background: linear-gradient(135deg, rgba(139,92,246,0.25), rgba(217,70,239,0.14)); display: flex; align-items: center; justify-content: center; }
+.pill-icon svg { width: 54%; height: 54%; stroke: var(--accent-purple); fill: none; stroke-width: 2; }
+.pill-text { font-size: var(--body-size); font-weight: 600; line-height: 1.3; }
+.pill-text span { color: var(--text-secondary); font-weight: 400; }
+
+/* === NAV / CHROME === */
+.nav-dots { position: fixed; right: clamp(14px,2vw,26px); top: 50%; transform: translateY(-50%); z-index: 900; display: flex; flex-direction: column; gap: 12px; }
+.nav-dots button { width: 10px; height: 10px; border-radius: 50%; border: none; cursor: pointer; padding: 0; background: rgba(255,255,255,0.22); transition: all 0.3s; }
+.nav-dots button.active { background: var(--accent-purple); box-shadow: 0 0 12px var(--glow-purple); transform: scale(1.35); }
+.progress-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0%; z-index: 1000; background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink), var(--accent-orange)); transition: width 0.25s ease; }
+.slide-footer { position: fixed; bottom: clamp(8px,1.2vh,16px); left: clamp(12px,2vw,24px); z-index: 999; font-size: clamp(0.6rem,1vw,0.78rem); letter-spacing: 0.02em; color: rgba(255,255,255,0.42); }
+.page-number { position: fixed; bottom: clamp(8px,1.2vh,16px); right: clamp(12px,2vw,24px); z-index: 999; font-family: var(--font-body); font-size: clamp(0.6rem,0.9vw,0.75rem); letter-spacing: 0.05em; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; }
+@media (max-height: 600px) { .slide-footer, .page-number { display: none; } }
+
+/* === INLINE EDITING === */
+.edit-hotzone { position: fixed; top: 0; left: 0; width: 80px; height: 80px; z-index: 10000; cursor: pointer; }
+.edit-toggle { position: fixed; top: clamp(12px,2vh,20px); left: clamp(12px,2vw,20px); width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--card-border); background: rgba(139,92,246,0.14); color: #fff; font-size: 1.1rem; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.3s ease, background 0.2s; z-index: 10001; display: inline-flex; align-items: center; justify-content: center; }
+.edit-toggle:hover { background: rgba(139,92,246,0.28); }
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+body.editing-active .edit-toggle { opacity: 1; pointer-events: auto; background: var(--accent-purple); }
+.edit-save-file { position: fixed; top: clamp(12px,2vh,20px); left: clamp(68px,9vw,76px); padding: 0 14px; height: 44px; font-size: 0.85rem; font-family: var(--font-body); font-weight: 600; background: var(--accent-purple); color: #fff; border: none; border-radius: 10px; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 10001; display: inline-flex; align-items: center; gap: 7px; }
+.edit-save-file svg { width: 16px; height: 16px; stroke-width: 2; }
+body.editing-active .edit-save-file { opacity: 1; pointer-events: auto; }
+[contenteditable="true"] { outline: 2px dashed rgba(139,92,246,0.5); outline-offset: 4px; border-radius: 4px; cursor: text; transition: background 0.2s; }
+[contenteditable="true"]:hover { background: rgba(139,92,246,0.08); }
+[contenteditable="true"]:focus { outline: 2px solid var(--accent-pink); background: rgba(217,70,239,0.06); }
+.edit-banner { position: fixed; top: clamp(12px,2vh,20px); left: 50%; transform: translateX(-50%); z-index: 10001; padding: 7px 16px; border-radius: 999px; background: rgba(139,92,246,0.92); color: #fff; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.03em; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+body.editing-active .edit-banner { opacity: 1; }
+.edit-toast { position: fixed; bottom: clamp(20px,4vh,40px); left: 50%; transform: translateX(-50%) translateY(20px); padding: 10px 20px; background: rgba(0,0,0,0.85); color: #fff; font-family: var(--font-body); font-size: 0.85rem; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease; z-index: 10002; }
+.edit-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.edit-toast.error { background: rgba(220,38,38,0.92); }
+
+/* === OVERVIEW === */
+.overview-overlay { position: fixed; inset: 0; z-index: 9998; background: rgba(8,4,16,0.94); backdrop-filter: blur(14px); opacity: 0; pointer-events: none; transition: opacity 0.25s ease; overflow-y: auto; }
+.overview-overlay.active { opacity: 1; pointer-events: auto; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: clamp(16px,2.5vw,32px); padding: clamp(48px,6vh,80px) clamp(24px,5vw,72px); max-width: 1600px; margin: 0 auto; }
+.overview-card { position: relative; aspect-ratio: 16/9; background: var(--bg-primary); border: 2px solid rgba(255,255,255,0.12); border-radius: 10px; overflow: hidden; cursor: pointer; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; padding: 0; }
+.overview-card:hover, .overview-card:focus-visible { border-color: var(--accent-purple); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.5); outline: none; }
+.overview-card.current { border-color: var(--accent-purple); box-shadow: 0 0 0 3px rgba(139,92,246,0.4); }
+.overview-thumb { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.overview-page-number { position: absolute; bottom: 8px; right: 10px; padding: 2px 8px; font-family: var(--font-body); font-size: 0.75rem; font-variant-numeric: tabular-nums; color: #fff; background: rgba(0,0,0,0.65); border-radius: 4px; z-index: 2; }
+.overview-hint { position: fixed; top: clamp(12px,2vh,20px); right: clamp(16px,2vw,24px); font-size: 0.8rem; color: rgba(255,255,255,0.55); z-index: 10003; }
+.overview-hint kbd { background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.75rem; }
+body.overview-open { overflow: hidden; }
+.kbd-hint { position: fixed; bottom: clamp(8px,1.2vh,16px); left: 50%; transform: translateX(-50%); z-index: 800; font-size: clamp(0.6rem,0.9vw,0.72rem); color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
+@media (max-height: 600px) { .kbd-hint { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+<nav class="nav-dots" id="navDots"></nav>
+<div class="slide-footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+<div class="page-number" id="pageNumber">1</div>
+<div class="kbd-hint">↑ ↓ navigate · E edit · Esc overview</div>
+
+<!-- Editing chrome -->
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)"><i data-lucide="pencil"></i></button>
+<button class="edit-save-file" id="editSaveFile" title="Save to file (Ctrl/Cmd+S)"><i data-lucide="save"></i><span>Save to file</span></button>
+<div class="edit-banner">Editing — click any text · Esc to save &amp; exit · Ctrl/Cmd+S to write file</div>
+<div class="edit-toast" id="editToast" role="status" aria-live="polite"></div>
+
+<!-- SLIDE 1 — TITLE -->
+<section class="slide title-slide">
+    <div class="blob-canvas">
+        <div class="blob" style="width:55vw;height:55vw;top:-10%;left:40%;background:rgba(139,92,246,0.5);animation:blob1 14s ease-in-out infinite;"></div>
+        <div class="blob" style="width:50vw;height:50vw;bottom:-5%;left:-10%;background:rgba(217,70,239,0.45);animation:blob2 17s ease-in-out infinite;"></div>
+        <div class="blob" style="width:40vw;height:40vw;top:20%;left:10%;background:rgba(59,80,200,0.4);animation:blob3 20s ease-in-out infinite;"></div>
+        <div class="blob" style="width:35vw;height:35vw;bottom:10%;right:5%;background:rgba(236,72,153,0.3);animation:blob4 22s ease-in-out infinite;"></div>
+    </div>
+    <div class="slide-content">
+        <div class="title-label editable reveal d1">AWS RE:INVENT · LAUNCH</div>
+        <h1 class="title-main reveal d2">Introducing<br><em class="editable">Amazon Q Flow</em></h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="title-sub editable reveal d4">Turn plain-language intent into running, observable workflows — across every service you already use.</p>
+    </div>
+</section>
+
+<!-- SLIDE 2 — BIG NUMBER -->
+<section class="slide bignumber-slide">
+    <div class="floating-orb orb-purple" style="width:35vw;height:35vw;top:5%;right:15%;animation:orbFloat3 18s ease-in-out infinite;"></div>
+    <div class="slide-content">
+        <div class="section-label editable reveal d1">PREVIEW BY THE NUMBERS</div>
+        <div class="bignumber editable reveal d2">12 Billion</div>
+        <p class="bignumber-desc editable reveal d3">The workflow steps customers automated in preview — in the first ninety days.</p>
+    </div>
+</section>
+
+<!-- SLIDE 3 — TIMELINE -->
+<section class="slide">
+    <div class="floating-orb orb-blue" style="width:26vw;height:26vw;top:10%;left:6%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+    <div class="slide-content" style="align-items:center;gap:clamp(1.5rem,3vw,2.5rem);">
+        <div class="section-label editable reveal d1" style="text-align:center;">THE JOURNEY</div>
+        <h2 class="section-title editable reveal d2" style="text-align:center;">How We Got Here</h2>
+        <div class="timeline reveal d3">
+            <!-- top cards: cols 1,3,5 -->
+            <div class="tl-top tl-col1"><div class="tl-card"><div class="tl-year editable">2021</div><div class="tl-desc editable">Step Functions express workflows</div></div><div class="tl-stem-up"></div></div>
+            <div class="tl-top tl-col2 empty"></div>
+            <div class="tl-top tl-col3"><div class="tl-card"><div class="tl-year editable">2023</div><div class="tl-desc editable">Natural-language draft mode</div></div><div class="tl-stem-up"></div></div>
+            <div class="tl-top tl-col4 empty"></div>
+            <div class="tl-top tl-col5"><div class="tl-card"><div class="tl-year editable">2026</div><div class="tl-desc editable">General availability</div></div><div class="tl-stem-up"></div></div>
+            <!-- mid dots: all cols -->
+            <div class="tl-mid tl-col1"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col2"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col3"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col4"><div class="tl-dot"></div></div>
+            <div class="tl-mid tl-col5"><div class="tl-dot"></div></div>
+            <!-- bottom cards: cols 2,4 -->
+            <div class="tl-bot tl-col1 empty"></div>
+            <div class="tl-bot tl-col2"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year editable">2022</div><div class="tl-desc editable">Visual workflow studio</div></div></div>
+            <div class="tl-bot tl-col3 empty"></div>
+            <div class="tl-bot tl-col4"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year editable">2024</div><div class="tl-desc editable">Q Flow preview opens</div></div></div>
+            <div class="tl-bot tl-col5 empty"></div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 4 — PROCESS -->
+<section class="slide process-slide">
+    <div class="floating-orb orb-purple" style="width:24vw;height:24vw;bottom:15%;right:5%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+    <div class="slide-content">
+        <div class="section-label editable reveal d1" style="text-align:center;">HOW IT WORKS</div>
+        <h2 class="section-title editable reveal d2" style="text-align:center;">From Sentence to System</h2>
+        <div class="process-row">
+            <div class="process-step reveal d3"><div class="step-num">1</div><div class="step-title editable">Describe</div><div class="step-desc editable">State the outcome in plain language</div></div>
+            <div class="process-step reveal d4"><div class="step-num">2</div><div class="step-title editable">Draft</div><div class="step-desc editable">Q Flow proposes a workflow graph</div></div>
+            <div class="process-step reveal d5"><div class="step-num">3</div><div class="step-title editable">Refine</div><div class="step-desc editable">Edit any step, swap any service</div></div>
+            <div class="process-step reveal d6"><div class="step-num">4</div><div class="step-title editable">Deploy</div><div class="step-desc editable">Ship to your account in one click</div></div>
+            <div class="process-step reveal d7"><div class="step-num">5</div><div class="step-title editable">Observe</div><div class="step-desc editable">Trace every execution end-to-end</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 5 — COMPARISON -->
+<section class="slide compare-slide">
+    <div class="floating-orb orb-pink" style="width:22vw;height:22vw;top:12%;left:8%;animation:orbFloat2 15s ease-in-out infinite;"></div>
+    <div class="slide-content">
+        <div class="section-label editable reveal d1" style="text-align:center;">BEFORE AND AFTER</div>
+        <h2 class="section-title editable reveal d2" style="text-align:center;">A Different Way to Build</h2>
+        <div class="compare-grid">
+            <div class="compare-card reveal d3">
+                <div class="compare-card-title"><div class="compare-dot" style="background:rgba(255,255,255,0.4);"></div><span class="editable">The Old Way</span></div>
+                <ul class="compare-list">
+                    <li class="editable">Hand-wire each integration by hand</li>
+                    <li class="editable">Weeks of effort per workflow</li>
+                    <li class="editable">Logic lives in tribal knowledge</li>
+                </ul>
+            </div>
+            <div class="compare-card reveal d4">
+                <div class="compare-card-title"><div class="compare-dot" style="background:var(--accent-pink);"></div><span class="editable">With Q Flow</span></div>
+                <ul class="compare-list">
+                    <li class="editable">Describe the goal in a sentence</li>
+                    <li class="editable">Minutes from intent to deploy</li>
+                    <li class="editable">The graph is the documentation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 6 — QUOTE -->
+<section class="slide quote-slide">
+    <div class="floating-orb orb-purple" style="width:28vw;height:28vw;top:15%;left:5%;animation:orbFloat2 16s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink" style="width:20vw;height:20vw;bottom:10%;right:8%;animation:orbFloat1 14s ease-in-out infinite;"></div>
+    <div class="slide-content">
+        <div class="quote-mark reveal d1">"</div>
+        <p class="quote-text editable reveal d2">We described what we wanted, and Q Flow built the plumbing. What took a sprint now takes a coffee break.</p>
+        <div class="quote-attr reveal d3"><strong class="editable">Staff Engineer</strong><span class="editable"> — a global logistics platform</span></div>
+    </div>
+</section>
+
+<!-- SLIDE 7 — WHY IT MATTERS (pill cards) -->
+<section class="slide">
+    <div class="floating-orb orb-blue" style="width:26vw;height:26vw;top:12%;left:8%;animation:orbFloat1 16s ease-in-out infinite;"></div>
+    <div class="slide-content">
+        <div class="content-layout">
+            <div>
+                <div class="section-label editable reveal d1">PRODUCTION-READY</div>
+                <h2 class="section-title editable reveal d2">Built for Real<br>Production</h2>
+                <p class="section-desc editable reveal d3">Not a demo toy — the guarantees teams actually need.</p>
+            </div>
+            <div class="pill-cards">
+                <div class="pill-card reveal d2"><div class="pill-icon"><i data-lucide="git-branch"></i></div><div class="pill-text"><span class="editable">Versioned, traceable, and reversible workflows</span></div></div>
+                <div class="pill-card reveal d3"><div class="pill-icon"><i data-lucide="users"></i></div><div class="pill-text"><span class="editable">Human-in-the-loop steps are first-class</span></div></div>
+                <div class="pill-card reveal d4"><div class="pill-icon"><i data-lucide="lock"></i></div><div class="pill-text"><span class="editable">Runs in your account, under your IAM</span></div></div>
+                <div class="pill-card reveal d5"><div class="pill-icon"><i data-lucide="coins"></i></div><div class="pill-text"><span class="editable">Pay only for the steps that execute</span></div></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SLIDE 8 — CLOSING -->
+<section class="slide title-slide">
+    <div class="blob-canvas">
+        <div class="blob" style="width:50vw;height:50vw;top:-8%;left:35%;background:rgba(139,92,246,0.5);animation:blob1 15s ease-in-out infinite;"></div>
+        <div class="blob" style="width:46vw;height:46vw;bottom:-6%;left:-8%;background:rgba(217,70,239,0.45);animation:blob2 18s ease-in-out infinite;"></div>
+        <div class="blob" style="width:36vw;height:36vw;bottom:8%;right:6%;background:rgba(236,72,153,0.3);animation:blob4 21s ease-in-out infinite;"></div>
+    </div>
+    <div class="slide-content">
+        <div class="title-label editable reveal d1">GENERALLY AVAILABLE TODAY</div>
+        <h1 class="title-main reveal d2">Describe It.<br><em class="editable">Ship It.</em></h1>
+        <div class="title-accent reveal d3"></div>
+        <p class="title-sub editable reveal d4">Amazon Q Flow — thank you.</p>
+    </div>
+</section>
+
+<!-- OVERVIEW -->
+<div class="overview-overlay" id="overviewOverlay" role="dialog" aria-label="Slide overview" aria-hidden="true">
+    <div class="overview-hint">Click a slide or press <kbd>Esc</kbd> to close</div>
+    <div class="overview-grid" id="overviewGrid"></div>
+</div>
+
+<script>
+/* === SLIDE CONTROLLER === */
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('body > .slide'));
+        this.current = 0;
+        this.pageNum = document.getElementById('pageNumber');
+        this.progress = document.getElementById('progressBar');
+        this.setupObserver(); this.setupNavDots(); this.setupKeyboard(); this.setupWheel(); this.setupTouch(); this.updateUI(0);
+    }
+    setupObserver() {
+        const io = new IntersectionObserver((entries) => { entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); const i = this.slides.indexOf(e.target); if (i>=0) this.updateUI(i); } }); }, { threshold: 0.55 });
+        this.slides.forEach(s => io.observe(s));
+    }
+    setupNavDots() {
+        const nav = document.getElementById('navDots');
+        this.slides.forEach((_, i) => { const b = document.createElement('button'); b.setAttribute('aria-label','Go to slide '+(i+1)); b.addEventListener('click', () => this.slides[i].scrollIntoView({behavior:'smooth'})); nav.appendChild(b); });
+        this.dots = Array.from(nav.children);
+    }
+    updateUI(i) { this.current = i; if (this.pageNum) this.pageNum.textContent = (i+1); if (this.progress) this.progress.style.width = ((i+1)/this.slides.length*100)+'%'; if (this.dots) this.dots.forEach((d,k) => d.classList.toggle('active', k===i)); }
+    go(dir) { const t = Math.max(0, Math.min(this.slides.length-1, this.current+dir)); this.slides[t].scrollIntoView({behavior:'smooth'}); }
+    setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (window.__overview && window.__overview.isOpen) return;
+            if (window.__editor && window.__editor.isActive) return;
+            if (['ArrowDown','ArrowRight','PageDown',' '].includes(e.key)) { e.preventDefault(); this.go(1); }
+            else if (['ArrowUp','ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); this.go(-1); }
+            else if (e.key === 'Home') { e.preventDefault(); this.slides[0].scrollIntoView({behavior:'smooth'}); }
+            else if (e.key === 'End') { e.preventDefault(); this.slides[this.slides.length-1].scrollIntoView({behavior:'smooth'}); }
+        });
+    }
+    setupWheel() {
+        let lock = false;
+        window.addEventListener('wheel', (e) => {
+            if (window.__overview && window.__overview.isOpen) return;
+            if (window.__editor && window.__editor.isActive) return;
+            if (lock) return; if (Math.abs(e.deltaY) < 24) return;
+            lock = true; this.go(e.deltaY>0?1:-1); setTimeout(() => lock=false, 700);
+        }, { passive: true });
+    }
+    setupTouch() {
+        let y0 = null;
+        window.addEventListener('touchstart', e => y0 = e.touches[0].clientY, { passive: true });
+        window.addEventListener('touchend', e => { if (y0===null) return; if (window.__editor && window.__editor.isActive) return; const dy = y0 - e.changedTouches[0].clientY; if (Math.abs(dy)>50) this.go(dy>0?1:-1); y0 = null; }, { passive: true });
+    }
+}
+window.__slides = new SlidePresentation();
+
+/* === IndexedDB helpers for FileSystemFileHandle === */
+const HANDLE_DB = 'slide-editor', HANDLE_STORE = 'handles', HANDLE_KEY = 'indexHtml';
+function openHandleDB() { return new Promise((resolve, reject) => { const req = indexedDB.open(HANDLE_DB, 1); req.onupgradeneeded = () => req.result.createObjectStore(HANDLE_STORE); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+async function getSavedHandle() { const db = await openHandleDB(); return new Promise((resolve, reject) => { const tx = db.transaction(HANDLE_STORE,'readonly'); const req = tx.objectStore(HANDLE_STORE).get(HANDLE_KEY); req.onsuccess = () => resolve(req.result||null); req.onerror = () => reject(req.error); }); }
+async function setSavedHandle(handle) { const db = await openHandleDB(); return new Promise((resolve, reject) => { const tx = db.transaction(HANDLE_STORE,'readwrite'); tx.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+async function clearSavedHandle() { const db = await openHandleDB(); return new Promise((resolve, reject) => { const tx = db.transaction(HANDLE_STORE,'readwrite'); tx.objectStore(HANDLE_STORE).delete(HANDLE_KEY); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+
+/* === INLINE EDITOR === */
+class InlineEditor {
+    constructor() {
+        this.isActive = false;
+        this.editableSelector = '.editable';
+        this.storageKey = 'qflow-edits-v1';
+        this._toastTimer = null;
+        this.restore();
+    }
+    enable() {
+        document.querySelectorAll(this.editableSelector).forEach(el => el.setAttribute('contenteditable','true'));
+        document.body.classList.add('editing-active');
+        document.getElementById('editToggle').classList.add('active');
+        this.isActive = true;
+    }
+    disable() {
+        document.querySelectorAll(this.editableSelector).forEach(el => el.removeAttribute('contenteditable'));
+        document.body.classList.remove('editing-active');
+        document.getElementById('editToggle').classList.remove('active');
+        this.isActive = false;
+        this.persistLocal();
+    }
+    toggleEditMode() { this.isActive ? this.disable() : this.enable(); }
+    _keyFor(slideIndex, elIndex) { return 's'+slideIndex+'_e'+elIndex; }
+    persistLocal() {
+        const data = {};
+        document.querySelectorAll('body > .slide').forEach((slide, si) => {
+            slide.querySelectorAll(this.editableSelector).forEach((el, ei) => { data[this._keyFor(si,ei)] = el.innerHTML; });
+        });
+        try { localStorage.setItem(this.storageKey, JSON.stringify(data)); } catch(_){}
+    }
+    restore() {
+        let data; try { data = JSON.parse(localStorage.getItem(this.storageKey)||'null'); } catch(_){ data = null; }
+        if (!data) return;
+        document.querySelectorAll('body > .slide').forEach((slide, si) => {
+            slide.querySelectorAll(this.editableSelector).forEach((el, ei) => { const k = this._keyFor(si,ei); if (data[k] !== undefined) el.innerHTML = data[k]; });
+        });
+    }
+    showToast(message, isError=false) {
+        const toast = document.getElementById('editToast'); if (!toast) return;
+        toast.textContent = message; toast.classList.toggle('error', isError); toast.classList.add('show');
+        clearTimeout(this._toastTimer); this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+    async _ensureHandle() {
+        if (!('showOpenFilePicker' in window)) throw new Error('This browser cannot save to file. Use Chrome or Edge.');
+        let handle = await getSavedHandle();
+        if (handle) {
+            const perm = await handle.queryPermission({ mode: 'readwrite' });
+            if (perm === 'granted') return handle;
+            const req = await handle.requestPermission({ mode: 'readwrite' });
+            if (req === 'granted') return handle;
+            await clearSavedHandle();
+        }
+        const [picked] = await window.showOpenFilePicker({ multiple: false, types: [{ description: 'HTML', accept: { 'text/html': ['.html','.htm'] } }] });
+        const writePerm = await picked.requestPermission({ mode: 'readwrite' });
+        if (writePerm !== 'granted') throw new Error('Write permission denied.');
+        await setSavedHandle(picked);
+        return picked;
+    }
+    async saveToFile() {
+        const live = {};
+        document.querySelectorAll('body > .slide').forEach((slide, si) => { slide.querySelectorAll(this.editableSelector).forEach((el, ei) => { live[this._keyFor(si,ei)] = el.innerHTML; }); });
+        let handle;
+        try { handle = await this._ensureHandle(); } catch(e) { if (e.name !== 'AbortError') this.showToast(e.message, true); return; }
+        try {
+            const file = await handle.getFile();
+            const originalHtml = await file.text();
+            if (!originalHtml || originalHtml.length < 50) throw new Error('Source file empty/too small — aborting.');
+            const doc = new DOMParser().parseFromString(originalHtml, 'text/html');
+            const parsedSlides = doc.querySelectorAll('.slide');
+            if (parsedSlides.length === 0) throw new Error('No .slide elements in picked file — wrong file?');
+            parsedSlides.forEach((slide, si) => { slide.querySelectorAll(this.editableSelector).forEach((el, ei) => { const k = this._keyFor(si,ei); if (live[k] !== undefined) el.innerHTML = live[k]; }); });
+            const output = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+            const writable = await handle.createWritable();
+            await writable.write(output); await writable.close();
+            try { localStorage.removeItem(this.storageKey); } catch(_){}
+            this.showToast('Saved to ' + handle.name);
+        } catch(e) { console.error(e); this.showToast('Save failed: ' + e.message, true); }
+    }
+}
+window.__editor = new InlineEditor();
+
+/* wiring */
+(function(){
+    const hotzone = document.querySelector('.edit-hotzone');
+    const editToggle = document.getElementById('editToggle');
+    let hideTimeout = null;
+    document.getElementById('editToggle').addEventListener('click', () => window.__editor.toggleEditMode());
+    hotzone.addEventListener('mouseenter', () => { clearTimeout(hideTimeout); editToggle.classList.add('show'); });
+    hotzone.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!window.__editor.isActive) editToggle.classList.remove('show'); }, 400); });
+    editToggle.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+    editToggle.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!window.__editor.isActive) editToggle.classList.remove('show'); }, 400); });
+    hotzone.addEventListener('click', () => window.__editor.toggleEditMode());
+    document.getElementById('editSaveFile').addEventListener('click', () => window.__editor.saveToFile());
+    document.addEventListener('keydown', (e) => {
+        const typing = e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true';
+        if ((e.key === 'e' || e.key === 'E') && !typing && !(window.__overview && window.__overview.isOpen)) { e.preventDefault(); window.__editor.toggleEditMode(); }
+        if (e.key === 'Escape' && window.__editor.isActive) { e.preventDefault(); window.__editor.toggleEditMode(); }
+        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); window.__editor.saveToFile(); }
+    }, true);
+})();
+
+/* === OVERVIEW === */
+class Overview {
+    constructor(editor) {
+        this.editor = editor; this.overlay = document.getElementById('overviewOverlay'); this.grid = document.getElementById('overviewGrid');
+        this.isOpen = false; this.focusedIndex = 0;
+        this._setupKeyboard();
+        this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay || e.target === this.grid) this.close(); });
+        window.addEventListener('resize', () => { if (this.isOpen) this._rescaleAll(); });
+    }
+    _setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') {
+                if (!this.isOpen) return;
+                const cards = this.grid.querySelectorAll('.overview-card'); if (!cards.length) return;
+                const cols = this._currentColumns(); let next = this.focusedIndex;
+                if (e.key === 'ArrowRight') next = Math.min(cards.length-1, next+1);
+                else if (e.key === 'ArrowLeft') next = Math.max(0, next-1);
+                else if (e.key === 'ArrowDown') next = Math.min(cards.length-1, next+cols);
+                else if (e.key === 'ArrowUp') next = Math.max(0, next-cols);
+                else if (e.key === 'Enter') { e.preventDefault(); this._jumpTo(this.focusedIndex); return; }
+                else return;
+                e.preventDefault(); this.focusedIndex = next; cards[next].focus(); return;
+            }
+            if (this.editor && this.editor.isActive) return;   // editor owns Esc in edit mode
+            const a = document.activeElement; const isTyping = a && (a.isContentEditable || a.tagName==='INPUT' || a.tagName==='TEXTAREA');
+            if (isTyping) return;
+            e.preventDefault(); this.toggle();
+        });
+    }
+    _currentColumns() { const cards = this.grid.querySelectorAll('.overview-card'); if (cards.length<2) return 1; const t0 = cards[0].offsetTop; let c=1; for (let i=1;i<cards.length;i++){ if (cards[i].offsetTop!==t0) break; c++; } return c; }
+    toggle() { this.isOpen ? this.close() : this.open(); }
+    open() { this._build(); this.overlay.classList.add('active'); this.overlay.setAttribute('aria-hidden','false'); document.body.classList.add('overview-open'); this.isOpen = true; this._highlightCurrent(); this._rescaleAll(); const cards = this.grid.querySelectorAll('.overview-card'); if (cards[this.focusedIndex]) cards[this.focusedIndex].focus(); }
+    close() { this.overlay.classList.remove('active'); this.overlay.setAttribute('aria-hidden','true'); document.body.classList.remove('overview-open'); this.isOpen = false; }
+    _build() {
+        this.grid.innerHTML = '';
+        const slides = document.querySelectorAll('body > .slide');
+        slides.forEach((slide, i) => {
+            const card = document.createElement('button'); card.type='button'; card.className='overview-card'; card.setAttribute('aria-label','Go to slide '+(i+1)); card.dataset.index=i;
+            const thumb = document.createElement('div'); thumb.className='overview-thumb';
+            const clone = slide.cloneNode(true);
+            clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+            clone.querySelectorAll('script').forEach(s => s.remove());
+            // Force the revealed (post-animation) state in the clone, so thumbnails of
+            // not-yet-viewed slides aren't blank (their .reveal elements are still opacity:0
+            // until the IntersectionObserver marks the live slide .visible).
+            clone.classList.add('visible');
+            clone.querySelectorAll('.reveal').forEach(el => { el.style.opacity = '1'; el.style.transform = 'none'; });
+            clone.style.width = slide.offsetWidth+'px'; clone.style.height = slide.offsetHeight+'px'; clone.style.minHeight='auto'; clone.style.transform='none';
+            thumb.appendChild(clone);
+            const pn = document.createElement('span'); pn.className='overview-page-number'; pn.textContent=(i+1)+' / '+slides.length;
+            card.appendChild(thumb); card.appendChild(pn);
+            card.addEventListener('click', () => this._jumpTo(i));
+            card.addEventListener('focus', () => { this.focusedIndex = i; });
+            this.grid.appendChild(card);
+        });
+    }
+    _rescaleAll() {
+        this.grid.querySelectorAll('.overview-card').forEach((card) => {
+            const thumb = card.querySelector('.overview-thumb'); const clone = thumb.firstElementChild; if (!clone) return;
+            const cardW = card.clientWidth, cardH = card.clientHeight;
+            const slideW = parseFloat(clone.style.width) || window.innerWidth;
+            const slideH = parseFloat(clone.style.height) || window.innerHeight;
+            const scale = Math.min(cardW/slideW, cardH/slideH);
+            clone.style.transform = 'scale('+scale+')'; clone.style.transformOrigin='top left'; clone.style.position='absolute';
+            clone.style.left = ((cardW - slideW*scale)/2)+'px'; clone.style.top = ((cardH - slideH*scale)/2)+'px';
+        });
+    }
+    _currentSlideIndex() { const slides = document.querySelectorAll('body > .slide'); const y = window.scrollY + window.innerHeight/2; let best=0,bd=Infinity; slides.forEach((s,i)=>{ const m = s.offsetTop + s.offsetHeight/2; const d = Math.abs(m-y); if (d<bd){bd=d;best=i;} }); return best; }
+    _highlightCurrent() { const cur = this._currentSlideIndex(); this.focusedIndex = cur; this.grid.querySelectorAll('.overview-card').forEach((c,i)=>c.classList.toggle('current', i===cur)); }
+    _jumpTo(i) { const s = document.querySelectorAll('body > .slide')[i]; if (!s) return; this.close(); requestAnimationFrame(() => s.scrollIntoView({behavior:'smooth', block:'start'})); }
+}
+window.__overview = new Overview(window.__editor);
+
+window.addEventListener('load', () => {
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    const first = document.querySelector('body > .slide'); if (first) first.classList.add('visible');
+});
+</script>
+</body>
+</html>

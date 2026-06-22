@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS re:Invent Keynote — GSAP Content Micro-Effects</title>
+
+  <!--
+    ============================================================================
+    OFFLINE GSAP "CONTENT MICRO-EFFECTS" TOOLKIT  (AWS re:Invent Keynote)
+    ----------------------------------------------------------------------------
+    A companion to the big-title `gsap-title` demo. Where that one is about the
+    HERO reveal, THIS file is a toolkit of CONTENT / DATA micro-effects — the
+    small, repeatable animations you sprinkle through the body of a deck.
+
+    Everything is SELF-CONTAINED: double-click the file, no network, no web
+    fonts, no build step. GSAP 3.13.0 (free for commercial use, incl. all
+    plugins) is vendored locally in ./vendor/.
+
+    THREE full-viewport sections, navigated by ↑/↓/←/→ arrows, PageUp/PageDown,
+    or the mouse wheel. Each section REPLAYS its effect every time it becomes
+    active, so you can show it again live on stage:
+
+      1. NUMBER COUNT-UP metric cards
+         Big KPI numbers tween from 0 → target (99.99%, 12.4M, 3×, 47ms).
+         Technique: GSAP can't tween the *text* of an element directly, so we
+         tween a plain PROXY OBJECT { val: 0 } and use onUpdate to FORMAT and
+         write proxy.val into the DOM each frame. This gives full control over
+         decimals, thousands separators, suffixes and easing.
+
+      2. TEXT SCRAMBLE / DECODE-IN headline
+         Headline resolves from random "encrypted" glyphs into real text.
+         Technique: hand-rolled — we tween a single progress value 0 → 1 and, on
+         each onUpdate, reveal the first (progress * length) characters as final
+         text while filling the rest with random glyphs. NO paid ScrambleText
+         plugin is assumed; we feature-detect and always use our own scramble.
+
+      3. SVG ICON PATH-DRAW + STAGGERED TIMELINE list
+         An inline icon path "draws" itself (DrawSVG if present, else a
+         stroke-dashoffset fallback), then milestone rows reveal on a stagger
+         with their own little connector line drawing down the timeline.
+
+    PLUGINS are feature-detected (typeof window.SplitText / window.DrawSVGPlugin)
+    BEFORE gsap.registerPlugin(...). Core `gsap` alone is enough; missing plugins
+    fall back to hand-rolled equivalents. We console.log what loaded.
+
+    prefers-reduced-motion: reduce → we JUMP STRAIGHT TO THE FINAL STATE
+    (numbers at target, headline resolved, list visible) with no animation.
+    ============================================================================
+  -->
+
+  <style>
+    /* ---------- Reset / base ---------- */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #0A0A0A;   /* near-black re:Invent backdrop */
+      --bg2:       #121016;   /* faint vertical lift */
+      --ink:       #F5F5F7;   /* primary text */
+      --muted:     #9A9AA8;   /* secondary text */
+      --faint:     #5A5A66;   /* tertiary / hints */
+      --purple:    #8B5CF6;
+      --pink:      #EC4899;
+      --magenta:   #D946EF;
+      --blue:      #38BDF8;
+      --aws-orange:#FF9900;   /* AWS accent — used sparingly */
+      --line:      rgba(255,255,255,0.09);
+      /* System-font stack only — NO web fonts (must work offline). */
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+              Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+      /* Tabular figures keep counting numbers from jittering as digits change. */
+      --mono: "SF Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ---------- Scroll-snap deck of full-viewport sections ---------- */
+    .deck {
+      height: 100vh;
+      height: 100dvh;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+      /* hide native scrollbar — we navigate by keys / wheel */
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .deck::-webkit-scrollbar { width: 0; height: 0; }
+
+    /* ---------- A single full-viewport content section ---------- */
+    .section {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;       /* mobile dynamic-viewport fix */
+      overflow: hidden;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(24px, 6vmin, 80px);
+      isolation: isolate;   /* keep glow / blend contained per section */
+    }
+
+    /* Subtle radial glows behind each section (pure CSS, no motion needed). */
+    .section::before,
+    .section::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .section::before {
+      width: 60vmax; height: 60vmax;
+      top: -22vmax; left: -16vmax;
+      background: radial-gradient(circle, rgba(139,92,246,0.26), transparent 60%);
+    }
+    .section::after {
+      width: 55vmax; height: 55vmax;
+      bottom: -24vmax; right: -18vmax;
+      background: radial-gradient(circle, rgba(217,70,239,0.20), transparent 60%);
+    }
+    /* Per-section accent tints so each page feels distinct. */
+    .section[data-accent="blue"]::after {
+      background: radial-gradient(circle, rgba(56,189,248,0.20), transparent 60%);
+    }
+    .section[data-accent="orange"]::before {
+      background: radial-gradient(circle, rgba(255,153,0,0.14), transparent 60%);
+    }
+
+    /* ---------- Shared content frame ---------- */
+    .frame {
+      width: min(1120px, 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* ---------- Eyebrow (small label above each section) ---------- */
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55em;
+      font-size: clamp(0.66rem, 1.3vw, 0.9rem);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: clamp(14px, 2.4vmin, 30px);
+      will-change: transform, opacity;
+    }
+    .eyebrow .dot {
+      width: 0.5em; height: 0.5em; border-radius: 50%;
+      background: var(--aws-orange);
+      box-shadow: 0 0 12px var(--aws-orange);
+    }
+    .eyebrow .step { color: var(--faint); letter-spacing: 0.2em; }
+
+    /* Gradient-clipped ink recipe — reused by numbers + headline glyphs. */
+    .grad-ink {
+      background: linear-gradient(120deg, #FFFFFF 0%, #E9D5FF 42%, #FBCFE8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* ===================================================================== */
+    /* SECTION 1 — NUMBER COUNT-UP METRIC CARDS                              */
+    /* ===================================================================== */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: clamp(12px, 1.8vw, 24px);
+      width: 100%;
+      margin-top: clamp(18px, 3vmin, 40px);
+    }
+    .metric {
+      position: relative;
+      padding: clamp(18px, 2.4vmin, 30px) clamp(16px, 2vmin, 26px);
+      border-radius: 18px;
+      text-align: left;
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      border: 1px solid transparent;   /* real ring is the gradient ::before */
+      backdrop-filter: blur(6px);
+      will-change: transform, opacity;
+      min-width: 0;
+    }
+    /* Premium gradient hairline ring (two-mask exclude-composite trick). */
+    .metric::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(150deg,
+        rgba(139,92,246,0.7) 0%,
+        rgba(217,70,239,0.28) 42%,
+        rgba(255,255,255,0.05) 72%);
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;     /* Safari */
+              mask-composite: exclude; /* standard */
+      pointer-events: none;
+    }
+    .metric .ic {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: grid; place-items: center;
+      margin-bottom: clamp(10px, 1.6vmin, 18px);
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      box-shadow: 0 6px 18px rgba(139,92,246,0.35);
+    }
+    /* Icons are inline Lucide SVGs (ISC) — NEVER emoji (emoji-as-icon reads as
+       "AI slop" and is banned by the aws-html-slides skill). Inlined for offline. */
+    .ic svg {
+      width: 20px; height: 20px; stroke: #fff; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .metric .value {
+      font-family: var(--mono);
+      font-feature-settings: "tnum" 1;   /* tabular figures = no width jitter */
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(2rem, 4.2vw, 3.6rem);
+      font-weight: 750;
+      line-height: 1.02;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: baseline;
+      gap: 0.06em;
+    }
+    .metric .value .suffix { font-size: 0.5em; font-weight: 700; }
+    .metric .label {
+      margin-top: clamp(6px, 1vmin, 12px);
+      font-size: clamp(0.82rem, 1.5vw, 1rem);
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .metric .delta {
+      margin-top: 4px;
+      font-size: clamp(0.7rem, 1.2vw, 0.84rem);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .metric .delta svg {
+      width: 14px; height: 14px; stroke-width: 2.4;
+      stroke-linecap: round; stroke-linejoin: round; fill: none;
+    }
+    .metric .delta.up   { color: #4ADE80; }
+    .metric .delta.up   svg { stroke: #4ADE80; }
+    .metric .delta.flat { color: var(--blue); }
+    .metric .delta.flat svg { stroke: var(--blue); }
+
+    /* ===================================================================== */
+    /* SECTION 2 — TEXT SCRAMBLE / DECODE-IN HEADLINE                        */
+    /* ===================================================================== */
+    .decode-wrap { width: min(92vw, 26ch); text-align: center; }
+    .decode {
+      font-family: var(--mono);
+      font-size: clamp(1.8rem, 5.8vw, 4.4rem);
+      font-weight: 800;
+      line-height: 1.06;
+      letter-spacing: -0.01em;
+      /* tabular + fixed glyphs keep the line stable while characters scramble */
+      font-variant-numeric: tabular-nums;
+      /* normal whitespace + keep-all so the headline only ever wraps at SPACES,
+         never mid-word — the per-char scramble spans must not break inside words. */
+      white-space: normal;
+      word-break: keep-all;
+      overflow-wrap: normal;
+    }
+    /* each word is an inline-block so a word never splits across lines */
+    .decode .word { display: inline-block; white-space: nowrap; }
+    /* Characters still "encrypted" get a dim accent tint; resolved chars
+       inherit the bright gradient ink. We toggle the class per-char each frame. */
+    .decode .ch { display: inline; }
+    .decode .ch.locked {
+      color: var(--magenta);
+      -webkit-text-fill-color: var(--magenta);
+      opacity: 0.55;
+    }
+    .decode-sub {
+      margin-top: clamp(16px, 2.8vmin, 34px);
+      font-size: clamp(0.92rem, 2vw, 1.25rem);
+      color: var(--muted);
+      max-width: 46ch;
+      will-change: transform, opacity;
+    }
+
+    /* ===================================================================== */
+    /* SECTION 3 — SVG ICON PATH-DRAW + STAGGERED TIMELINE                   */
+    /* ===================================================================== */
+    .draw-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.8fr) 1.2fr;
+      gap: clamp(28px, 5vw, 72px);
+      align-items: center;
+      width: 100%;
+      margin-top: clamp(16px, 2.6vmin, 36px);
+      text-align: left;
+    }
+    /* The big "drawn" hero icon on the left. */
+    .draw-art {
+      display: grid;
+      place-items: center;
+    }
+    .draw-art svg {
+      width: clamp(150px, 22vw, 280px);
+      height: auto;
+      overflow: visible;
+    }
+    .draw-art .stroke {
+      fill: none;
+      stroke: url(#iconGrad);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 10px rgba(56,189,248,0.45));
+    }
+
+    /* The vertical staggered timeline on the right. */
+    .timeline { position: relative; display: flex; flex-direction: column; }
+    .tl-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: clamp(12px, 1.6vw, 20px);
+      padding: clamp(8px, 1.4vmin, 16px) 0;
+      will-change: transform, opacity;
+    }
+    .tl-node {
+      position: relative;
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(139,92,246,0.18));
+      border: 1px solid var(--line);
+    }
+    .tl-node svg { width: 20px; height: 20px; stroke: var(--blue); fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    /* Connector line between rows — its own little draw via scaleY.
+       JS animates the --conn-scale custom property on the .tl-node; the
+       ::after reads it here (GSAP can't target a pseudo-element directly). */
+    .tl-row:not(:last-child) .tl-node::after {
+      content: "";
+      position: absolute;
+      top: 46px; left: 50%;
+      width: 2px;
+      /* span the gap down to the next node: row padding (top+bottom) + the
+         44px node height, minus the 46px head start of this connector. */
+      height: calc(2 * clamp(8px, 1.4vmin, 16px) + 44px - 2px);
+      transform: translateX(-50%) scaleY(var(--conn-scale, 0));
+      transform-origin: top center;
+      background: linear-gradient(180deg, var(--blue), rgba(139,92,246,0.25));
+      will-change: transform;
+    }
+    .tl-body h3 {
+      font-size: clamp(1rem, 1.8vw, 1.28rem);
+      font-weight: 680;
+      margin-bottom: 3px;
+    }
+    .tl-body p { font-size: clamp(0.82rem, 1.4vw, 0.98rem); color: var(--muted); line-height: 1.45; }
+    .tl-body .when {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      letter-spacing: 0.08em;
+      color: var(--blue);
+      text-transform: uppercase;
+    }
+
+    /* ---------- Shared section heading (sections 2 & 3 use a smaller title) ---------- */
+    .section-title {
+      font-size: clamp(1.6rem, 4.4vw, 3rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      max-width: 18ch;
+    }
+    .section-title.left { text-align: left; max-width: 16ch; }
+
+    /* ---------- Fixed footer (copyright + page indicator + nav hint) ---------- */
+    .footer {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px clamp(16px, 4vw, 44px);
+      font-size: clamp(0.6rem, 1vw, 0.72rem);
+      color: var(--faint);
+      background: linear-gradient(0deg, rgba(10,10,10,0.85), transparent);
+      pointer-events: none;
+    }
+    .footer .copy { color: var(--faint); }
+    .footer .right { display: inline-flex; align-items: center; gap: 16px; }
+    .footer .hint  { color: var(--faint); opacity: 0.7; }
+    .footer .pager { color: var(--muted); font-family: var(--mono); letter-spacing: 0.06em; }
+    .footer .pager b { color: var(--ink); font-weight: 700; }
+
+    /* Right-side page dots. */
+    .dots {
+      position: fixed;
+      right: clamp(12px, 2.5vw, 30px);
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .dots button {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: transparent;
+      padding: 0; cursor: pointer;
+      transition: background 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+    }
+    .dots button.active {
+      background: var(--purple);
+      border-color: var(--purple);
+      transform: scale(1.35);
+      box-shadow: 0 0 12px rgba(139,92,246,0.7);
+    }
+
+    /* ---------- Height breakpoints — keep everything in-viewport ---------- */
+    @media (max-height: 700px) {
+      .eyebrow { margin-bottom: 10px; }
+      .metrics { margin-top: 14px; }
+      .metric .ic { width: 30px; height: 30px; margin-bottom: 8px; }
+      .draw-grid { margin-top: 10px; gap: clamp(20px, 4vw, 48px); }
+      .decode-sub { margin-top: 14px; }
+    }
+    @media (max-height: 600px) {
+      .metric .ic { display: none; }          /* reclaim vertical room */
+      .metric { padding: 14px 16px; }
+      .tl-body p { display: none; }
+      .footer { padding: 6px clamp(12px, 4vw, 32px); }
+    }
+    /* Narrow viewports: collapse the 4-up metric grid + 2-col draw grid. */
+    @media (max-width: 760px) {
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .draw-grid { grid-template-columns: 1fr; text-align: center; }
+      .draw-grid .timeline { text-align: left; }
+      .dots { display: none; }
+    }
+
+    /* prefers-reduced-motion: ensure the static glows don't animate or jank. */
+    @media (prefers-reduced-motion: reduce) {
+      .deck { scroll-behavior: auto; }
+      .section::before, .section::after { filter: blur(90px); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="deck" data-deck>
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 1 — NUMBER COUNT-UP METRIC CARDS                              -->
+    <!-- ===================================================================== -->
+    <section class="section" data-section="0" data-accent="purple">
+      <div class="frame">
+        <div class="eyebrow" data-anim="eyebrow">
+          <span class="dot"></span>
+          <span>AWS re:Invent &nbsp;·&nbsp; By the Numbers</span>
+          <span class="step">01 / 03</span>
+        </div>
+        <h2 class="section-title grad-ink" data-anim="title">A year of scale, measured</h2>
+
+        <div class="metrics">
+          <!--
+            Each .value carries its target + format hints as data-* attributes:
+              data-to       = numeric target
+              data-decimals = digits after the decimal point
+              data-suffix   = unit appended after the number (%, M, ×, ms)
+              data-sep      = "1" to insert thousands separators
+            The JS reads these, tweens a PROXY object, and formats on every frame.
+          -->
+          <div class="metric">
+            <div class="ic"><!-- lucide: gauge --><svg viewBox="0 0 24 24"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg></div>
+            <div class="value grad-ink"
+                 data-count data-to="99.99" data-decimals="2" data-suffix="%"></div>
+            <div class="label">Service availability</div>
+            <div class="delta flat"><!-- lucide: activity --><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>Four-nines SLA, all regions</div>
+          </div>
+
+          <div class="metric">
+            <div class="ic"><!-- lucide: users --><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
+            <div class="value grad-ink"
+                 data-count data-to="12.4" data-decimals="1" data-suffix="M"></div>
+            <div class="label">Active builders</div>
+            <div class="delta up"><!-- lucide: trending-up --><svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>+18% year over year</div>
+          </div>
+
+          <div class="metric">
+            <div class="ic"><!-- lucide: zap --><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
+            <div class="value grad-ink"
+                 data-count data-to="3" data-decimals="0" data-suffix="×"></div>
+            <div class="label">Faster inference</div>
+            <div class="delta up"><!-- lucide: trending-up --><svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>vs. last generation</div>
+          </div>
+
+          <div class="metric">
+            <div class="ic"><!-- lucide: timer --><svg viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2"></line><line x1="12" x2="15" y1="14" y2="11"></line><circle cx="12" cy="14" r="8"></circle></svg></div>
+            <div class="value grad-ink"
+                 data-count data-to="47" data-decimals="0" data-suffix="ms"></div>
+            <div class="label">Median latency</div>
+            <div class="delta flat"><!-- lucide: activity --><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>p50 at the edge</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 2 — TEXT SCRAMBLE / DECODE-IN HEADLINE                         -->
+    <!-- ===================================================================== -->
+    <section class="section" data-section="1" data-accent="magenta">
+      <div class="frame">
+        <div class="eyebrow" data-anim="eyebrow">
+          <span class="dot"></span>
+          <span>AWS re:Invent &nbsp;·&nbsp; Decrypting the Roadmap</span>
+          <span class="step">02 / 03</span>
+        </div>
+        <!--
+          The decode headline. We store the FINAL text in data-text and clear the
+          visible content; JS renders per-character <span class="ch"> and drives a
+          scramble → resolve tween. Reduced-motion shows the final text instantly.
+        -->
+        <div class="decode-wrap">
+          <h2 class="decode grad-ink" data-decode data-text="Security is job zero."></h2>
+        </div>
+        <p class="decode-sub" data-anim="sub">
+          From silicon to service: every layer encrypted, attested, and verified —
+          decoded for you, live.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- SECTION 3 — SVG ICON PATH-DRAW + STAGGERED TIMELINE                    -->
+    <!-- ===================================================================== -->
+    <section class="section" data-section="2" data-accent="blue">
+      <div class="frame">
+        <div class="eyebrow" data-anim="eyebrow">
+          <span class="dot"></span>
+          <span>AWS re:Invent &nbsp;·&nbsp; Launch Timeline</span>
+          <span class="step">03 / 03</span>
+        </div>
+
+        <div class="draw-grid">
+          <!-- Left: a single hero icon whose path "draws" itself on enter. -->
+          <div class="draw-art">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <defs>
+                <linearGradient id="iconGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0"   stop-color="#38BDF8" />
+                  <stop offset="0.55" stop-color="#8B5CF6" />
+                  <stop offset="1"   stop-color="#D946EF" />
+                </linearGradient>
+              </defs>
+              <!-- lucide-style rocket, single continuous-ish path set, "drawn" in -->
+              <path class="stroke" data-draw
+                d="M60 14
+                   C 78 22, 86 42, 84 64
+                   L 72 88
+                   L 48 88
+                   L 36 64
+                   C 34 42, 42 22, 60 14 Z" />
+              <path class="stroke" data-draw d="M48 88 L 42 104 L 54 98" />
+              <path class="stroke" data-draw d="M72 88 L 78 104 L 66 98" />
+              <circle class="stroke" data-draw cx="60" cy="50" r="9" />
+            </svg>
+          </div>
+
+          <!-- Right: staggered milestone rows + connector lines drawing down. -->
+          <div class="timeline" data-timeline>
+            <div class="tl-row" data-row>
+              <div class="tl-node"><!-- lucide: cpu --><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"></path></svg></div>
+              <div class="tl-body">
+                <div class="when">Keynote · Day 1</div>
+                <h3>Next-gen silicon</h3>
+                <p>Custom inference chips ship to every region by default.</p>
+              </div>
+            </div>
+            <div class="tl-row" data-row>
+              <div class="tl-node"><!-- lucide: boxes --><svg viewBox="0 0 24 24"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"></path><path d="m7 16.5-4.74-2.85"></path><path d="m7 16.5 5-3"></path><path d="M7 16.5v5.17"></path><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"></path></svg></div>
+              <div class="tl-body">
+                <div class="when">Preview</div>
+                <h3>Agentic workflows</h3>
+                <p>Multi-step agents orchestrate services with guardrails built in.</p>
+              </div>
+            </div>
+            <div class="tl-row" data-row>
+              <div class="tl-node"><!-- lucide: globe --><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg></div>
+              <div class="tl-body">
+                <div class="when">GA · Q3</div>
+                <h3>Global low-latency</h3>
+                <p>Edge inference in 40+ metros, single-digit-ms round trips.</p>
+              </div>
+            </div>
+            <div class="tl-row" data-row>
+              <div class="tl-node"><!-- lucide: check-circle --><svg viewBox="0 0 24 24"><path d="M21.801 10A10 10 0 1 1 17 3.335"></path><path d="m9 11 3 3L22 4"></path></svg></div>
+              <div class="tl-body">
+                <div class="when">Available now</div>
+                <h3>Zero-trust by default</h3>
+                <p>Every call signed, scoped, and audited end to end.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ---------- Fixed footer ---------- -->
+  <footer class="footer">
+    <span class="copy">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</span>
+    <span class="right">
+      <span class="hint">↑ ↓ / wheel to navigate · R to replay</span>
+      <span class="pager"><b data-pager-current>1</b> / <span data-pager-total>3</span></span>
+    </span>
+  </footer>
+
+  <!-- Right-side page dots (click to jump). -->
+  <nav class="dots" data-dots aria-label="Section navigation"></nav>
+
+  <!-- ============================ VENDORED GSAP ============================ -->
+  <!-- Core (required). Global UMD build → exposes window.gsap -->
+  <script src="./vendor/gsap.min.js"></script>
+  <!-- Optional plugins. If a file is missing/blocked, the demo still works
+       (we feature-detect below and fall back to hand-rolled equivalents). -->
+  <script src="./vendor/SplitText.min.js"></script>
+  <script src="./vendor/DrawSVGPlugin.min.js"></script>
+
+  <script>
+  (function () {
+    "use strict";
+
+    /* === BOOT: GSAP core sanity check ===================================== */
+    if (!window.gsap) {
+      console.error("[micro] GSAP core failed to load from ./vendor/gsap.min.js");
+      return;
+    }
+    console.log("[micro] GSAP version:", gsap.version);
+
+    /* === Feature-detect optional plugins ================================== *
+     * SplitText & DrawSVGPlugin are FREE in 3.13.0, but we NEVER assume — we
+     * detect the globals and register, otherwise use hand-rolled fallbacks.   */
+    var hasSplitText = typeof window.SplitText !== "undefined";
+    var hasDrawSVG   = typeof window.DrawSVGPlugin !== "undefined";
+    if (hasSplitText) gsap.registerPlugin(window.SplitText);
+    if (hasDrawSVG)   gsap.registerPlugin(window.DrawSVGPlugin);
+    console.log("[micro] plugins → SplitText:", hasSplitText, " DrawSVG:", hasDrawSVG);
+
+    var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    console.log("[micro] prefers-reduced-motion:", reduceMotion);
+
+    /* === SECTION 1 — NUMBER COUNT-UP ====================================== *
+     * KEY TECHNIQUE — the "proxy object" count-up:
+     *   GSAP tweens numeric *properties*, not the text content of a node. So we
+     *   create a throwaway object  proxy = { val: 0 }  and tween proxy.val to the
+     *   target. On every frame, onUpdate formats proxy.val (decimals, separators,
+     *   suffix) and writes it into the element. This decouples the animated number
+     *   from its display formatting and gives smooth, eased counting.
+     * ---------------------------------------------------------------------- */
+    var countEls = gsap.utils.toArray("[data-count]");
+
+    // Format a raw number per the element's data-* hints.
+    function formatNumber(el, n) {
+      var decimals = parseInt(el.dataset.decimals || "0", 10);
+      var suffix   = el.dataset.suffix || "";
+      var useSep   = el.dataset.sep === "1";
+      var fixed    = n.toFixed(decimals);
+      if (useSep) {
+        var parts = fixed.split(".");
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        fixed = parts.join(".");
+      }
+      // suffix is rendered smaller via a <span class="suffix">
+      el.innerHTML = fixed + (suffix ? '<span class="suffix">' + suffix + "</span>" : "");
+    }
+
+    // Set a count element straight to its final formatted value (no motion).
+    function settleCount(el) {
+      formatNumber(el, parseFloat(el.dataset.to));
+    }
+
+    // Build (but don't start) the count-up tweens onto a timeline.
+    function buildCountUp(tl) {
+      countEls.forEach(function (el, i) {
+        var proxy = { val: 0 };
+        var target = parseFloat(el.dataset.to);
+        formatNumber(el, 0); // start visibly at zero
+        tl.to(proxy, {
+          val: target,
+          duration: 1.4,
+          ease: "power2.out",
+          onUpdate: function () { formatNumber(el, proxy.val); }
+        }, 0.15 + i * 0.12);
+      });
+    }
+
+    /* === SECTION 2 — TEXT SCRAMBLE / DECODE-IN ============================ *
+     * KEY TECHNIQUE — hand-rolled scramble (no paid ScrambleText plugin):
+     *   We split the headline into per-character spans once. Then we tween a
+     *   single progress value 0 → 1. On each onUpdate we compute how many chars
+     *   should be "resolved" (progress * length); those show their FINAL glyph,
+     *   the rest show a RANDOM glyph from a charset (re-rolled each frame so they
+     *   visibly churn). A char near the resolve boundary gets a brief locked tint.
+     * ---------------------------------------------------------------------- */
+    var SCRAMBLE_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&@$<>/\\=+*".split("");
+    var decodeEl  = document.querySelector("[data-decode]");
+    var decodeText = decodeEl ? decodeEl.dataset.text : "";
+    var decodeChars = [];   // array of { span, final } for non-space chars
+
+    function buildDecodeSpans() {
+      decodeEl.textContent = "";
+      decodeChars = [];
+      // Group chars into WORD wrappers so a word never splits across lines
+      // (each .word is inline-block/nowrap). Per-char spans still scramble.
+      var words = decodeText.split(" ");
+      words.forEach(function (word, wi) {
+        var wEl = document.createElement("span");
+        wEl.className = "word";
+        for (var i = 0; i < word.length; i++) {
+          var span = document.createElement("span");
+          span.className = "ch";
+          span.textContent = word[i];
+          decodeChars.push({ span: span, final: word[i] });
+          wEl.appendChild(span);
+        }
+        decodeEl.appendChild(wEl);
+        // a real, breakable space BETWEEN words (not inside the nowrap word)
+        if (wi < words.length - 1) decodeEl.appendChild(document.createTextNode(" "));
+      });
+    }
+
+    function rnd() { return SCRAMBLE_SET[(Math.random() * SCRAMBLE_SET.length) | 0]; }
+
+    // Render one frame of the scramble for a given progress 0..1.
+    function renderDecode(progress) {
+      var revealUpTo = progress * decodeChars.length;
+      decodeChars.forEach(function (item, i) {
+        if (i < revealUpTo - 0.5) {
+          // resolved → show the real character, bright gradient ink
+          if (item.span.textContent !== item.final) item.span.textContent = item.final;
+          item.span.classList.remove("locked");
+        } else {
+          // still encrypted → random glyph + dim accent tint
+          item.span.textContent = rnd();
+          item.span.classList.add("locked");
+        }
+      });
+    }
+    function settleDecode() {
+      decodeChars.forEach(function (item) {
+        item.span.textContent = item.final;
+        item.span.classList.remove("locked");
+      });
+    }
+
+    /* === SECTION 3 — SVG PATH-DRAW + STAGGERED TIMELINE =================== *
+     * KEY TECHNIQUE — draw-in with feature detection:
+     *   With DrawSVGPlugin we animate drawSVG "0%" → "100%". Without it we measure
+     *   getTotalLength() and animate stroke-dashoffset → 0 (the classic fallback).
+     *   The timeline rows then stagger in, and each connector line scales its
+     *   height from 0 → 1 to "grow" down the spine.
+     * ---------------------------------------------------------------------- */
+    var drawPaths = gsap.utils.toArray("[data-draw]");
+    var tlRows    = gsap.utils.toArray("[data-timeline] [data-row]");
+    var connectors = gsap.utils.toArray("[data-timeline] [data-row]:not(:last-child) .tl-node");
+
+    // Prep each drawable path for its draw mode; returns an "add to timeline" fn.
+    function prepDraw() {
+      if (hasDrawSVG) {
+        gsap.set(drawPaths, { drawSVG: "0%" });
+        return function (tl, pos) {
+          tl.to(drawPaths, {
+            drawSVG: "100%", duration: 1.0, ease: "power1.inOut",
+            stagger: 0.12
+          }, pos);
+        };
+      }
+      // Fallback: per-path stroke-dashoffset.
+      drawPaths.forEach(function (p) {
+        var len = p.getTotalLength ? p.getTotalLength() : 300;
+        gsap.set(p, { strokeDasharray: len, strokeDashoffset: len });
+      });
+      return function (tl, pos) {
+        tl.to(drawPaths, {
+          strokeDashoffset: 0, duration: 1.0, ease: "power1.inOut",
+          stagger: 0.12
+        }, pos);
+      };
+    }
+    function settleDraw() {
+      if (hasDrawSVG) gsap.set(drawPaths, { drawSVG: "100%" });
+      else drawPaths.forEach(function (p) { gsap.set(p, { strokeDashoffset: 0 }); });
+    }
+
+    /* ===================================================================== *
+     * PER-SECTION TIMELINE FACTORIES                                        *
+     * Each returns a fresh GSAP timeline (paused). We REBUILD on every entry *
+     * so the effect replays each time the section becomes active.           *
+     * ===================================================================== */
+    function tlSection0() {
+      var eyebrow = document.querySelector('[data-section="0"] [data-anim="eyebrow"]');
+      var title   = document.querySelector('[data-section="0"] [data-anim="title"]');
+      var cards   = gsap.utils.toArray('[data-section="0"] .metric');
+      gsap.set(eyebrow, { opacity: 0, y: -14 });
+      gsap.set(title,   { opacity: 0, y: 18 });
+      gsap.set(cards,   { opacity: 0, y: 34 });
+      var tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+      tl.to(eyebrow, { opacity: 1, y: 0, duration: 0.5 }, 0)
+        .to(title,   { opacity: 1, y: 0, duration: 0.6 }, 0.08)
+        .to(cards,   { opacity: 1, y: 0, duration: 0.6, stagger: 0.1 }, 0.18);
+      buildCountUp(tl);   // count-ups overlap the card reveal
+      return tl;
+    }
+
+    function tlSection1() {
+      var eyebrow = document.querySelector('[data-section="1"] [data-anim="eyebrow"]');
+      var sub     = document.querySelector('[data-section="1"] [data-anim="sub"]');
+      buildDecodeSpans();
+      renderDecode(0);
+      gsap.set(eyebrow, { opacity: 0, y: -14 });
+      gsap.set(sub,     { opacity: 0, y: 16 });
+      var prog = { p: 0 };
+      var tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+      tl.to(eyebrow, { opacity: 1, y: 0, duration: 0.5 }, 0)
+        // Drive the scramble by tweening a single progress value 0 → 1.
+        .to(prog, {
+          p: 1, duration: 1.7, ease: "power2.inOut",
+          onUpdate: function () { renderDecode(prog.p); },
+          onComplete: settleDecode
+        }, 0.15)
+        .to(sub, { opacity: 1, y: 0, duration: 0.6 }, 0.9);
+      return tl;
+    }
+
+    function tlSection2() {
+      var eyebrow = document.querySelector('[data-section="2"] [data-anim="eyebrow"]');
+      var addDraw = prepDraw();
+      gsap.set(eyebrow, { opacity: 0, y: -14 });
+      gsap.set(tlRows,  { opacity: 0, x: 26 });
+      // Reset each connector line to collapsed (scaleY 0) and give it a proxy
+      // object the connector tween will drive (GSAP can't target ::after directly).
+      connectors.forEach(function (n) {
+        n._connProxy = { s: 0 };
+        applyConnector(n, 0);
+      });
+
+      var tl = gsap.timeline({ paused: true, defaults: { ease: "power3.out" } });
+      tl.to(eyebrow, { opacity: 1, y: 0, duration: 0.5 }, 0);
+      addDraw(tl, 0.1);   // hero icon draws first
+      tl.to(tlRows, { opacity: 1, x: 0, duration: 0.6, stagger: 0.16 }, 0.35);
+      // Grow each connector line as its row settles.
+      connectors.forEach(function (n, i) {
+        tl.to(n._connProxy, {
+          s: 1, duration: 0.5, ease: "power2.out",
+          onUpdate: function () { applyConnector(n, n._connProxy.s); }
+        }, 0.5 + i * 0.16);
+      });
+      return tl;
+    }
+
+    // The ::after connector can't be targeted by GSAP directly, so we drive its
+    // scaleY through an inline custom property the stylesheet maps to transform.
+    function applyConnector(node, s) {
+      node.style.setProperty("--conn-scale", s);
+    }
+    function settleConnectors() {
+      gsap.utils.toArray('[data-timeline] [data-row]:not(:last-child) .tl-node')
+        .forEach(function (n) { applyConnector(n, 1); });
+    }
+
+    var builders = [tlSection0, tlSection1, tlSection2];
+
+    /* === REDUCED MOTION: jump straight to final state, skip all timelines = */
+    if (reduceMotion) {
+      // Section 1 — numbers at target
+      countEls.forEach(settleCount);
+      gsap.set('[data-section="0"] [data-anim="eyebrow"]', { opacity: 1, y: 0 });
+      gsap.set('[data-section="0"] [data-anim="title"]',   { opacity: 1, y: 0 });
+      gsap.set('[data-section="0"] .metric',               { opacity: 1, y: 0 });
+      // Section 2 — headline resolved
+      buildDecodeSpans(); settleDecode();
+      gsap.set('[data-section="1"] [data-anim="eyebrow"]', { opacity: 1, y: 0 });
+      gsap.set('[data-section="1"] [data-anim="sub"]',     { opacity: 1, y: 0 });
+      // Section 3 — icon drawn, list visible, connectors full
+      settleDraw();
+      gsap.set('[data-section="2"] [data-anim="eyebrow"]', { opacity: 1, y: 0 });
+      gsap.set(tlRows, { opacity: 1, x: 0 });
+      settleConnectors();
+      console.log("[micro] reduced-motion → all sections at final state, no animation");
+      // still wire navigation (below) so arrows/wheel/dots work, but no replay.
+    }
+
+    /* ===================================================================== *
+     * NAVIGATION + REPLAY-ON-ACTIVE                                          *
+     * IntersectionObserver detects which section is on screen; on entry we   *
+     * (re)build that section's timeline and play it from 0 → replay effect.  *
+     * Arrow keys / wheel / dots scroll the snap container.                   *
+     * ===================================================================== */
+    var deck     = document.querySelector("[data-deck]");
+    var sections = gsap.utils.toArray(".section");
+    var dotsNav  = document.querySelector("[data-dots]");
+    var pagerCur = document.querySelector("[data-pager-current]");
+    document.querySelector("[data-pager-total]").textContent = sections.length;
+
+    var current  = 0;
+    var liveTL   = [null, null, null];  // currently-built timeline per section
+
+    // Build page dots.
+    sections.forEach(function (_, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-label", "Go to section " + (i + 1));
+      b.addEventListener("click", function () { goTo(i); b.blur(); });
+      dotsNav.appendChild(b);
+    });
+    var dotBtns = gsap.utils.toArray("[data-dots] button");
+
+    function setActiveUI(i) {
+      pagerCur.textContent = i + 1;
+      dotBtns.forEach(function (b, j) { b.classList.toggle("active", j === i); });
+    }
+
+    // Play (or replay) a section's effect.
+    function playSection(i) {
+      if (reduceMotion) return;            // reduced motion = already final, no replay
+      if (liveTL[i]) liveTL[i].kill();     // tear down a prior build to avoid overlap
+      liveTL[i] = builders[i]();
+      liveTL[i].play(0);
+    }
+
+    function goTo(i) {
+      i = Math.max(0, Math.min(sections.length - 1, i));
+      sections[i].scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+    }
+
+    // IntersectionObserver: the most-visible section becomes "current".
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting && e.intersectionRatio >= 0.6) {
+          var i = sections.indexOf(e.target);
+          if (i !== current || liveTL[i] == null) {
+            current = i;
+            setActiveUI(i);
+            playSection(i);
+          } else {
+            setActiveUI(i);
+          }
+        }
+      });
+    }, { threshold: [0.6] });
+    sections.forEach(function (s) { io.observe(s); });
+
+    // --- Keyboard navigation ---
+    window.addEventListener("keydown", function (e) {
+      switch (e.key) {
+        case "ArrowDown": case "ArrowRight": case "PageDown": case " ":
+          e.preventDefault(); goTo(current + 1); break;
+        case "ArrowUp": case "ArrowLeft": case "PageUp":
+          e.preventDefault(); goTo(current - 1); break;
+        case "Home": e.preventDefault(); goTo(0); break;
+        case "End":  e.preventDefault(); goTo(sections.length - 1); break;
+        case "r": case "R": e.preventDefault(); playSection(current); break;
+      }
+    });
+
+    // --- Wheel navigation (debounced so one notch = one section) ---
+    var wheelLock = false;
+    deck.addEventListener("wheel", function (e) {
+      if (Math.abs(e.deltaY) < 12) return;
+      if (wheelLock) { e.preventDefault(); return; }
+      wheelLock = true;
+      goTo(current + (e.deltaY > 0 ? 1 : -1));
+      setTimeout(function () { wheelLock = false; }, 700);
+    }, { passive: true });
+
+    // Kick the first section once layout is ready.
+    setActiveUI(0);
+    if (!reduceMotion) {
+      // small delay lets fonts/layout settle so SVG getTotalLength() is accurate
+      requestAnimationFrame(function () { playSection(0); });
+    }
+
+    // Expose for debugging / verification.
+    window.__microNav = { goTo: goTo, play: playSection, liveTL: liveTL };
+  })();
+  </script>
+</body>
+</html>

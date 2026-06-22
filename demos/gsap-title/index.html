@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS re:Invent Keynote — GSAP Kinetic Title</title>
+
+  <!--
+    ============================================================================
+    OFFLINE GSAP "KINETIC TITLE" DEMO  (AWS re:Invent Keynote slide)
+    ----------------------------------------------------------------------------
+    Everything here is SELF-CONTAINED and works by double-clicking the file —
+    no network, no web fonts, no build step. GSAP 3.13.0 (free for commercial
+    use as of 2025) is vendored locally in ./vendor/.
+
+    Timeline sequence on load:
+      1. Kinetic typography  — headline revealed per-character (y / opacity / blur)
+      2. SVG underline draw  — glowing gradient line draws via stroke-dashoffset
+      3. Staggered cards     — eyebrow + 3 feature cards fade/rise in
+      4. Infinite glow pulse — subtle yoyo on the headline
+
+    prefers-reduced-motion: we jump straight to the final state (no motion).
+    ============================================================================
+  -->
+
+  <style>
+    /* ---------- Reset / base ---------- */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #0A0A0A;   /* near-black re:Invent backdrop */
+      --ink:       #F5F5F7;   /* primary text */
+      --muted:     #9A9AA8;   /* secondary text */
+      --purple:    #8B5CF6;
+      --pink:      #EC4899;
+      --aws-orange:#FF9900;   /* AWS accent */
+      /* System-font stack only — NO web fonts (must work offline). */
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+              Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ---------- The single full-viewport slide ---------- */
+    .slide {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6vmin;
+      overflow: hidden;
+      isolation: isolate; /* keep blend/glow contained */
+    }
+
+    /* Subtle purple / pink radial glows behind everything (pure CSS). */
+    .slide::before,
+    .slide::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .slide::before {
+      width: 60vmax; height: 60vmax;
+      top: -20vmax; left: -15vmax;
+      background: radial-gradient(circle, rgba(139,92,246,0.28), transparent 60%);
+    }
+    .slide::after {
+      width: 55vmax; height: 55vmax;
+      bottom: -22vmax; right: -18vmax;
+      background: radial-gradient(circle, rgba(236,72,153,0.22), transparent 60%);
+    }
+
+    /* ---------- Eyebrow (small label above headline) ---------- */
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55em;
+      font-size: clamp(0.7rem, 1.4vw, 0.95rem);
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2.2vmin;
+      will-change: transform, opacity;
+    }
+    .eyebrow .dot {
+      width: 0.5em; height: 0.5em; border-radius: 50%;
+      background: var(--aws-orange);
+      box-shadow: 0 0 12px var(--aws-orange);
+    }
+
+    /* ---------- Headline (the kinetic typography target) ---------- */
+    /*
+      Shared gradient-ink recipe. We apply this to BOTH the headline element
+      AND the per-character spans.
+
+      WHY both? SplitText (and our manual fallback) move the actual glyphs out
+      of the <h1> and into child <span class="char"> elements. With
+      `-webkit-text-fill-color: transparent` + `background-clip: text`, the
+      gradient is clipped to whatever element OWNS the glyphs. After splitting,
+      the glyphs live in the children — so the gradient must be on the children
+      too, or the text paints transparent (invisible). We keep it on the parent
+      as well so the un-split state (reduced-motion / no-JS) still looks right.
+    */
+    .headline,
+    .headline .char {
+      background: linear-gradient(120deg, #FFFFFF 0%, #E9D5FF 45%, #FBCFE8 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .headline {
+      font-size: clamp(2.6rem, 9vw, 7.5rem);
+      font-weight: 800;
+      line-height: 1.02;
+      letter-spacing: -0.02em;
+      text-align: center;
+      max-width: 16ch;
+      will-change: filter; /* the infinite glow pulse animates filter */
+    }
+
+    /*
+      Each character we split out is an inline-block so GSAP can transform it
+      individually. We keep spaces from collapsing with a tiny min-width.
+    */
+    .headline .char {
+      display: inline-block;
+      will-change: transform, opacity, filter;
+    }
+    .headline .char.is-space {
+      width: 0.32em;
+      /* a space glyph needs no gradient; keep it truly empty */
+      background: none;
+    }
+
+    /* ---------- SVG underline ---------- */
+    .underline-wrap {
+      width: clamp(220px, 42vw, 620px);
+      margin-top: 3vmin;
+      line-height: 0;
+    }
+    .underline-wrap svg { width: 100%; height: 22px; display: block; overflow: visible; }
+    .underline-wrap path {
+      fill: none;
+      stroke: url(#lineGrad);
+      stroke-width: 4;
+      stroke-linecap: round;
+      filter: drop-shadow(0 0 8px rgba(236,72,153,0.55));
+    }
+
+    /* ---------- Feature cards ---------- */
+    .cards {
+      display: flex;
+      gap: clamp(12px, 2.2vw, 28px);
+      margin-top: 6vmin;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .card {
+      position: relative;
+      width: clamp(150px, 22vw, 230px);
+      padding: 22px 22px 24px;
+      border-radius: 16px;
+      text-align: left;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid transparent;     /* real border is the gradient ::before */
+      backdrop-filter: blur(6px);
+      will-change: transform, opacity;
+    }
+    /*
+      Premium gradient hairline. A 1px-thick gradient ring drawn with the
+      classic "two masks, exclude-composite" trick so only the border shows
+      (the fill is masked out). Catches purple at the top-left and fades to
+      transparent — lifts the cards above flat grey boxes, on-brand, no motion.
+    */
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(150deg,
+        rgba(139,92,246,0.65) 0%,
+        rgba(236,72,153,0.25) 38%,
+        rgba(255,255,255,0.06) 70%);
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;       /* Safari */
+              mask-composite: exclude;   /* standard */
+      pointer-events: none;
+    }
+    .card .ic {
+      width: 34px; height: 34px; border-radius: 9px;
+      display: grid; place-items: center;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      box-shadow: 0 6px 18px rgba(139,92,246,0.35);
+    }
+    /* Icons are inline Lucide SVGs (ISC license), NOT emoji — emoji as icons
+       reads as "AI slop" and is banned by the aws-html-slides skill. Lucide is
+       inlined here (rather than the usual CDN) so the demo stays fully offline. */
+    .card .ic svg {
+      width: 19px; height: 19px; stroke: #fff; fill: none;
+      stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .card h3 { font-size: 1.02rem; font-weight: 650; margin-bottom: 6px; }
+    .card p  { font-size: 0.84rem; color: var(--muted); line-height: 1.45; }
+
+    /* prefers-reduced-motion: ensure nothing visually janks even before JS runs */
+    @media (prefers-reduced-motion: reduce) {
+      .slide::before, .slide::after { filter: blur(80px); }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="slide" role="main">
+    <!-- 1) Eyebrow / label -->
+    <div class="eyebrow" data-eyebrow>
+      <span class="dot"></span>
+      <span>AWS re:Invent &nbsp;·&nbsp; Keynote</span>
+    </div>
+
+    <!-- 2) Headline — text is split into per-character spans at runtime -->
+    <h1 class="headline" data-headline>Building the Future</h1>
+
+    <!-- 3) SVG underline that "draws" in -->
+    <div class="underline-wrap">
+      <svg viewBox="0 0 600 22" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0"   stop-color="#8B5CF6" />
+            <stop offset="0.5" stop-color="#EC4899" />
+            <stop offset="1"   stop-color="#FF9900" />
+          </linearGradient>
+        </defs>
+        <!-- a gently curved stroke -->
+        <path data-underline d="M6 14 C 150 2, 450 2, 594 12" />
+      </svg>
+    </div>
+
+    <!-- 4) Feature cards -->
+    <div class="cards" data-cards>
+      <div class="card">
+        <div class="ic"><!-- lucide: zap --><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
+        <h3>Serverless Scale</h3>
+        <p>Spin to zero, burst to millions. Pay only for what runs.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><!-- lucide: cpu --><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"></path></svg></div>
+        <h3>Generative AI</h3>
+        <p>Foundation models and agents, built right into the cloud.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><!-- lucide: shield-check --><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg></div>
+        <h3>Security First</h3>
+        <p>Defense in depth, encrypted by default, everywhere.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================ VENDORED GSAP ============================ -->
+  <!-- Core (required). Global UMD build → exposes window.gsap -->
+  <script src="./vendor/gsap.min.js"></script>
+  <!-- Optional plugins. If a file is missing/blocked, the demo still works
+       (we feature-detect below and fall back to hand-rolled equivalents). -->
+  <script src="./vendor/SplitText.min.js"></script>
+  <script src="./vendor/DrawSVGPlugin.min.js"></script>
+
+  <script>
+  (function () {
+    "use strict";
+
+    // ---- Sanity: GSAP core must be present ----------------------------------
+    if (!window.gsap) {
+      console.error("[demo] GSAP core failed to load from ./vendor/gsap.min.js");
+      return;
+    }
+    console.log("[demo] GSAP version:", gsap.version);
+
+    // ---- Feature-detect optional plugins ------------------------------------
+    // SplitText & DrawSVGPlugin are FREE in 3.13.0, but we never assume — we
+    // detect them and register, otherwise we use the manual fallbacks below.
+    var hasSplitText = typeof window.SplitText !== "undefined";
+    var hasDrawSVG   = typeof window.DrawSVGPlugin !== "undefined";
+    if (hasSplitText) gsap.registerPlugin(SplitText);
+    if (hasDrawSVG)   gsap.registerPlugin(DrawSVGPlugin);
+    console.log("[demo] plugins → SplitText:", hasSplitText, " DrawSVG:", hasDrawSVG);
+
+    var headline  = document.querySelector("[data-headline]");
+    var eyebrow   = document.querySelector("[data-eyebrow]");
+    var underline = document.querySelector("[data-underline]");
+    var cards     = gsap.utils.toArray("[data-cards] .card");
+
+    // -------------------------------------------------------------------------
+    // STEP 1 helper — split the headline into per-character spans.
+    // Uses SplitText if available (returns its .chars array); otherwise we
+    // wrap each character in a <span class="char"> by hand and return them.
+    // -------------------------------------------------------------------------
+    function splitHeadline() {
+      if (hasSplitText) {
+        var st = new SplitText(headline, { type: "chars", charsClass: "char" });
+        return st.chars;
+      }
+      // --- Manual fallback: pure-JS character splitting ---
+      var text = headline.textContent;
+      headline.textContent = "";
+      var chars = [];
+      for (var i = 0; i < text.length; i++) {
+        var span = document.createElement("span");
+        span.className = "char";
+        if (text[i] === " ") {
+          span.classList.add("is-space");
+          span.innerHTML = "&nbsp;";
+        } else {
+          span.textContent = text[i];
+        }
+        headline.appendChild(span);
+        chars.push(span);
+      }
+      return chars;
+    }
+
+    // -------------------------------------------------------------------------
+    // STEP 2 helper — prep the SVG underline for a "draw-in" effect.
+    // With DrawSVGPlugin we just animate drawSVG "0%" -> "100%".
+    // Without it, we measure the path length and animate stroke-dashoffset.
+    // Returns a function(tl, position) that adds the draw tween to a timeline.
+    // -------------------------------------------------------------------------
+    function makeUnderlineDraw() {
+      if (hasDrawSVG) {
+        gsap.set(underline, { drawSVG: "0%" });
+        return function (tl, pos) {
+          tl.to(underline, { drawSVG: "100%", duration: 0.9, ease: "power2.inOut" }, pos);
+        };
+      }
+      // --- Manual fallback: stroke-dashoffset animation ---
+      var len = underline.getTotalLength();
+      gsap.set(underline, { strokeDasharray: len, strokeDashoffset: len });
+      return function (tl, pos) {
+        tl.to(underline, { strokeDashoffset: 0, duration: 0.9, ease: "power2.inOut" }, pos);
+      };
+    }
+
+    var chars   = splitHeadline();
+    var drawIn  = makeUnderlineDraw();
+
+    // -------------------------------------------------------------------------
+    // REDUCED MOTION: jump straight to final state, skip the timeline entirely.
+    // -------------------------------------------------------------------------
+    var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) {
+      gsap.set(chars,   { opacity: 1, yPercent: 0, filter: "blur(0px)" });
+      gsap.set(eyebrow, { opacity: 1, y: 0 });
+      gsap.set(cards,   { opacity: 1, y: 0 });
+      if (hasDrawSVG) gsap.set(underline, { drawSVG: "100%" });
+      else            gsap.set(underline, { strokeDashoffset: 0 });
+      console.log("[demo] prefers-reduced-motion → showing final state, no animation");
+      return;
+    }
+
+    // -------------------------------------------------------------------------
+    // Set initial (pre-animation) states.
+    // -------------------------------------------------------------------------
+    gsap.set(chars,   { opacity: 0, yPercent: 120, filter: "blur(12px)" });
+    gsap.set(eyebrow, { opacity: 0, y: -14 });
+    gsap.set(cards,   { opacity: 0, y: 30 });
+
+    // -------------------------------------------------------------------------
+    // The master timeline.
+    // -------------------------------------------------------------------------
+    var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+    // (0) Eyebrow drops in first.
+    tl.to(eyebrow, { opacity: 1, y: 0, duration: 0.6 }, 0.1);
+
+    // (1) KINETIC TYPOGRAPHY — per-character reveal with stagger.
+    tl.to(chars, {
+      opacity: 1,
+      yPercent: 0,
+      filter: "blur(0px)",
+      duration: 0.85,
+      ease: "back.out(1.7)",
+      stagger: { each: 0.035, from: "start" }
+    }, 0.25);
+
+    // (2) SVG UNDERLINE DRAW — overlaps the tail of the text reveal.
+    drawIn(tl, "-=0.35");
+
+    // (3) STAGGERED CARDS — rise + fade in together.
+    tl.to(cards, {
+      opacity: 1,
+      y: 0,
+      duration: 0.7,
+      stagger: 0.12,
+      ease: "power3.out"
+    }, "-=0.4");
+
+    // (4) INFINITE GLOW PULSE — subtle, runs forever, yoyo.
+    //     We start it after the intro settles via an onComplete hook so it
+    //     doesn't fight the reveal.
+    tl.add(function () {
+      gsap.to(headline, {
+        filter: "drop-shadow(0 0 26px rgba(236,72,153,0.55))",
+        duration: 1.8,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+      });
+    });
+
+    // Expose for debugging / verification.
+    window.__demoTimeline = tl;
+  })();
+  </script>
+</body>
+</html>

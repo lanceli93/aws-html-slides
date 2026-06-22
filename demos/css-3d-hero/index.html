@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AWS re:Invent Keynote — CSS 3D Hero</title>
+
+<!--
+  ============================================================================
+  AWS re:Invent Keynote — Pure-CSS 3D Hero Demo
+  ============================================================================
+  Self-contained, offline, ZERO JS dependency (one tiny vanilla key/scroll
+  helper only). Double-click to open via file:// — no build, no network.
+
+  Two full-viewport showcases stacked vertically, navigated with CSS
+  scroll-snap + arrow keys:
+    SLIDE 1  Rotating 3D cube  (transform-style: preserve-3d + perspective)
+    SLIDE 2  2.5D parallax title (layered translateZ depth)
+
+  ---------------------------------------------------------------------------
+  CSS 3D CRASH COURSE (this file doubles as a skill reference)
+  ---------------------------------------------------------------------------
+  * perspective: set on the PARENT/container. It defines how far the viewer's
+    eye is from the z=0 plane. Smaller value = stronger, more dramatic 3D;
+    larger value = flatter / more "telephoto". We use ~900-1200px.
+
+  * transform-style: preserve-3d  -> put on the element whose CHILDREN should
+    live in real 3D space (the cube, the parallax stage). Without it, children
+    are projected (flattened) onto the parent's plane.
+
+  * THE FLATTENING GOTCHA (critical): a preserve-3d element is silently forced
+    back to flat (transform-style: flat) if it ALSO has any of:
+        opacity < 1, filter, backdrop-filter, clip-path, mask,
+        mix-blend-mode, isolation, or overflow != visible.
+    => Therefore the preserve-3d parents below carry NONE of those. All glow,
+       blur, opacity and gradients live on CHILD elements instead. Comments
+       mark every preserve-3d element with "// KEEP CLEAN".
+
+  * Cube faces: 6 absolutely-positioned faces. Each is rotated to face one
+    direction, then pushed out by half the cube size via translateZ(size/2):
+        front  : translateZ( s/2 )
+        back   : rotateY(180deg) translateZ( s/2 )
+        right  : rotateY( 90deg) translateZ( s/2 )
+        left   : rotateY(-90deg) translateZ( s/2 )
+        top    : rotateX( 90deg) translateZ( s/2 )
+        bottom : rotateX(-90deg) translateZ( s/2 )
+    backface-visibility: hidden hides the inside of each face so the
+    semi-transparent faces don't show their own back when rotating.
+
+  * reduced-motion: prefers-reduced-motion: reduce stops auto-rotation/drift
+    and presents a static, nicely-angled cube + static title.
+
+  * Graceful degradation: text layers always sit at a higher z-index and are
+    never occluded; if 3D transforms were unsupported the content reads as a
+    plain flat dark slide.
+  ============================================================================
+-->
+
+<style>
+  /* ---------------------------------------------------------------- *
+   *  re:Invent palette + tokens                                       *
+   * ---------------------------------------------------------------- */
+  :root {
+    --bg:        #0A0A0A;  /* base near-black                          */
+    --purple:    #8B5CF6;  /* primary neon purple                      */
+    --pink:      #D946EF;  /* neon pink / magenta                      */
+    --blue:      #38BDF8;  /* blue accent                              */
+    --ink:       #F4F1FF;  /* near-white text                          */
+    --muted:     #9C93C4;  /* muted lavender                          */
+    --cube-size: 260px;    /* edge length of the cube (s)              */
+    --half:      130px;    /* s / 2  -> used in translateZ            */
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    /* No web fonts: clean inline system-font stack (offline-safe). */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+
+    /* CSS scroll-snap drives slide-to-slide navigation (no JS framework). */
+    height: 100vh;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Slide shell — each is exactly 100vh, snaps, hides its overflow.  *
+   *  NOTE: .slide has overflow:hidden, which would flatten 3D — but   *
+   *  .slide is NOT a preserve-3d element, so that's fine. The 3D      *
+   *  preserve-3d stages are nested CHILDREN that stay clean.          *
+   * ---------------------------------------------------------------- */
+  .slide {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;          /* contains z-index/blends per slide  */
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Ambient animated radial blobs (background, CSS only)             *
+   *  These live BEHIND everything and may freely use filter/opacity   *
+   *  because they are NOT preserve-3d parents.                        *
+   * ---------------------------------------------------------------- */
+  .blobs { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.55;
+    will-change: transform;
+  }
+  .blob.b1 {
+    width: 520px; height: 520px; top: -120px; left: -100px;
+    background: radial-gradient(circle, var(--purple), transparent 70%);
+    animation: drift1 18s ease-in-out infinite alternate;
+  }
+  .blob.b2 {
+    width: 460px; height: 460px; bottom: -140px; right: -80px;
+    background: radial-gradient(circle, var(--pink), transparent 70%);
+    animation: drift2 22s ease-in-out infinite alternate;
+  }
+  .blob.b3 {
+    width: 380px; height: 380px; top: 40%; left: 55%;
+    background: radial-gradient(circle, var(--blue), transparent 70%);
+    opacity: 0.30;
+    animation: drift3 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { from { transform: translate(0,0) scale(1);   }
+                      to   { transform: translate(80px,60px) scale(1.15); } }
+  @keyframes drift2 { from { transform: translate(0,0) scale(1);   }
+                      to   { transform: translate(-70px,-50px) scale(1.2);} }
+  @keyframes drift3 { from { transform: translate(0,0) scale(0.9); }
+                      to   { transform: translate(-60px,40px) scale(1.05);} }
+
+  /* faint dotted grid overlay for that "platform" feel */
+  .grid-overlay {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background-image:
+      radial-gradient(rgba(139,92,246,0.10) 1px, transparent 1px);
+    background-size: 38px 38px;
+    mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 80%);
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  STAGE LIGHT-POOL — grounds the cube so it isn't floating.       *
+   *  A soft elliptical light pool sits just under the cube, like a    *
+   *  spotlight hitting the stage floor; a fainter, lower echo reads   *
+   *  as a reflection. Both are SLIDE-level children (z between grid   *
+   *  and stage) — fully decoupled from the preserve-3d cube, so they  *
+   *  can freely use filter/opacity without flattening the 3D.         *
+   * ---------------------------------------------------------------- */
+  .floor {
+    position: absolute; left: 50%; z-index: 1;
+    pointer-events: none; will-change: transform;
+    transform: translateX(-50%);
+  }
+  /* the contact light-pool directly beneath the cube */
+  .floor.pool {
+    top: 60%;
+    width: 540px; height: 150px;
+    background: radial-gradient(ellipse at center,
+      rgba(217,70,239,0.40) 0%,
+      rgba(139,92,246,0.30) 35%,
+      transparent 72%);
+    filter: blur(26px);
+    animation: poolPulse 22s linear infinite;
+  }
+  /* a fainter, lower echo -> implied floor reflection */
+  .floor.echo {
+    top: 70%;
+    width: 360px; height: 90px;
+    background: radial-gradient(ellipse at center,
+      rgba(56,189,248,0.22) 0%, transparent 70%);
+    filter: blur(30px);
+    opacity: 0.7;
+  }
+  /* the pool brightens/dims subtly in time with the cube's tumble */
+  @keyframes poolPulse {
+    0%, 100% { opacity: 0.85; transform: translateX(-50%) scaleX(1);    }
+    50%      { opacity: 1;    transform: translateX(-50%) scaleX(1.12); }
+  }
+
+  /* ================================================================ *
+   *  SLIDE 1 — ROTATING 3D CUBE                                      *
+   * ================================================================ */
+
+  /* The perspective container: defines the viewer eye distance.       *
+   * perspective lives HERE (not on the cube). Smaller = punchier 3D.  */
+  .stage {
+    position: relative;
+    z-index: 2;
+    perspective: 1100px;          /* viewer distance to z=0 plane      */
+    perspective-origin: 50% 45%;  /* look slightly down at the cube    */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 54px;
+    /* lift the whole stack up a touch so the cube sits ABOVE its floor  *
+     * light-pool (which lives lower in the slide) instead of dead-center */
+    transform: translateY(-6%);
+  }
+
+  /* The cube itself. // KEEP CLEAN:
+   * preserve-3d here, and NO opacity/filter/overflow/clip/mask/blend.
+   * Glow & translucency are applied to the .face CHILDREN only.       */
+  .cube {
+    position: relative;
+    width: var(--cube-size);
+    height: var(--cube-size);
+    transform-style: preserve-3d;            /* children live in 3D    */
+    transform: rotateX(-22deg) rotateY(-32deg);
+    animation: spin 22s linear infinite;     /* slow auto-rotation     */
+    will-change: transform;
+  }
+
+  /* Full 360 tumble around Y with a gentle X wobble baked in.         */
+  @keyframes spin {
+    0%   { transform: rotateX(-22deg) rotateY(0deg);   }
+    50%  { transform: rotateX(-14deg) rotateY(180deg); }
+    100% { transform: rotateX(-22deg) rotateY(360deg); }
+  }
+
+  /* Each face: absolute, hidden backface, translucent glowing panel.  *
+   * Opacity/box-shadow live on the FACE (a child of the cube) — safe. */
+  .face {
+    position: absolute;
+    width: var(--cube-size);
+    height: var(--cube-size);
+    backface-visibility: hidden;             /* hide inside of faces   */
+    border: 2px solid var(--purple);
+    border-radius: 14px;
+    background:
+      linear-gradient(135deg,
+        rgba(139,92,246,0.18),
+        rgba(217,70,239,0.14));
+    /* inset glow + outer neon halo (both on the child = allowed) */
+    box-shadow:
+      inset 0 0 40px rgba(217,70,239,0.45),
+      inset 0 0 12px rgba(139,92,246,0.65),
+      0 0 22px rgba(139,92,246,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--ink);
+    text-shadow: 0 0 10px rgba(217,70,239,0.9);
+  }
+  /* Icons are inline Lucide SVGs (ISC license), NOT emoji — emoji-as-icons reads
+     as "AI slop" and is banned by the aws-html-slides skill. Inlined (not the usual
+     CDN) so the demo stays fully offline. The glow lives here on the child, never
+     on the preserve-3d cube parent (which would flatten the 3D). */
+  .face .glyph { line-height: 0; filter: drop-shadow(0 0 12px var(--pink)); }
+  .face .glyph svg {
+    width: 60px; height: 60px; stroke: #fff; fill: none;
+    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .face .cap   { position: absolute; bottom: 16px; font-size: 13px;
+                 letter-spacing: 2px; color: var(--muted); text-shadow: none; }
+
+  /* Face transforms: rotate to orientation, push out by half-size.    *
+   * --half == cube-size / 2 == 130px.                                 */
+  .front  { transform: rotateY(  0deg) translateZ(var(--half)); }
+  .back   { transform: rotateY(180deg) translateZ(var(--half)); }
+  .right  { transform: rotateY( 90deg) translateZ(var(--half)); }
+  .left   { transform: rotateY(-90deg) translateZ(var(--half)); }
+  .top    { transform: rotateX( 90deg) translateZ(var(--half)); }
+  .bottom { transform: rotateX(-90deg) translateZ(var(--half)); }
+
+  /* subtle face hue variation so rotation reads clearly */
+  .right, .left { border-color: var(--pink);
+                  box-shadow: inset 0 0 40px rgba(139,92,246,0.45),
+                              inset 0 0 12px rgba(217,70,239,0.65),
+                              0 0 22px rgba(217,70,239,0.55); }
+  .top, .bottom { border-color: var(--blue);
+                  box-shadow: inset 0 0 40px rgba(56,189,248,0.40),
+                              inset 0 0 12px rgba(139,92,246,0.55),
+                              0 0 22px rgba(56,189,248,0.45); }
+
+  /* Hero caption under the cube */
+  .cube-caption { text-align: center; }
+  .kicker {
+    display: inline-block;
+    font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--blue);
+    border: 1px solid rgba(56,189,248,0.4);
+    padding: 6px 14px; border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .cube-caption h2 {
+    margin: 0; font-size: 34px; font-weight: 800; letter-spacing: 0.5px;
+    background: linear-gradient(90deg, var(--purple), var(--pink), var(--blue));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .cube-caption p { margin: 8px 0 0; color: var(--muted); font-size: 15px; }
+
+  /* ================================================================ *
+   *  SLIDE 2 — 2.5D PARALLAX TITLE                                   *
+   * ================================================================ */
+
+  /* Perspective container for the parallax stage. The deeper a layer  *
+   * sits (more-negative translateZ), the smaller/further it appears,  *
+   * and the more it shifts under perspective-origin drift => parallax.*/
+  .parallax {
+    position: relative;
+    z-index: 2;
+    width: min(900px, 86vw);
+    height: 70vh;
+    perspective: 900px;
+    perspective-origin: 50% 50%;
+    /* Ambient drift: animate perspective-origin so all depth layers   *
+     * shift by amounts proportional to their translateZ => parallax.  */
+    animation: ambient 14s ease-in-out infinite alternate;
+  }
+  @keyframes ambient {
+    from { perspective-origin: 42% 44%; }
+    to   { perspective-origin: 58% 56%; }
+  }
+
+  /* // KEEP CLEAN: the 3D scene root. preserve-3d, no filter/opacity.  */
+  .scene {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Depth layers. translateZ sets each layer's distance.              *
+   * scale() compensates so layers keep roughly the same screen size   *
+   * despite their depth (perspective shrinks far layers):             *
+   *   apparent size ~ (perspective - z) / perspective                 *
+   *   so we scale by  perspective / (perspective - z).                *
+   * FAR  z=-400, p=900  -> scale 900/1300 ≈ 0.69  -> compensate 1.44  *
+   * MID  z=-180         -> scale 900/1080 ≈ 0.83  -> compensate 1.20  *
+   * FORE z=  60         -> scale 900/840  ≈ 1.07  -> compensate 0.93  */
+  .layer {
+    position: absolute;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+  }
+
+  /* FAR background layer: big soft word, deep and dim */
+  .layer.far {
+    transform: translateZ(-400px) scale(1.44);
+    font-size: 180px; font-weight: 900; letter-spacing: 6px;
+    color: rgba(139,92,246,0.10);
+    text-shadow: 0 0 40px rgba(139,92,246,0.25);
+    white-space: nowrap;
+  }
+
+  /* MID glow layer: a soft glowing plate that floats between layers */
+  .layer.mid {
+    transform: translateZ(-180px) scale(1.20);
+    width: 620px; height: 240px;
+    border-radius: 28px;
+    background: radial-gradient(ellipse at center,
+                  rgba(217,70,239,0.30), rgba(139,92,246,0.10) 60%, transparent 75%);
+    box-shadow: 0 0 80px rgba(217,70,239,0.35);
+  }
+
+  /* FOREGROUND headline: closest layer, sharp gradient + neon shadow */
+  .layer.fore {
+    transform: translateZ(60px) scale(0.93);
+    flex-direction: column; gap: 18px;
+  }
+  .layer.fore .eyebrow {
+    font-size: 13px; letter-spacing: 6px; text-transform: uppercase;
+    color: var(--blue); text-shadow: 0 0 12px rgba(56,189,248,0.8);
+  }
+  .layer.fore h1 {
+    margin: 0; font-size: 72px; line-height: 1.02; font-weight: 900;
+    letter-spacing: 1px;
+    background: linear-gradient(100deg, var(--purple) 0%, var(--pink) 45%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    /* neon text-shadow must be drawn behind the clipped text; we layer
+       a glow via filter on a wrapper to avoid killing the clip. */
+    filter:
+      drop-shadow(0 0 18px rgba(217,70,239,0.55))
+      drop-shadow(0 0 36px rgba(139,92,246,0.35));
+  }
+  .layer.fore .sub {
+    font-size: 17px; color: var(--ink); opacity: 0.85; letter-spacing: 1px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Slide-number pill + nav hint (shared)                           *
+   * ---------------------------------------------------------------- */
+  .pill {
+    position: absolute; top: 26px; left: 26px; z-index: 5;
+    font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .nav-hint {
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+    z-index: 5; font-size: 12px; letter-spacing: 2px; color: var(--muted);
+    opacity: 0.8;
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translate(-50%, 0); }
+                   50%     { transform: translate(-50%, 6px); } }
+
+  /* ================================================================ *
+   *  REDUCED MOTION — stop all auto motion; show static angled scene *
+   * ================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    html, body { scroll-behavior: auto; }
+    .blob,
+    .nav-hint        { animation: none !important; }
+    /* Static, nicely-angled cube (no spin) */
+    .cube {
+      animation: none !important;
+      transform: rotateX(-24deg) rotateY(-34deg);
+    }
+    /* Static parallax stage (no ambient drift) */
+    .parallax {
+      animation: none !important;
+      perspective-origin: 50% 50%;
+    }
+  }
+
+  /* ================================================================ *
+   *  GRACEFUL DEGRADATION — engines without 3D transforms            *
+   *  If preserve-3d is unsupported the faces collapse to one plane;   *
+   *  we keep text layers readable and stacked, never hidden.          *
+   * ================================================================ */
+  @supports not (transform-style: preserve-3d) {
+    .cube { transform: none; animation: none; }
+    .face { position: relative; display: none; }   /* avoid overlap pile */
+    .front { display: flex; }                       /* show one clean face */
+    .scene { transform: none; }
+    .layer.far, .layer.mid { display: none; }       /* drop depth-only layers */
+    .layer.fore { transform: none; position: relative; }
+  }
+
+  /* small-height safety so a slide never spawns its own scrollbar */
+  @media (max-height: 620px) {
+    .cube { --cube-size: 180px; --half: 90px; }
+    .layer.fore h1 { font-size: 52px; }
+    .layer.far { font-size: 120px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============================ SLIDE 1 ============================ -->
+  <section class="slide" id="slide1" aria-label="Rotating 3D cube hero">
+    <div class="blobs">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+    </div>
+    <div class="grid-overlay"></div>
+
+    <!-- stage light-pool + reflection echo: grounds the cube (NOT 3D, safe) -->
+    <div class="floor pool"></div>
+    <div class="floor echo"></div>
+
+    <div class="pill">re:Invent · Keynote</div>
+
+    <div class="stage">
+      <!-- preserve-3d cube (KEEP CLEAN: no opacity/filter/overflow here) -->
+      <div class="cube" role="img" aria-label="Rotating 3D platform cube">
+        <div class="face front"><span class="glyph"><!-- lucide: cloud --><svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 0-9h-1.8A7 7 0 1 0 4 16.3"></path></svg></span><span class="cap">CORE PLATFORM</span></div>
+        <div class="face back"><span class="glyph"><!-- lucide: zap --><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span><span class="cap">EDGE</span></div>
+        <div class="face right"><span class="glyph"><!-- lucide: cpu --><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"></path></svg></span><span class="cap">COMPUTE</span></div>
+        <div class="face left"><span class="glyph"><!-- lucide: database --><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg></span><span class="cap">DATA</span></div>
+        <div class="face top"><span class="glyph"><!-- lucide: sparkles --><svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"></path></svg></span><span class="cap">AI / ML</span></div>
+        <div class="face bottom"><span class="glyph"><!-- lucide: hard-drive --><svg viewBox="0 0 24 24"><line x1="22" y1="12" x2="2" y2="12"></line><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path><line x1="6" y1="16" x2="6.01" y2="16"></line><line x1="10" y1="16" x2="10.01" y2="16"></line></svg></span><span class="cap">STORAGE</span></div>
+      </div>
+
+      <div class="cube-caption">
+        <span class="kicker">The Core Platform</span>
+        <h2>One Cloud. Every Dimension.</h2>
+        <p>Compute · Data · AI · Edge · Storage — rendered in pure CSS 3D.</p>
+      </div>
+    </div>
+
+    <div class="nav-hint">↓ scroll or press → for the parallax title</div>
+  </section>
+
+  <!-- ============================ SLIDE 2 ============================ -->
+  <section class="slide" id="slide2" aria-label="2.5D parallax title">
+    <div class="blobs">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+    </div>
+    <div class="grid-overlay"></div>
+
+    <div class="pill">re:Invent · 2026</div>
+
+    <!-- perspective container; ambient drift animates perspective-origin -->
+    <div class="parallax">
+      <!-- preserve-3d scene root (KEEP CLEAN) -->
+      <div class="scene">
+        <div class="layer far">REINVENT</div>
+        <div class="layer mid"></div>
+        <div class="layer fore">
+          <span class="eyebrow">Keynote · Main Stage</span>
+          <h1>Build the<br>Impossible.</h1>
+          <span class="sub">A 2.5D parallax title — depth from layered translateZ.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-hint">↑ scroll or press ← to return to the cube</div>
+  </section>
+
+  <!--
+    TINY vanilla JS: arrow-key navigation between the two snap slides.
+    Everything visual is pure CSS; this only smooth-scrolls on keypress.
+    Not required for the demo to work (scroll-snap already navigates).
+  -->
+  <script>
+    (function () {
+      var slides = [document.getElementById('slide1'),
+                    document.getElementById('slide2')];
+      function current() {
+        // index of the slide nearest the top of the viewport
+        return window.scrollY < window.innerHeight * 0.5 ? 0 : 1;
+      }
+      document.addEventListener('keydown', function (e) {
+        var i = current();
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') {
+          slides[Math.min(i + 1, slides.length - 1)].scrollIntoView();
+          e.preventDefault();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp') {
+          slides[Math.max(i - 1, 0)].scrollIntoView();
+          e.preventDefault();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
