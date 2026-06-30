@@ -2,7 +2,7 @@
 
 Curated visual styles for Frontend Slides. Each preset is inspired by real design references — no generic "AI slop" aesthetics. **Abstract shapes only — no illustrations.**
 
-This skill ships **2 specialty presets**: **Neon Cyber** (#1) and **re:Invent Keynote** (#2). The re:Invent Keynote preset has a rich, keynote-grade content-layout system documented in [layout-reinvent.md](layout-reinvent.md) and optional self-contained 3D/motion effects documented in [effects-reference.md](effects-reference.md).
+This skill ships **2 specialty presets**: **Neon Cyber** (#1) and **re:Invent Keynote** (#2). The re:Invent Keynote preset has a rich, keynote-grade content-layout system documented in [layout-reinvent.md](layout-reinvent.md). **Both** presets support optional self-contained 3D/motion effects documented in [effects-reference.md](effects-reference.md) — the palette-agnostic catalog ships each technique in two tints: re:Invent purple (`demos/`) and Neon Cyber cyan (`demos/neon/`).
 
 **Viewport CSS:** For mandatory base styles, see [viewport-base.css](viewport-base.css). Include in every presentation.
 
@@ -21,6 +21,8 @@ This skill ships **2 specialty presets**: **Neon Cyber** (#1) and **re:Invent Ke
 **Signature:** Particle backgrounds, neon glow, grid patterns
 
 See the bundled preview at `preview/01-neon-cyber.html` for the full implementation.
+
+**Optional 3D & motion effects:** Experimental, self-contained, offline effects can enrich this style — a cyan WebGL shader nebula, an upgraded constellation network, pointer-driven 3D tilt, and a GSAP-orchestrated kinetic title. Neon-palette demos live in `demos/neon/`; see [effects-reference.md](effects-reference.md) (palette-agnostic catalog, use the Neon token set). The particle/grid background remains the lightweight default.
 
 ---
 

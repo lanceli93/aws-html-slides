@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neon Cyber Keynote — Pointer-Driven 3D Tilt</title>
+
+<!--
+  ============================================================================
+  Neon Cyber Keynote — Pointer-Driven Interactive 3D Tilt
+  ============================================================================
+  Single self-contained, OFFLINE, zero-dependency file (pure hand-written
+  CSS + vanilla JS, NO libraries). Double-click to open via file:// — no
+  build step, no network at runtime, no web fonts, no CDN.
+
+  Two full-viewport sections stacked vertically, navigated with CSS
+  scroll-snap + arrow keys / wheel:
+    SECTION 1  Tilt hero  — a glowing glass panel that tilts in 3D toward the
+                            cursor, with a specular sheen that tracks it.
+    SECTION 2  Tilt grid  — three cards that each independently tilt toward
+                            the cursor and lift (translateZ) on hover, with a
+                            parallax inner layer (icon floats above the text).
+
+  ---------------------------------------------------------------------------
+  HOW THE TILT WORKS (this file doubles as a skill reference)
+  ---------------------------------------------------------------------------
+  * perspective lives on the CONTAINER (the wrapper that the eye looks
+    through), NOT on the tilting element. ~800-1100px gives a punchy but
+    believable 3D. Smaller = more dramatic; larger = flatter / telephoto.
+
+  * TILT MATH. For a pointer at (px,py) over an element whose center is
+    (cx,cy) and half-size is (hw,hh), normalise the offset to [-1, 1]:
+        nx = (px - cx) / hw          // -1 = left edge,  +1 = right edge
+        ny = (py - cy) / hh          // -1 = top  edge,  +1 = bottom edge
+    Then map to rotation, capped at MAX_TILT (~14deg):
+        rotateY =  nx * MAX_TILT     // mouse RIGHT -> panel turns right
+        rotateX = -ny * MAX_TILT     // mouse DOWN  -> panel tips back/away
+    rotateX is NEGATED because the X axis points right, so a positive
+    rotateX tips the TOP toward the viewer; we want the side the cursor is
+    near to come FORWARD, hence the minus sign.
+
+  * SMOOTHING. We never write the target rotation straight to the DOM — that
+    snaps. Instead we keep a "current" value and ease it toward the "target"
+    each animation frame:  current += (target - current) * EASE;  (EASE≈0.12)
+    driven by a single requestAnimationFrame loop. On pointer-leave the
+    target resets to 0 so the panel glides back to its neutral resting pose.
+
+  * SPECULAR SHEEN. A radial-gradient layer (.sheen) sits on top of the panel
+    and its background-position follows the cursor, so a soft highlight
+    "rolls" across the glass like a real reflection catching a stage light.
+
+  * THE preserve-3d FLATTENING GOTCHA (critical). An element with
+    transform-style: preserve-3d is silently forced back to FLAT if it ALSO
+    carries ANY of: opacity < 1, filter, backdrop-filter, clip-path, mask,
+    mix-blend-mode, isolation, or overflow != visible. So every preserve-3d
+    parent below (.tilt, .card) carries NONE of those — all glow, blur,
+    rounded-corner clipping, opacity and sheen live on CHILD layers instead.
+    Each such parent is marked "// KEEP CLEAN".
+
+  * PARALLAX DEPTH (Section 2). Inside each preserve-3d card, the icon sits at
+    translateZ(+Npx) (closer to the viewer) and the text at a smaller Z. When
+    the card tilts, the nearer layer swings through a larger arc than the far
+    layer — that differential motion reads as physical depth/parallax.
+
+  * NO-POINTER / TOUCH. If the device has no fine pointer (touch only) we
+    can't track a mouse, so the hero panel gently AUTO-ORBITS via a CSS
+    keyframe instead, keeping the slide alive.
+
+  * prefers-reduced-motion: reduce -> all tilt, auto-orbit, sheen and ambient
+    motion are disabled; everything rests in a static, nicely-angled pose.
+  ============================================================================
+-->
+
+<style>
+  /* ================================================================ *
+   *  Neon Cyber palette + design tokens                              *
+   * ================================================================ */
+  :root {
+    --bg:     #0a0f1c;   /* base deep navy                          */
+    --cyan: #00ffcc;   /* primary neon cyan                      */
+    --magenta:   #ff00aa;   /* neon magenta                      */
+    --blue:   #00aaff;   /* blue accent                              */
+    --ink:    #F5F3FF;   /* near-white text                          */
+    --orange: #FF9900;   /* AWS orange — used sparingly              */
+    --muted:  #9C93C4;   /* muted lavender                          */
+
+    --max-tilt: 14deg;   /* hero peak tilt (JS reads this conceptually) */
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    /* Offline-safe system font stack only — NO web fonts. */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+
+    /* CSS scroll-snap drives section-to-section navigation. */
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+
+  /* ================================================================ *
+   *  Section shell — each is exactly one viewport tall, snaps, and   *
+   *  hides its own overflow.                                         *
+   *  NOTE: .section has overflow:hidden + isolation, which WOULD     *
+   *  flatten 3D — but .section is NOT a preserve-3d element. The     *
+   *  preserve-3d tilt stages are nested CHILDREN that stay clean.    *
+   * ================================================================ */
+  .section {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;          /* mobile-safe dynamic viewport height   */
+    overflow: hidden;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;      /* contain z-index/blends per section     */
+  }
+
+  /* ================================================================ *
+   *  Ambient animated radial blobs (background, CSS only)            *
+   *  Live BEHIND everything; may freely use filter/opacity because   *
+   *  they are NOT preserve-3d parents.                               *
+   * ================================================================ */
+  .blobs { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.55;
+    will-change: transform;
+  }
+  .blob.b1 {
+    width: clamp(320px, 40vw, 560px); height: clamp(320px, 40vw, 560px);
+    top: clamp(-160px, -10vh, -100px); left: clamp(-140px, -8vw, -90px);
+    background: radial-gradient(circle, var(--cyan), transparent 70%);
+    animation: drift1 18s ease-in-out infinite alternate;
+  }
+  .blob.b2 {
+    width: clamp(300px, 36vw, 500px); height: clamp(300px, 36vw, 500px);
+    bottom: clamp(-160px, -12vh, -110px); right: clamp(-120px, -7vw, -80px);
+    background: radial-gradient(circle, var(--magenta), transparent 70%);
+    animation: drift2 22s ease-in-out infinite alternate;
+  }
+  .blob.b3 {
+    width: clamp(260px, 30vw, 400px); height: clamp(260px, 30vw, 400px);
+    top: 42%; left: 56%;
+    background: radial-gradient(circle, var(--blue), transparent 70%);
+    opacity: 0.30;
+    animation: drift3 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { from { transform: translate(0,0) scale(1);    }
+                      to   { transform: translate(70px,55px) scale(1.15); } }
+  @keyframes drift2 { from { transform: translate(0,0) scale(1);    }
+                      to   { transform: translate(-60px,-45px) scale(1.2); } }
+  @keyframes drift3 { from { transform: translate(0,0) scale(0.9);  }
+                      to   { transform: translate(-55px,38px) scale(1.05);} }
+
+  /* faint dotted grid overlay for that "platform" feel */
+  .grid-overlay {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background-image:
+      radial-gradient(rgba(0,255,204,0.10) 1px, transparent 1px);
+    background-size: 38px 38px;
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 80%);
+            mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 80%);
+  }
+
+  /* ================================================================ *
+   *  Shared chrome — kicker pill, section heading, nav hint, footer  *
+   * ================================================================ */
+  .pill {
+    position: absolute; top: clamp(16px, 3vh, 28px); left: clamp(16px, 3vw, 28px);
+    z-index: 5;
+    font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .heading {
+    position: relative; z-index: 2;
+    text-align: center;
+    margin: 0 0 clamp(20px, 4vh, 46px);
+    padding: 0 clamp(16px, 4vw, 40px);
+  }
+  .kicker {
+    display: inline-block;
+    font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 4px; text-transform: uppercase;
+    color: var(--blue);
+    border: 1px solid rgba(0,170,255,0.4);
+    padding: 6px 14px; border-radius: 999px;
+    margin-bottom: clamp(12px, 2vh, 18px);
+  }
+  .heading h1 {
+    margin: 0;
+    font-size: clamp(36px, 6.4vw, 76px);
+    line-height: 1.02; font-weight: 900; letter-spacing: 0.5px;
+    background: linear-gradient(100deg, var(--cyan) 0%, var(--magenta) 48%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    /* neon glow via drop-shadow on the clipped text (filter is fine here:
+       .heading is a plain flat element, not a preserve-3d parent). */
+    filter:
+      drop-shadow(0 0 18px rgba(255,0,170,0.50))
+      drop-shadow(0 0 38px rgba(0,255,204,0.32));
+  }
+  .heading p {
+    margin: clamp(10px, 2vh, 16px) auto 0; max-width: 56ch;
+    color: var(--muted); font-size: clamp(13px, 1.6vw, 17px); letter-spacing: 0.5px;
+  }
+
+  .nav-hint {
+    position: absolute; bottom: clamp(40px, 7vh, 58px); left: 50%;
+    transform: translateX(-50%);
+    z-index: 5; font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 2px;
+    color: var(--muted); opacity: 0.8;
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translate(-50%, 0); }
+                   50%     { transform: translate(-50%, 6px); } }
+
+  .footer {
+    position: fixed; bottom: clamp(10px, 1.6vh, 16px); left: 50%;
+    transform: translateX(-50%);
+    z-index: 6; font-size: clamp(9px, 1vw, 11px); letter-spacing: 0.4px;
+    color: rgba(156,147,196,0.55); white-space: nowrap; pointer-events: none;
+  }
+
+  /* ================================================================ *
+   *  SECTION 1 — POINTER-TILT HERO                                  *
+   * ================================================================ */
+
+  /* Perspective container: defines the viewer's eye distance. The     *
+   * perspective lives HERE, never on the tilting .tilt element.       */
+  .hero-stage {
+    position: relative; z-index: 2;
+    perspective: 1000px;
+    perspective-origin: 50% 50%;
+    width: min(620px, 86vw);
+  }
+
+  /* // KEEP CLEAN: the tilting panel. preserve-3d so its inner layers  *
+   * inhabit real 3D space. Carries NO opacity/filter/overflow/clip/    *
+   * mask/blend — all of those live on its CHILDREN. JS writes the      *
+   * rotateX/rotateY here each frame via the --rx / --ry custom props.  */
+  .tilt {
+    position: relative;
+    transform-style: preserve-3d;
+    transform:
+      rotateX(var(--rx, 0deg))
+      rotateY(var(--ry, 0deg));
+    will-change: transform;
+  }
+
+  /* The visible glass card — a CHILD of .tilt, so it may safely use     *
+   * border-radius (overflow/clip), background, box-shadow, opacity.     */
+  .panel {
+    position: relative;
+    border-radius: clamp(18px, 2.4vw, 26px);
+    padding: clamp(26px, 4.4vw, 48px);
+    overflow: hidden;                 /* safe: .panel is NOT preserve-3d */
+    border: 1px solid rgba(0,255,204,0.45);
+    background:
+      linear-gradient(150deg,
+        rgba(0,255,204,0.16),
+        rgba(255,0,170,0.10) 55%,
+        rgba(0,170,255,0.10));
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      inset 0 0 60px rgba(0,255,204,0.18),
+      0 30px 70px rgba(0,0,0,0.55),
+      0 0 50px rgba(0,255,204,0.30);
+  }
+
+  /* Specular sheen: a soft highlight that the JS slides around by    *
+   * setting --mx / --my (the cursor position as a percentage). On a  *
+   * preserve-3d-free child, so it can blend freely.                  */
+  .panel .sheen {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    border-radius: inherit;
+    background:
+      radial-gradient(
+        220px 220px at var(--mx, 50%) var(--my, 50%),
+        rgba(255,255,255,0.32),
+        rgba(255,255,255,0.06) 38%,
+        transparent 62%);
+    mix-blend-mode: screen;           /* additive glint over the glass  */
+    opacity: 0.9;
+    transition: opacity 0.4s ease;
+  }
+
+  /* faint hairline reflection along the top edge for "glass" realism */
+  .panel .edge-glint {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0.16), transparent 18%);
+  }
+
+  .panel .content { position: relative; z-index: 4; text-align: left; }
+
+  .panel .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 2px; text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: clamp(14px, 2.4vh, 22px);
+  }
+  .panel .badge svg {
+    width: 16px; height: 16px; stroke: var(--blue); fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .panel h2 {
+    margin: 0;
+    font-size: clamp(26px, 4vw, 44px); line-height: 1.05; font-weight: 800;
+    letter-spacing: 0.3px; color: var(--ink);
+    text-shadow: 0 0 26px rgba(255,0,170,0.35);
+  }
+  .panel h2 .accent {
+    background: linear-gradient(90deg, var(--magenta), var(--orange));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .panel p {
+    margin: clamp(12px, 2vh, 18px) 0 0; max-width: 44ch;
+    color: var(--muted); font-size: clamp(13px, 1.5vw, 16px); line-height: 1.55;
+  }
+  .panel .row {
+    display: flex; gap: clamp(10px, 1.6vw, 16px);
+    margin-top: clamp(18px, 3vh, 28px); flex-wrap: wrap;
+  }
+  .panel .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px; border-radius: 999px;
+    border: 1px solid rgba(255,0,170,0.4);
+    background: rgba(255,0,170,0.08);
+    font-size: clamp(11px, 1.2vw, 13px); color: var(--ink);
+  }
+  .panel .chip svg {
+    width: 15px; height: 15px; stroke: var(--magenta); fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* contact light-pool that grounds the hero panel (NOT 3D, safe). */
+  .hero-pool {
+    position: absolute; left: 50%; bottom: clamp(8%, 12vh, 16%);
+    z-index: 1; pointer-events: none; transform: translateX(-50%);
+    width: min(560px, 80vw); height: clamp(70px, 12vh, 130px);
+    background: radial-gradient(ellipse at center,
+      rgba(255,0,170,0.34) 0%, rgba(0,255,204,0.22) 38%, transparent 72%);
+    filter: blur(28px);
+  }
+
+  /* ================================================================ *
+   *  SECTION 2 — POINTER-TILT CARD GRID                             *
+   * ================================================================ */
+
+  .grid {
+    position: relative; z-index: 2;
+    display: flex; gap: clamp(16px, 2.4vw, 30px);
+    flex-wrap: wrap; justify-content: center;
+    padding: 0 clamp(16px, 4vw, 40px);
+    /* Perspective on the row container so every card shares one eye    *
+     * point — but each .card tilts independently (its own --rx/--ry).  */
+    perspective: 900px;
+    perspective-origin: 50% 50%;
+  }
+
+  /* // KEEP CLEAN: each tilting card. preserve-3d so its inner icon &  *
+   * text layers float at different depths (translateZ) -> parallax.    *
+   * NO opacity/filter/overflow/clip/mask/blend on THIS element — they  *
+   * all live on the .card-face / .sheen CHILDREN. The glass surface,   *
+   * the content layers and the sheen are all DIRECT children so each   *
+   * sits in the card's shared 3D space. JS sets --rx/--ry/--lift here. */
+  .card {
+    position: relative;
+    width: clamp(220px, 26vw, 300px);
+    min-height: clamp(210px, 24vw, 270px);
+    transform-style: preserve-3d;
+    transform:
+      translateZ(var(--lift, 0px))
+      rotateX(var(--rx, 0deg))
+      rotateY(var(--ry, 0deg));
+    transition: transform 0.18s ease-out;   /* eases the hover lift     */
+    will-change: transform;
+  }
+
+  /* The visible glass surface sits at the card's BASE plane (z=0) as a  *
+   * flat backdrop. It may freely clip/glow/blur because it is a CHILD,  *
+   * not the preserve-3d root. The parallax content floats ABOVE it.     */
+  .card-face {
+    position: absolute; inset: 0; z-index: 0;
+    border-radius: clamp(16px, 2vw, 22px);
+    overflow: hidden;                 /* safe: .card-face is NOT 3D root */
+    border: 1px solid rgba(0,255,204,0.40);
+    background:
+      linear-gradient(160deg,
+        rgba(0,255,204,0.15),
+        rgba(10,15,28,0.40) 70%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.10),
+      0 22px 50px rgba(0,0,0,0.5),
+      0 0 34px rgba(0,255,204,0.22);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease;
+  }
+  .card:hover .card-face {
+    border-color: rgba(255,0,170,0.65);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.16),
+      0 30px 64px rgba(0,0,0,0.6),
+      0 0 48px rgba(255,0,170,0.40);
+  }
+
+  /* per-card sheen, driven by the same --mx/--my the JS sets. */
+  .card-face .sheen {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    border-radius: inherit;
+    background:
+      radial-gradient(
+        160px 160px at var(--mx, 50%) var(--my, 50%),
+        rgba(255,255,255,0.26),
+        transparent 60%);
+    mix-blend-mode: screen;
+    opacity: 0;                       /* only glints while hovered       */
+    transition: opacity 0.3s ease;
+  }
+  .card:hover .card-face .sheen { opacity: 1; }
+
+  /* PARALLAX INNER LAYERS. .icon and .text are DIRECT children of the   *
+   * preserve-3d .card, so their translateZ is measured in the card's    *
+   * own 3D space (no flattening parent in between). The icon sits       *
+   * NEARER the viewer (+46px) than the text (+18px); when the card      *
+   * tilts, the nearer layer swings through a larger arc than the far    *
+   * layer — that differential motion is what reads as physical depth.   *
+   * .content gives them normal padded flow on top of the glass face.    */
+  .card .content {
+    position: relative; z-index: 2;
+    padding: clamp(22px, 2.8vw, 32px);
+    transform-style: preserve-3d;     /* // KEEP CLEAN: relay 3D to layers */
+  }
+  .card .icon {
+    transform: translateZ(46px);      /* nearest layer -> floats forward */
+    width: clamp(46px, 5vw, 58px); height: clamp(46px, 5vw, 58px);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(150deg, rgba(255,0,170,0.30), rgba(0,255,204,0.20));
+    border: 1px solid rgba(255,0,170,0.5);
+    box-shadow: 0 10px 26px rgba(255,0,170,0.35);
+    margin-bottom: clamp(16px, 2.4vh, 22px);
+  }
+  .card .icon svg {
+    width: 56%; height: 56%; stroke: #fff; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .card .text {
+    transform: translateZ(18px);      /* mid layer -> shallower depth    */
+  }
+  .card h3 {
+    margin: 0; font-size: clamp(17px, 1.9vw, 22px); font-weight: 800;
+    letter-spacing: 0.3px; color: var(--ink);
+  }
+  .card p {
+    margin: clamp(8px, 1.4vh, 12px) 0 0;
+    color: var(--muted); font-size: clamp(12px, 1.4vw, 14.5px); line-height: 1.55;
+  }
+  .card .tag {
+    display: inline-block; margin-top: clamp(12px, 2vh, 18px);
+    font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 2px; text-transform: uppercase;
+    color: var(--blue);
+  }
+  /* one card leans into AWS orange as the highlighted/featured pick */
+  .card.featured .icon {
+    background: linear-gradient(150deg, rgba(255,153,0,0.30), rgba(255,0,170,0.18));
+    border-color: rgba(255,153,0,0.55);
+    box-shadow: 0 10px 26px rgba(255,153,0,0.30);
+  }
+  .card.featured .tag { color: var(--orange); }
+
+  /* ================================================================ *
+   *  REDUCED MOTION — stop ALL tilt / auto-orbit / sheen / ambient   *
+   *  motion; present a static, nicely-angled resting pose.           *
+   * ================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    html, body { scroll-behavior: auto; }
+    .blob, .nav-hint { animation: none !important; }
+
+    /* Static, gently-angled hero panel (JS also halts — see script). */
+    .tilt {
+      animation: none !important;
+      transform: rotateX(6deg) rotateY(-12deg) !important;
+    }
+    .panel .sheen { opacity: 0.5; }
+
+    /* Cards rest at a subtle uniform angle; no per-card tilt/lift. */
+    .card {
+      transition: none !important;
+      transform: rotateX(4deg) rotateY(-8deg) !important;
+    }
+    .card-face .sheen { display: none; }
+  }
+
+  /* ================================================================ *
+   *  TOUCH / NO FINE POINTER — auto-orbit the hero so the slide      *
+   *  stays alive when there's no mouse to track. (Suppressed under   *
+   *  reduced-motion by the @media block above via !important.)       *
+   * ================================================================ */
+  @media (hover: none), (pointer: coarse) {
+    .tilt { animation: autoOrbit 9s ease-in-out infinite; }
+  }
+  @keyframes autoOrbit {
+    0%, 100% { transform: rotateX( 6deg) rotateY(-12deg); }
+    50%      { transform: rotateX(-6deg) rotateY( 12deg); }
+  }
+
+  /* ================================================================ *
+   *  GRACEFUL DEGRADATION — engines without 3D transforms.          *
+   *  Tilt collapses to flat; content stays fully readable.          *
+   * ================================================================ */
+  @supports not (transform-style: preserve-3d) {
+    .tilt, .card { transform: none !important; }
+    .card .icon, .card .text { transform: none; }
+  }
+
+  /* ================================================================ *
+   *  HEIGHT BREAKPOINTS — keep each section inside the viewport so   *
+   *  a slide never spawns its own scrollbar on short windows.        *
+   * ================================================================ */
+  @media (max-height: 700px) {
+    .heading { margin-bottom: clamp(14px, 2.6vh, 28px); }
+    .heading h1 { font-size: clamp(32px, 5.4vw, 60px); }
+    .panel { padding: clamp(22px, 3.6vw, 38px); }
+    .card .icon { width: 48px; height: 48px; margin-bottom: 14px; }
+  }
+  @media (max-height: 600px) {
+    .nav-hint { display: none; }
+    .heading h1 { font-size: clamp(28px, 4.8vw, 48px); }
+    .heading p { display: none; }
+    .panel h2 { font-size: clamp(22px, 3.4vw, 36px); }
+    .panel p { font-size: clamp(12px, 1.4vw, 14px); }
+    .card p { font-size: 12px; }
+    .hero-pool { display: none; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============================ SECTION 1 — TILT HERO ============================ -->
+  <section class="section" id="sec1" aria-label="Pointer-driven 3D tilt hero">
+    <div class="blobs">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+    </div>
+    <div class="grid-overlay"></div>
+
+    <div class="pill">Neon Cyber · Keynote</div>
+
+    <!-- contact light-pool grounds the panel (plain element, not 3D) -->
+    <div class="hero-pool"></div>
+
+    <div class="heading">
+      <span class="kicker">Interactive · Pointer Tilt</span>
+      <h1>Move Your Mouse.<br>Bend the Light.</h1>
+    </div>
+
+    <!-- perspective container; the tilting panel is its child -->
+    <div class="hero-stage">
+      <!-- // KEEP CLEAN: preserve-3d, NO opacity/filter/overflow/clip here -->
+      <div class="tilt" id="heroTilt" role="img"
+           aria-label="A glass panel that tilts in 3D toward the cursor">
+        <div class="panel">
+          <!-- sheen + edge-glint are children, free to blend/clip -->
+          <div class="sheen"></div>
+          <div class="edge-glint"></div>
+          <div class="content">
+            <span class="badge">
+              <!-- lucide: sparkles -->
+              <svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"></path></svg>
+              Real-time depth
+            </span>
+            <h2>Light follows<br>your <span class="accent">cursor.</span></h2>
+            <p>This panel reads the pointer offset from its center, maps it to a
+               capped 14&deg; tilt, and eases there every frame. A specular sheen
+               tracks the cursor like a stage light rolling across glass.</p>
+            <div class="row">
+              <span class="chip">
+                <!-- lucide: zap -->
+                <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                Eased, never snaps
+              </span>
+              <span class="chip">
+                <!-- lucide: shield-check -->
+                <svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                Reduced-motion safe
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-hint">↓ scroll or press → for the tilt card grid</div>
+  </section>
+
+  <!-- ============================ SECTION 2 — TILT CARD GRID ============================ -->
+  <section class="section" id="sec2" aria-label="Pointer-driven 3D tilt card grid">
+    <div class="blobs">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+      <div class="blob b3"></div>
+    </div>
+    <div class="grid-overlay"></div>
+
+    <div class="pill">Neon Cyber · 2026</div>
+
+    <div class="heading">
+      <span class="kicker">Independent · Per-Card Tilt</span>
+      <h1>Three Cards,<br>Three Pivots.</h1>
+      <p>Each card tilts toward the cursor on its own and lifts forward on hover.
+         The icon floats nearer than the text, so depth reads as parallax.</p>
+    </div>
+
+    <!-- perspective row; each card tilts independently -->
+    <div class="grid" id="cardGrid">
+
+      <!-- // KEEP CLEAN: .card is preserve-3d (no opacity/filter/overflow) -->
+      <article class="card">
+        <!-- flat glass backdrop (its own clip/blend layer) at card base -->
+        <div class="card-face"><div class="sheen"></div></div>
+        <!-- parallax content floats above; icon nearer than text -->
+        <div class="content">
+          <div class="icon">
+            <!-- lucide: cpu -->
+            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"></path></svg>
+          </div>
+          <div class="text">
+            <h3>Elastic Compute</h3>
+            <p>Spin up capacity that responds to the pointer of demand — scale
+               to zero, burst on signal.</p>
+            <span class="tag">Compute</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- featured card leans into AWS orange -->
+      <article class="card featured">
+        <div class="card-face"><div class="sheen"></div></div>
+        <div class="content">
+          <div class="icon">
+            <!-- lucide: cloud -->
+            <svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 0-9h-1.8A7 7 0 1 0 4 16.3"></path></svg>
+          </div>
+          <div class="text">
+            <h3>Global Edge</h3>
+            <p>Deliver from hundreds of points of presence. The nearest region
+               leans toward every user.</p>
+            <span class="tag">Featured</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-face"><div class="sheen"></div></div>
+        <div class="content">
+          <div class="icon">
+            <!-- lucide: database -->
+            <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></svg>
+          </div>
+          <div class="text">
+            <h3>Durable Data</h3>
+            <p>Eleven nines of durability with storage layers that float
+               independently beneath your apps.</p>
+            <span class="tag">Storage</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="nav-hint">↑ scroll or press ← to return to the hero</div>
+  </section>
+
+  <!-- fixed copyright + faint nav hint -->
+  <div class="footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+
+  <!--
+    ============================================================================
+    VANILLA JS — pointer-driven tilt engine + arrow/wheel section navigation.
+    No libraries. All easing runs in ONE requestAnimationFrame loop.
+    ============================================================================
+  -->
+  <script>
+  (function () {
+    "use strict";
+
+    /* Respect reduced-motion: if the user asked for less motion we skip the
+       entire tilt engine and leave the CSS static resting pose in place. */
+    var reduceMotion = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    /* Touch / no-fine-pointer devices: CSS handles the auto-orbit fallback,
+       so the JS pointer tracking would only fight it. Detect & skip. */
+    var coarsePointer = window.matchMedia &&
+      window.matchMedia("(hover: none), (pointer: coarse)").matches;
+
+    /* ---- Tilt tuning ------------------------------------------------ */
+    var MAX_TILT_HERO = 14;   /* deg — peak hero rotation                */
+    var MAX_TILT_CARD = 12;   /* deg — peak per-card rotation            */
+    var EASE          = 0.12; /* lerp factor toward target each frame    */
+    var CARD_LIFT     = 36;   /* px  — translateZ pop while pointer over  */
+
+    /* A Tilter wraps one preserve-3d element. It holds a "current" and a
+       "target" rotation; the rAF loop eases current -> target each frame
+       and writes the result to CSS custom props (--rx/--ry/--lift) plus
+       the sheen position (--mx/--my). Easing = current += (target-current)*EASE
+       which is a critically-pleasant exponential ease that never snaps. */
+    function Tilter(el, opts) {
+      this.el       = el;
+      this.maxTilt  = opts.maxTilt;
+      this.lift     = opts.lift || 0;
+      this.curRX = 0; this.curRY = 0; this.curLift = 0;
+      this.tgtRX = 0; this.tgtRY = 0; this.tgtLift = 0;
+      /* sheen position (percentages); ease these too so the glint glides */
+      this.curMX = 50; this.curMY = 50;
+      this.tgtMX = 50; this.tgtMY = 50;
+    }
+
+    /* Convert a pointer event into target rotations for THIS element,
+       using the element's own bounding box (so each card pivots about
+       its own center, independently). */
+    Tilter.prototype.point = function (clientX, clientY) {
+      var r  = this.el.getBoundingClientRect();
+      var hw = r.width  / 2;
+      var hh = r.height / 2;
+      var cx = r.left + hw;
+      var cy = r.top  + hh;
+      /* normalise offset to [-1, 1] (clamped for pointers just outside) */
+      var nx = Math.max(-1, Math.min(1, (clientX - cx) / hw));
+      var ny = Math.max(-1, Math.min(1, (clientY - cy) / hh));
+      /* map to rotation. rotateX negated so the near edge comes FORWARD. */
+      this.tgtRY =  nx * this.maxTilt;
+      this.tgtRX = -ny * this.maxTilt;
+      this.tgtLift = this.lift;
+      /* sheen tracks the cursor as a 0-100% position across the surface */
+      this.tgtMX = (nx * 0.5 + 0.5) * 100;
+      this.tgtMY = (ny * 0.5 + 0.5) * 100;
+    };
+
+    /* Pointer left -> glide everything back to the neutral resting pose. */
+    Tilter.prototype.reset = function () {
+      this.tgtRX = 0; this.tgtRY = 0; this.tgtLift = 0;
+      this.tgtMX = 50; this.tgtMY = 50;
+    };
+
+    /* One easing step; returns true while still meaningfully animating. */
+    Tilter.prototype.step = function () {
+      this.curRX   += (this.tgtRX   - this.curRX)   * EASE;
+      this.curRY   += (this.tgtRY   - this.curRY)   * EASE;
+      this.curLift += (this.tgtLift - this.curLift) * EASE;
+      this.curMX   += (this.tgtMX   - this.curMX)   * EASE;
+      this.curMY   += (this.tgtMY   - this.curMY)   * EASE;
+
+      var s = this.el.style;
+      s.setProperty("--rx",   this.curRX.toFixed(2) + "deg");
+      s.setProperty("--ry",   this.curRY.toFixed(2) + "deg");
+      if (this.lift) s.setProperty("--lift", this.curLift.toFixed(2) + "px");
+      s.setProperty("--mx",   this.curMX.toFixed(1) + "%");
+      s.setProperty("--my",   this.curMY.toFixed(1) + "%");
+      return true;
+    };
+
+    /* ---- Wire up the tilters (only when motion + pointer allow) ----- */
+    var tilters = [];
+    if (!reduceMotion && !coarsePointer) {
+      var hero = document.getElementById("heroTilt");
+      if (hero) {
+        var heroTilter = new Tilter(hero, { maxTilt: MAX_TILT_HERO });
+        tilters.push(heroTilter);
+        /* The hero tracks the pointer ANYWHERE over its section so the tilt
+           feels responsive even when the cursor is near (not on) the panel. */
+        var sec1 = document.getElementById("sec1");
+        sec1.addEventListener("pointermove", function (e) {
+          heroTilter.point(e.clientX, e.clientY);
+        });
+        sec1.addEventListener("pointerleave", function () { heroTilter.reset(); });
+      }
+
+      /* Each card is its own Tilter and only reacts to its own hover area,
+         so three cards can tilt in different directions at the same time. */
+      var cards = document.querySelectorAll("#cardGrid .card");
+      cards.forEach(function (card) {
+        var t = new Tilter(card, { maxTilt: MAX_TILT_CARD, lift: CARD_LIFT });
+        tilters.push(t);
+        card.addEventListener("pointermove", function (e) {
+          t.point(e.clientX, e.clientY);
+        });
+        card.addEventListener("pointerleave", function () { t.reset(); });
+      });
+
+      /* Single shared rAF loop eases every tilter each frame. */
+      (function loop() {
+        for (var i = 0; i < tilters.length; i++) tilters[i].step();
+        requestAnimationFrame(loop);
+      })();
+    }
+
+    /* ---- Arrow-key / wheel section navigation ----------------------- */
+    /* scroll-snap already navigates on plain scroll; this adds keyboard
+       support and prevents the wheel from skipping past a snap point. */
+    var sections = [document.getElementById("sec1"),
+                    document.getElementById("sec2")];
+    function currentIndex() {
+      return window.scrollY < window.innerHeight * 0.5 ? 0 : 1;
+    }
+    function go(delta) {
+      var i = currentIndex();
+      var next = Math.max(0, Math.min(sections.length - 1, i + delta));
+      sections[next].scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
+    }
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown") {
+        go(1); e.preventDefault();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
+        go(-1); e.preventDefault();
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

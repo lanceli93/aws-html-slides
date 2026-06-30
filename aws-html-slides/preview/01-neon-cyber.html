@@ -33,7 +33,8 @@
         /* === BASE === */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: var(--font-body); background: var(--bg-primary); color: var(--text-primary); -webkit-font-smoothing: antialiased; }
-        html, body { height: 100%; overflow-x: hidden; }
+        html, body { height: 100%; overflow-x: hidden; scrollbar-width: none; /* Firefox */ }
+        html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
         html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
 
         .slide {
@@ -116,6 +117,11 @@
                 radial-gradient(ellipse at 70% 30%, rgba(255, 0, 170, 0.06) 0%, transparent 50%),
                 var(--bg-primary);
         }
+        /* WebGL nebula canvas — only on the title slide, behind the grid + content.
+           Opaque shader covers the radial-gradient fallback above; if WebGL is
+           unavailable, body.no-webgl hides it and the title-slide gradient shows. */
+        #nebula { position: absolute; inset: 0; z-index: 0; display: block; }
+        body.no-webgl #nebula { display: none; }
         .title-slide .slide-content { align-items: center; text-align: center; gap: var(--content-gap); }
         .title-label {
             font-family: var(--font-body); font-size: var(--small-size); font-weight: 500;
@@ -166,7 +172,13 @@
             transition: border-color 0.3s, box-shadow 0.3s;
         }
         .feature-card:hover { border-color: rgba(0, 255, 204, 0.3); box-shadow: 0 0 20px rgba(0, 255, 204, 0.05); }
-        .feature-icon { font-size: clamp(1.2rem, 2.5vw, 1.8rem); margin-bottom: clamp(0.3rem, 0.8vw, 0.6rem); }
+        .feature-icon { margin-bottom: clamp(0.3rem, 0.8vw, 0.6rem); line-height: 0; color: var(--accent-cyan); }
+        .feature-icon svg {
+            width: clamp(1.4rem, 2.8vw, 2rem); height: clamp(1.4rem, 2.8vw, 2rem);
+            stroke: var(--accent-cyan); fill: none; stroke-width: 1.75;
+            stroke-linecap: round; stroke-linejoin: round;
+            filter: drop-shadow(0 0 8px var(--accent-glow-cyan));
+        }
         .feature-card h3 { font-family: var(--font-display); font-size: var(--h3-size); font-weight: 600; margin-bottom: clamp(0.2rem, 0.5vw, 0.4rem); }
         .feature-card p { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.5; }
 
@@ -198,6 +210,7 @@
 
 <!-- === SLIDE 1: TITLE === -->
 <section class="slide title-slide" aria-label="Title">
+    <canvas id="nebula"></canvas>
     <div class="scanline"></div>
     <div class="slide-content">
         <div class="title-label reveal">ANTHROPIC PRESENTS</div>
@@ -244,32 +257,32 @@
         <h2 class="section-title reveal">核心能力</h2>
         <div class="features-grid">
             <div class="feature-card glow-border reveal">
-                <div class="feature-icon">&#x1F4C1;</div>
+                <div class="feature-icon"><!-- lucide: folder-tree --><svg viewBox="0 0 24 24"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 14 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"></path><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H12a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"></path><path d="M3 5a2 2 0 0 0 2 2h3"></path><path d="M3 3v13a2 2 0 0 0 2 2h3"></path></svg></div>
                 <h3>全项目理解</h3>
                 <p>自动索引整个代码库，理解文件关系和架构模式</p>
             </div>
             <div class="feature-card glow-border reveal">
-                <div class="feature-icon">&#x1F527;</div>
+                <div class="feature-icon"><!-- lucide: wrench --><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg></div>
                 <h3>自主编辑</h3>
                 <p>直接读写文件、执行命令、运行测试，完成完整的开发循环</p>
             </div>
             <div class="feature-card glow-border reveal">
-                <div class="feature-icon">&#x1F50D;</div>
+                <div class="feature-icon"><!-- lucide: search --><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></div>
                 <h3>智能搜索</h3>
                 <p>跨文件搜索、符号查找、依赖追踪，快速定位问题根源</p>
             </div>
             <div class="feature-card glow-border reveal">
-                <div class="feature-icon">&#x1F500;</div>
+                <div class="feature-icon"><!-- lucide: git-branch --><svg viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg></div>
                 <h3>Git 集成</h3>
                 <p>创建分支、提交代码、生成 PR，内置完整的版本控制工作流</p>
             </div>
             <div class="feature-card glow-border reveal">
-                <div class="feature-icon">&#x1F9E9;</div>
+                <div class="feature-icon"><!-- lucide: blocks --><svg viewBox="0 0 24 24"><rect x="14" y="4" width="6" height="6" rx="1"></rect><path d="M10 20v-6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V8a2 2 0 0 1 2-2h2"></path></svg></div>
                 <h3>MCP 扩展</h3>
                 <p>通过 Model Context Protocol 连接外部工具和数据源</p>
             </div>
             <div class="feature-card glow-border reveal">
-                <div class="feature-icon">&#x1F512;</div>
+                <div class="feature-icon"><!-- lucide: lock --><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
                 <h3>权限控制</h3>
                 <p>分级权限系统，危险操作需要确认，保护代码安全</p>
             </div>
@@ -347,49 +360,263 @@
 
     updateUI();
 
-    /* Particle system */
-    const canvas = document.getElementById('particles');
-    const ctx = canvas.getContext('2d');
-    let particles = [];
+})();
 
-    function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
-    resize();
-    addEventListener('resize', resize);
+/* === Constellation network background (hand-written, zero-dep, offline) ===
+   Drifting cyan/magenta/blue dots linked by faint lines, brightening toward the
+   cursor (grab) + click-to-add. DPR-capped, ~45fps throttle, pauses when hidden,
+   respects prefers-reduced-motion. Replaces the old simple particle field. */
+(function () {
+    "use strict";
+    var canvas = document.getElementById('particles');
+    var ctx = canvas && canvas.getContext('2d');
+    if (!ctx) { if (canvas) canvas.style.display = 'none'; return; }
 
-    const count = Math.min(40, Math.floor(innerWidth / 30));
-    for (let i = 0; i < count; i++) {
-        particles.push({
-            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
-            vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
-            size: Math.random() * 2 + 0.5, opacity: Math.random() * 0.3 + 0.1
-        });
+    var reduceMotion = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+    var LINK_DIST = 150, LINK_DIST2 = LINK_DIST * LINK_DIST;
+    var GRAB_DIST = 200, GRAB_DIST2 = GRAB_DIST * GRAB_DIST;
+    var BASE_AREA = 1920 * 1080, MAX_DOTS = 90, FPS = 45, FRAME_MS = 1000 / FPS;
+    var COLORS = [[0, 255, 204], [255, 0, 170], [0, 170, 255]];
+
+    var W = 0, H = 0, dots = [], mouse = { x: -9999, y: -9999, active: false };
+    var rafId = 0, running = false, last = 0;
+
+    function makeDot(x, y) {
+        var c = COLORS[(Math.random() * COLORS.length) | 0];
+        var speed = reduceMotion ? 0 : 0.3;
+        return {
+            x: x != null ? x : Math.random() * W, y: y != null ? y : Math.random() * H,
+            vx: (Math.random() - 0.5) * speed, vy: (Math.random() - 0.5) * speed,
+            r: 1.3 + Math.random() * 1.8, a: 0.45 + Math.random() * 0.5, col: c
+        };
     }
-
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles.forEach(p => {
-            p.x += p.vx; p.y += p.vy;
-            if (p.x < 0) p.x = canvas.width; if (p.x > canvas.width) p.x = 0;
-            if (p.y < 0) p.y = canvas.height; if (p.y > canvas.height) p.y = 0;
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0,255,204,${p.opacity})`; ctx.fill();
-        });
-        for (let i = 0; i < particles.length; i++) {
-            for (let j = i + 1; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 150) {
-                    ctx.beginPath();
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.strokeStyle = `rgba(0,255,204,${0.05 * (1 - dist / 150)})`;
-                    ctx.lineWidth = 0.5; ctx.stroke();
+    function seed() {
+        var target = Math.round(MAX_DOTS * Math.min(1, (W * H) / BASE_AREA));
+        target = Math.max(32, target);
+        if (reduceMotion) target = Math.min(target, 60);
+        dots = [];
+        for (var i = 0; i < target; i++) dots.push(makeDot());
+    }
+    function resize() {
+        W = window.innerWidth; H = window.innerHeight;
+        canvas.width = Math.floor(W * DPR); canvas.height = Math.floor(H * DPR);
+        canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    function draw() {
+        ctx.clearRect(0, 0, W, H);
+        for (var i = 0; i < dots.length; i++) {
+            var d = dots[i]; d.x += d.vx; d.y += d.vy;
+            if (d.x < 0 || d.x > W) d.vx *= -1;
+            if (d.y < 0 || d.y > H) d.vy *= -1;
+        }
+        for (var a = 0; a < dots.length; a++) {
+            var p = dots[a];
+            for (var b = a + 1; b < dots.length; b++) {
+                var q = dots[b], dx = p.x - q.x, dy = p.y - q.y, dist2 = dx * dx + dy * dy;
+                if (dist2 < LINK_DIST2) {
+                    var t = 1 - Math.sqrt(dist2) / LINK_DIST;
+                    ctx.globalAlpha = t * 0.4; ctx.strokeStyle = 'rgba(0,255,204,1)';
+                    ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
                 }
             }
         }
-        requestAnimationFrame(animate);
+        if (mouse.active && !reduceMotion) {
+            for (var k = 0; k < dots.length; k++) {
+                var dd = dots[k], mx = dd.x - mouse.x, my = dd.y - mouse.y, md2 = mx * mx + my * my;
+                if (md2 < GRAB_DIST2) {
+                    var mt = 1 - Math.sqrt(md2) / GRAB_DIST;
+                    ctx.globalAlpha = mt * 0.65; ctx.strokeStyle = 'rgba(255,0,170,1)';
+                    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(dd.x, dd.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+                }
+            }
+        }
+        ctx.globalCompositeOperation = 'lighter';
+        for (var n = 0; n < dots.length; n++) {
+            var e = dots[n], c = e.col;
+            var grd = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 4);
+            grd.addColorStop(0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + e.a + ')');
+            grd.addColorStop(1, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)');
+            ctx.globalAlpha = 1; ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,' + (e.a * 0.85) + ')';
+            ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     }
-    animate();
+    function loop(now) {
+        if (!running) return;
+        rafId = requestAnimationFrame(loop);
+        if (now - last >= FRAME_MS) { last = now - ((now - last) % FRAME_MS); draw(); }
+    }
+    function start() { if (running || reduceMotion) return; running = true; last = 0; rafId = requestAnimationFrame(loop); }
+    function stop() { running = false; if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } }
+
+    window.addEventListener('resize', function () { resize(); seed(); if (reduceMotion) draw(); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else if (!reduceMotion) start(); });
+    window.addEventListener('mousemove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
+    window.addEventListener('mouseout', function () { mouse.active = false; });
+    window.addEventListener('click', function (e) {
+        for (var i = 0; i < 3 && dots.length < MAX_DOTS + 12; i++) {
+            dots.push(makeDot(e.clientX + (Math.random() - 0.5) * 20, e.clientY + (Math.random() - 0.5) * 20));
+        }
+    });
+    try { resize(); seed(); if (reduceMotion) draw(); else start(); }
+    catch (err) { console.error('constellation init failed:', err); canvas.style.display = 'none'; }
+})();
+
+/* === WebGL nebula on the TITLE slide (hand-written WebGL1 shader, offline) ===
+   Cyan/magenta domain-warped fBm over MIT snoise, confined to a soft mass.
+   An IntersectionObserver runs the GPU loop ONLY while the title slide is on
+   screen. WebGL unavailable -> body.no-webgl reveals the CSS gradient fallback.
+   prefers-reduced-motion -> one static frame, no loop. */
+(function () {
+    "use strict";
+    var canvas = document.getElementById('nebula');
+    if (!canvas) return;
+    var titleSlide = canvas.closest('.slide');
+    var reduceMotion = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+    var FPS = 30, FRAME_MS = 1000 / FPS;
+
+    var VERT_SRC = [
+        "attribute vec2 a_pos;",
+        "void main(){ gl_Position = vec4(a_pos,0.0,1.0); }"
+    ].join("\n");
+
+    var FRAG_SRC = [
+        "precision highp float;",
+        "uniform vec2 u_res; uniform float u_time; uniform vec2 u_mouse;",
+        "// GLSL 2D simplex noise — Ian McEwan, Ashima Arts. MIT License.",
+        "// https://github.com/ashima/webgl-noise / https://github.com/stegu/webgl-noise",
+        "vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}",
+        "vec2 mod289(vec2 x){return x-floor(x*(1.0/289.0))*289.0;}",
+        "vec3 permute(vec3 x){return mod289(((x*34.0)+1.0)*x);}",
+        "float snoise(vec2 v){",
+        "  const vec4 C=vec4(0.211324865405187,0.366025403784439,-0.577350269189626,0.024390243902439);",
+        "  vec2 i=floor(v+dot(v,C.yy)); vec2 x0=v-i+dot(i,C.xx);",
+        "  vec2 i1; i1=(x0.x>x0.y)?vec2(1.0,0.0):vec2(0.0,1.0);",
+        "  vec4 x12=x0.xyxy+C.xxzz; x12.xy-=i1; i=mod289(i);",
+        "  vec3 p=permute(permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));",
+        "  vec3 m=max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0);",
+        "  m=m*m; m=m*m; vec3 x=2.0*fract(p*C.www)-1.0; vec3 h=abs(x)-0.5;",
+        "  vec3 ox=floor(x+0.5); vec3 a0=x-ox;",
+        "  m*=1.79284291400159-0.85373472095314*(a0*a0+h*h);",
+        "  vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw;",
+        "  return 130.0*dot(m,g);",
+        "}",
+        "float fbm(vec2 p){ float val=0.0, amp=0.5, freq=1.0; const int OCT=4;",
+        "  for(int i=0;i<OCT;i++){ val+=amp*snoise(p*freq); freq*=1.9; amp*=0.52; } return val; }",
+        "void main(){",
+        "  vec2 uv=(gl_FragCoord.xy-0.5*u_res)/u_res.y;",
+        "  float t=u_time*0.04; vec2 mouseShift=(u_mouse-0.5)*0.4;",
+        "  vec2 p=uv*0.7+mouseShift;",
+        "  vec2 q=vec2(fbm(p+t), fbm(p+vec2(5.2,1.3)-t*0.75));",
+        "  float f=fbm(p+0.9*q); float cloud=clamp(f*0.45+0.5,0.0,1.0);",
+        "  vec2 c=vec2(0.0,0.0); float rad=length((uv-c)*vec2(0.62,1.05));",
+        "  float mass=smoothstep(1.05,0.08,rad);",
+        "  float density=cloud*mass; density=smoothstep(0.18,0.98,density); density=pow(density,1.35);",
+        "  vec3 cDeep=vec3(0.039,0.059,0.110);",   // #0a0f1c
+        "  vec3 cCyan=vec3(0.000,1.000,0.800);",   // #00ffcc
+        "  vec3 cMagenta=vec3(1.000,0.000,0.667);",// #ff00aa
+        "  vec3 cBlue=vec3(0.000,0.667,1.000);",   // #00aaff
+        "  float hueMix=clamp(0.35+0.45*(q.x-q.y),0.0,1.0);",
+        "  vec3 base=mix(cCyan,cBlue,hueMix); vec3 col=cDeep;",
+        "  col=mix(col,base,smoothstep(0.18,0.82,density));",
+        "  col=mix(col,cMagenta,smoothstep(0.62,1.0,density)*0.55);",
+        "  float glow=smoothstep(0.45,1.0,density);",
+        "  col+=base*glow*0.4; col+=cMagenta*pow(glow,2.4)*0.28;",
+        "  vec2 vpos=gl_FragCoord.xy/u_res; float vig=smoothstep(1.2,0.4,length(vpos-0.5));",
+        "  col*=mix(0.5,1.0,vig); col=col/(col+vec3(0.85)); col=pow(col,vec3(0.88));",
+        "  col+=vec3(0.010,0.005,0.018); gl_FragColor=vec4(col,1.0);",
+        "}"
+    ].join("\n");
+
+    var gl = null, program = null, u_res = null, u_time = null, u_mouse = null;
+    var rafId = 0, running = false, startTime = 0, lastDraw = 0, onScreen = true;
+    var mouseTarget = { x: 0.5, y: 0.5 }, mouseSmooth = { x: 0.5, y: 0.5 };
+
+    function compile(type, src) {
+        var sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh);
+        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+            console.error('Shader compile error:\n' + gl.getShaderInfoLog(sh)); gl.deleteShader(sh); return null;
+        }
+        return sh;
+    }
+    function buildProgram() {
+        var vs = compile(gl.VERTEX_SHADER, VERT_SRC), fs = compile(gl.FRAGMENT_SHADER, FRAG_SRC);
+        if (!vs || !fs) return null;
+        var prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.error('Program link error:\n' + gl.getProgramInfoLog(prog)); return null; }
+        return prog;
+    }
+    function initGL() {
+        var opts = { antialias: false, alpha: false, depth: false, stencil: false, powerPreference: 'low-power' };
+        gl = canvas.getContext('webgl', opts) || canvas.getContext('experimental-webgl', opts);
+        if (!gl) return false;
+        program = buildProgram(); if (!program) return false;
+        var verts = new Float32Array([-1, -1, 3, -1, -1, 3]);
+        var buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+        var loc = gl.getAttribLocation(program, 'a_pos'); gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        gl.useProgram(program);
+        u_res = gl.getUniformLocation(program, 'u_res');
+        u_time = gl.getUniformLocation(program, 'u_time');
+        u_mouse = gl.getUniformLocation(program, 'u_mouse');
+        resize(); return true;
+    }
+    function resize() {
+        var w = Math.floor(window.innerWidth * DPR), h = Math.floor(window.innerHeight * DPR);
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    function drawFrame(nowMs) {
+        if (!gl || !program) return;
+        var elapsed = (nowMs - startTime) / 1000.0;
+        mouseSmooth.x += (mouseTarget.x - mouseSmooth.x) * 0.08;
+        mouseSmooth.y += (mouseTarget.y - mouseSmooth.y) * 0.08;
+        gl.useProgram(program);
+        gl.uniform2f(u_res, canvas.width, canvas.height);
+        gl.uniform1f(u_time, elapsed);
+        gl.uniform2f(u_mouse, mouseSmooth.x, mouseSmooth.y);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    function loop(nowMs) {
+        if (!running) return;
+        rafId = requestAnimationFrame(loop);
+        if (nowMs - lastDraw >= FRAME_MS) { lastDraw = nowMs - ((nowMs - lastDraw) % FRAME_MS); drawFrame(nowMs); }
+    }
+    function start() {
+        if (running || reduceMotion || !onScreen || document.hidden) return;
+        running = true; lastDraw = 0; startTime = performance.now(); rafId = requestAnimationFrame(loop);
+    }
+    function stop() { running = false; if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } }
+
+    window.addEventListener('resize', function () { resize(); if (reduceMotion && gl) drawFrame(performance.now()); });
+    document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else start(); });
+    window.addEventListener('mousemove', function (e) {
+        mouseTarget.x = e.clientX / window.innerWidth; mouseTarget.y = 1.0 - e.clientY / window.innerHeight;
+    });
+    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); stop(); program = null; }, false);
+    canvas.addEventListener('webglcontextrestored', function () { if (initGL()) { if (reduceMotion) drawFrame(performance.now()); else start(); } }, false);
+
+    /* Gate the GPU loop to the title slide only. */
+    if (titleSlide && 'IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                onScreen = en.isIntersecting;
+                if (onScreen) start(); else stop();
+            });
+        }, { threshold: 0.15 }).observe(titleSlide);
+    }
+
+    if (!initGL()) { document.body.classList.add('no-webgl'); return; }
+    if (reduceMotion) drawFrame(performance.now()); else start();
 })();
 </script>
 </body>

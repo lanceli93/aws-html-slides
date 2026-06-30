@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<!-- =====================================================================
+     Neon Cyber — Constellation / Network Cover
+     ---------------------------------------------------------------------
+     ONE self-contained, OFFLINE, ZERO-DEPENDENCY file. No CDN, no web
+     fonts, no network at runtime, no emoji, no libraries — a hand-written
+     2D-canvas constellation.
+
+     WHY hand-written (not a particle library): the prime directive is a
+     deck that renders when you double-click it. A ~5 KB inline canvas loop
+     we fully control beats a ~180 KB engine for an effect this simple, and
+     it removes a vendored black box. The "linked network" look (dots that
+     connect with lines when near, brighten toward the cursor, and spawn on
+     click) is a handful of lines of math — see the commented loop below.
+
+     The scene: a calm, keynote-grade constellation — ≤ a bounded count of
+     dots in the Neon Cyber palette (cyan / magenta / blue over deep navy)
+     joined by faint lines that reach toward the cursor on hover and emit a
+     few new dots on click. Behind it sits a gradient headline + subtitle.
+
+     Perf discipline (kept from the library version's intent):
+       * Count is capped and scaled to viewport area (never a dense mess).
+       * Linking is O(n²); we cap N and use a squared-distance test (no sqrt
+         in the hot path until we actually draw a line).
+       * DPR capped at 1.5; the loop is throttled to ~45 fps.
+       * Pauses when the tab is hidden; respects prefers-reduced-motion.
+     ===================================================================== -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neon Cyber — Constellation Network Cover</title>
+<style>
+  /* ============================================================
+     SELF-CONTAINED, OFFLINE styles. System-font stacks only.
+     ============================================================ */
+  :root {
+    --bg:      #0a0f1c;         /* deep navy base */
+    --cyan:    #00ffcc;         /* Neon Cyber cyan */
+    --magenta: #ff00aa;         /* Neon Cyber magenta */
+    --blue:    #00aaff;         /* Neon Cyber blue */
+    --orange:  #FF9900;         /* orange — eyebrow accent only */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100vh; height: 100dvh;   /* viewport fit, no scroll */
+    overflow: hidden;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Helvetica, Arial, sans-serif;
+  }
+
+  /* ---------------- CSS radial-gradient nebula FALLBACK ----------------
+     Sits on <body> BEHIND the canvas. If the canvas/2D context is somehow
+     unavailable we add `.no-canvas` to <body>; the canvas is then hidden
+     and this gradient shows, so we never display a pure-black blank screen.
+     Mirrors the live look: a soft cyan-magenta-blue mass biased RIGHT (the
+     headline sits left), corners deep-navy. */
+  body {
+    background:
+      radial-gradient(ellipse 55% 60% at 72% 42%, rgba(0, 255, 204, 0.40), transparent 62%),
+      radial-gradient(ellipse 42% 46% at 80% 58%, rgba(255, 0, 170, 0.30), transparent 60%),
+      radial-gradient(ellipse 60% 52% at 64% 66%, rgba(0, 170, 255, 0.20), transparent 66%),
+      var(--bg);
+  }
+
+  /* The constellation canvas fills the viewport, fixed behind everything. */
+  #net {
+    position: fixed; inset: 0; z-index: 0; display: block;
+  }
+  body.no-canvas #net { display: none; }
+
+  /* ---------------- Slide-cover title overlay ---------------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 1;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 0 8vw;
+    pointer-events: none;   /* let pointer events reach the canvas */
+    user-select: none;
+  }
+  .scrim {
+    position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(ellipse 70% 80% at 20% 50%,
+      rgba(10, 15, 28, 0.62) 0%, rgba(10, 15, 28, 0.28) 45%, transparent 75%);
+  }
+  .eyebrow {
+    font-size: clamp(11px, 1.4vw, 16px); letter-spacing: 0.42em; font-weight: 600;
+    text-transform: uppercase; color: rgba(255, 255, 255, 0.78);
+    margin-bottom: 1.1rem; text-shadow: 0 1px 18px rgba(0, 0, 0, 0.6);
+  }
+  .eyebrow .tick { color: var(--orange); }   /* AWS orange, sparingly */
+  h1 {
+    font-size: clamp(38px, 7vw, 104px); line-height: 1.02; font-weight: 800;
+    letter-spacing: -0.02em; max-width: 18ch;
+    background: linear-gradient(100deg, #fff 0%, #b9fff0 28%, var(--magenta) 62%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 4px 30px rgba(0, 255, 204, 0.25));
+  }
+  .subtitle {
+    margin-top: 1.4rem; font-size: clamp(14px, 1.9vw, 22px); font-weight: 400;
+    color: rgba(255, 255, 255, 0.72); max-width: 46ch; line-height: 1.5;
+    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+  }
+  .hint {
+    position: fixed; bottom: 58px; left: 8vw; z-index: 1;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.40); pointer-events: none;
+  }
+  body.reduced-motion .hint { display: none; }
+
+  footer {
+    position: fixed; bottom: 18px; left: 0; right: 0; z-index: 1;
+    text-align: center; font-size: clamp(10px, 1vw, 12px); letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.34); pointer-events: none; padding: 0 6vw;
+  }
+</style>
+</head>
+<body>
+  <canvas id="net"></canvas>
+
+  <div class="overlay">
+    <div class="scrim"></div>
+    <div class="eyebrow">NEON<span class="tick"> // </span>CYBER</div>
+    <h1>Connect Everything</h1>
+    <p class="subtitle">
+      A constellation of services, builders, and ideas — linked into the
+      network that powers the next generation of cloud applications.
+    </p>
+  </div>
+
+  <div class="hint">Move your cursor to draw the network &middot; click to add stars</div>
+
+  <footer>© 2026 Neon Cyber. All rights reserved.</footer>
+
+  <script>
+  "use strict";
+  (function () {
+    // =================================================================
+    //  Hand-written constellation. Zero dependencies. Works from file://.
+    // =================================================================
+    var canvas = document.getElementById("net");
+    var ctx = canvas.getContext("2d");
+    if (!ctx) { document.body.classList.add("no-canvas"); return; }
+
+    var reduceMotion =
+      window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) document.body.classList.add("reduced-motion");
+
+    // ---- tunables (the taste + perf knobs) ----
+    var DPR = Math.min(window.devicePixelRatio || 1, 1.5);  // cap backing res
+    var LINK_DIST = 150;            // px: connect dots closer than this
+    var LINK_DIST2 = LINK_DIST * LINK_DIST;  // squared (cheap distance test)
+    var GRAB_DIST = 200;            // px: cursor "grab" reach
+    var GRAB_DIST2 = GRAB_DIST * GRAB_DIST;
+    var BASE_AREA = 1920 * 1080;    // reference area for density scaling
+    var MAX_DOTS = 110;             // hard cap (keeps O(n²) bounded)
+    var FPS = 45, FRAME_MS = 1000 / FPS;
+
+    // Neon Cyber palette for the dots (orange omitted — used sparingly).
+    var COLORS = [ [0,255,204], [255,0,170], [0,170,255] ];
+
+    var W = 0, H = 0;               // CSS pixel size
+    var dots = [];
+    var mouse = { x: -9999, y: -9999, active: false };
+    var rafId = 0, running = false, last = 0;
+
+    // ---- a single dot ----
+    function makeDot(x, y) {
+      var c = COLORS[(Math.random() * COLORS.length) | 0];
+      var speed = reduceMotion ? 0 : 0.35;
+      return {
+        x: x != null ? x : Math.random() * W,
+        y: y != null ? y : Math.random() * H,
+        vx: (Math.random() - 0.5) * speed,
+        vy: (Math.random() - 0.5) * speed,
+        r: 1.5 + Math.random() * 2.0,
+        a: 0.5 + Math.random() * 0.5,            // base alpha
+        col: c
+      };
+    }
+
+    // ---- (re)build the dot field, count scaled to viewport area ----
+    function seed() {
+      var target = Math.round(MAX_DOTS * Math.min(1, (W * H) / BASE_AREA));
+      target = Math.max(36, target);            // never look empty
+      if (reduceMotion) target = Math.min(target, 70);
+      dots = [];
+      for (var i = 0; i < target; i++) dots.push(makeDot());
+    }
+
+    function resize() {
+      W = window.innerWidth; H = window.innerHeight;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);   // draw in CSS pixels
+    }
+
+    // ---- one rendered frame ----
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
+      // advance positions (skipped when reduced-motion -> velocities are 0)
+      for (var i = 0; i < dots.length; i++) {
+        var d = dots[i];
+        d.x += d.vx; d.y += d.vy;
+        if (d.x < 0 || d.x > W) d.vx *= -1;     // bounce, no teleport pop
+        if (d.y < 0 || d.y > H) d.vy *= -1;
+      }
+
+      // links: O(n²) but N is capped. Squared-distance test in the inner
+      // loop; sqrt only when we actually draw a line (for the alpha ramp).
+      for (var a = 0; a < dots.length; a++) {
+        var p = dots[a];
+        for (var b = a + 1; b < dots.length; b++) {
+          var q = dots[b];
+          var dx = p.x - q.x, dy = p.y - q.y;
+          var dist2 = dx * dx + dy * dy;
+          if (dist2 < LINK_DIST2) {
+            var t = 1 - Math.sqrt(dist2) / LINK_DIST;   // 0..1, near = bright
+            ctx.globalAlpha = t * 0.5;
+            ctx.strokeStyle = "rgba(0,255,204,1)";       // brightened cyan
+            ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+          }
+        }
+      }
+
+      // cursor "grab": brighter lines from nearby dots to the pointer.
+      if (mouse.active && !reduceMotion) {
+        for (var k = 0; k < dots.length; k++) {
+          var dd = dots[k];
+          var mx = dd.x - mouse.x, my = dd.y - mouse.y;
+          var md2 = mx * mx + my * my;
+          if (md2 < GRAB_DIST2) {
+            var mt = 1 - Math.sqrt(md2) / GRAB_DIST;
+            ctx.globalAlpha = mt * 0.7;
+            ctx.strokeStyle = "rgba(255,0,170,1)";       // magenta toward cursor
+            ctx.lineWidth = 1.4;
+            ctx.beginPath(); ctx.moveTo(dd.x, dd.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+          }
+        }
+      }
+
+      // dots on top, each with a soft additive glow halo.
+      ctx.globalCompositeOperation = "lighter";
+      for (var n = 0; n < dots.length; n++) {
+        var e = dots[n], c = e.col;
+        var grd = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 4);
+        grd.addColorStop(0, "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + e.a + ")");
+        grd.addColorStop(1, "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0)");
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = grd;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 4, 0, Math.PI * 2); ctx.fill();
+        // crisp core
+        ctx.fillStyle = "rgba(255,255,255," + (e.a * 0.9) + ")";
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
+
+    // ---- throttled loop ----
+    function loop(now) {
+      if (!running) return;
+      rafId = requestAnimationFrame(loop);
+      if (now - last >= FRAME_MS) { last = now - ((now - last) % FRAME_MS); draw(); }
+    }
+    function start() { if (running || reduceMotion) return; running = true; last = 0; rafId = requestAnimationFrame(loop); }
+    function stop() { running = false; if (rafId) cancelAnimationFrame(rafId), rafId = 0; }
+
+    // ---- events ----
+    window.addEventListener("resize", function () {
+      resize(); seed();
+      if (reduceMotion) draw();   // redraw the static frame at the new size
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) stop(); else if (!reduceMotion) start();
+    });
+    window.addEventListener("mousemove", function (e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
+    window.addEventListener("mouseout", function () { mouse.active = false; });
+    // click: add a few stars at the cursor (bounded by MAX_DOTS).
+    window.addEventListener("click", function (e) {
+      for (var i = 0; i < 3 && dots.length < MAX_DOTS + 12; i++) {
+        dots.push(makeDot(e.clientX + (Math.random() - 0.5) * 20,
+                          e.clientY + (Math.random() - 0.5) * 20));
+      }
+    });
+
+    // ---- boot ----
+    try {
+      resize(); seed();
+      if (reduceMotion) draw();   // one static, full constellation
+      else start();
+    } catch (err) {
+      console.error("constellation init failed:", err);
+      document.body.classList.add("no-canvas");
+    }
+  })();
+  </script>
+</body>
+</html>

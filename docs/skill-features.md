@@ -37,12 +37,14 @@ no server. Share by zipping the folder.
 
 ## 3. Style presets
 
-13 curated presets (defined in `STYLE_PRESETS.md`), spanning dark / light /
-specialty themes — e.g. Bold Signal, Electric Studio, Neon Cyber, Terminal Green,
-Swiss Modern, **re:Invent Keynote** (the most developed, with a dedicated
-`layout-reinvent.md` of 10 layout patterns: title, pill cards, stats grid, split
-divider, pipeline, quote, big-number, comparison, process flow, timeline zigzag).
-Previews are pre-built HTML files the user can open and pick from.
+2 specialty presets (defined in `STYLE_PRESETS.md`): **Neon Cyber** (#1) and
+**re:Invent Keynote** (#2). re:Invent Keynote is the most developed, with a
+dedicated `layout-reinvent.md` of keynote-grade layout patterns (title, pill
+cards, stats grid, split divider, pipeline, quote, big-number, comparison,
+process flow, timeline zigzag). **Both** presets support the optional
+self-contained 3D/motion effects documented in `effects-reference.md` — purple
+demos in `demos/`, cyan Neon variants in `demos/neon/`. Previews are pre-built
+HTML files the user can open and pick from.
 
 ## 4. Rich content blocks (usable in any slide)
 
@@ -75,30 +77,38 @@ Previews are pre-built HTML files the user can open and pick from.
 
 ## 6. 3D & motion effects (`effects-reference.md` + `demos/`)
 
-A license-checked menu of ways to add 3D/motion while staying offline. **Three
-distinct 3D techniques**, each with a working demo:
+A license-checked, **palette-agnostic** menu of ways to add 3D/motion while staying
+offline. The catalog serves **both specialty styles**: each technique ships a
+re:Invent purple demo under `demos/`, and four also ship a Neon Cyber cyan variant
+under `demos/neon/` (re-tinted across CSS `:root`, inline `rgba`, JS color arrays,
+and GLSL `vec3`s — not a token swap). **Three distinct 3D techniques**, each with a
+working demo:
 
-1. **Three.js real-3D** (`demos/threejs-hero/`) — genuine WebGL: emissive morphing
-   core, fresnel rim, orbiting lights, particle cloud, hand-rolled inline bloom
-   (no ESM addons), ACES tone mapping. Vendor `three.min.js` **r160** (last UMD/
-   global build) locally for offline use.
-2. **CSS 3D** (`demos/css-3d-hero/`) — pure-CSS rotating cube + 2.5D parallax via
-   `transform-style: preserve-3d` + `perspective`. Watch the *flattening gotcha*:
-   no opacity/filter/overflow/clip/mask/blend on the preserve-3d element — put
-   those on children.
-3. **Pointer-driven 3D tilt** (`demos/pointer-tilt/`) — cards tilt toward the
-   cursor (capped + eased in one rAF loop), inner layers at different `translateZ`
-   for parallax, specular sheen tracking the pointer.
+1. **Three.js real-3D** (`demos/threejs-hero/`, purple only) — genuine WebGL:
+   emissive morphing core, fresnel rim, orbiting lights, particle cloud, hand-rolled
+   inline bloom (no ESM addons), ACES tone mapping. Vendor `three.min.js` **r160**
+   (last UMD/global build) locally for offline use. **Excluded from the Neon set by
+   design** (the CSS/WebGL/GSAP effects carry the look at a fraction of the weight).
+2. **CSS 3D** (`demos/css-3d-hero/`, purple only) — pure-CSS rotating cube + 2.5D
+   parallax via `transform-style: preserve-3d` + `perspective`. Watch the *flattening
+   gotcha*: no opacity/filter/overflow/clip/mask/blend on the preserve-3d element —
+   put those on children.
+3. **Pointer-driven 3D tilt** (`demos/pointer-tilt/` + `demos/neon/pointer-tilt/`) —
+   cards tilt toward the cursor (capped + eased in one rAF loop), inner layers at
+   different `translateZ` for parallax, specular sheen tracking the pointer.
 
-Other inline effects: hand-written **WebGL shader background** (`webgl-nebula/`),
-hand-written **2D-canvas constellation** (`particles-network/`), **GSAP** kinetic
-type + content micro-effects (`gsap-title/`, `gsap-micro/`; GSAP 3.13 free for
-commercial, vendored), `@property` spinning conic gradients, View Transitions.
+Other inline effects: hand-written **WebGL shader background** (`webgl-nebula/` +
+`neon/webgl-nebula/`), hand-written **2D-canvas constellation** (`particles-network/`
++ `neon/particles-network/`), **GSAP** kinetic type + content micro-effects
+(`gsap-title/` + `neon/gsap-title/`, `gsap-micro/`; GSAP 3.13 free for commercial,
+vendored), `@property` spinning conic gradients, View Transitions.
 
 > Status: these effects are a **deliberate, per-deck menu** — NOT yet wired into
-> the default generation flow. `demos/qa-runs/nova-core/` shows all three 3D
-> techniques integrated into one re:Invent deck (with per-slide animated
-> backgrounds and an IntersectionObserver that runs each effect only on its slide).
+> the default generation flow. `demos/qa-runs/nova-core/` shows the 3D techniques
+> integrated into one re:Invent deck (with per-slide animated backgrounds and an
+> IntersectionObserver that runs each effect only on its slide). The Neon Cyber
+> preview (`preview/01-neon-cyber.html`) showcases the cyan WebGL nebula +
+> constellation inline.
 
 Licensing red-lines are documented (Spline export = paid, Shadertoy = CC BY-NC-SA,
 LYGIA = paid, etc.); always-safe: Three.js, GSAP, tsParticles, lottie-web, Lucide,
@@ -121,14 +131,14 @@ agent per ~5-slide batch, concatenated), single-agent for 1–7.
 | File | Purpose |
 |------|---------|
 | `SKILL.md` | the workflow / entry point |
-| `STYLE_PRESETS.md` | 13 presets: colors, fonts, signature elements |
+| `STYLE_PRESETS.md` | 2 specialty presets: colors, fonts, signature elements |
 | `viewport-base.css` | mandatory responsive CSS (copied into every deck) |
 | `html-template.md` | HTML architecture, JS features, editing/overview/lightbox code |
 | `animation-patterns.md` | CSS/JS animation snippets per feeling |
 | `chart-reference.md` | Chart.js patterns + theme palettes |
 | `diagram-reference.md` | draw.io patterns, theme-match, PNG embed, fallbacks |
 | `layout-reinvent.md` | re:Invent Keynote layout patterns (CSS + HTML) |
-| `effects-reference.md` | 3D/motion technique catalog + licensing + demo index |
+| `effects-reference.md` | palette-agnostic 3D/motion catalog + token sets + licensing + demo index |
 | `scripts/extract-pptx.py` | PPT → content extraction |
 | `scripts/gen-content.py` | generate `content.md` template by page count |
 | `preview/` | pre-built style preview HTML files |
@@ -136,6 +146,9 @@ agent per ~5-slide batch, concatenated), single-agent for 1–7.
 ## 9. Demos & QA decks (this repo, `demos/`)
 
 - **Effect demos** — one per technique (above), each offline + self-contained.
+  Purple (re:Invent) demos at `demos/*`; cyan (Neon Cyber) variants of the four
+  portable techniques at `demos/neon/*` (Three.js, CSS-3D, and the combined deck
+  stay purple-only).
 - **`demos/qa-runs/`** — full decks built end-to-end to QA skill features:
   - `genai-economics/` — Chart.js (line/doughnut/bar) + themed table
   - `serverless-arch/` — real drawio diagram pipeline (AWS arch + flowchart)

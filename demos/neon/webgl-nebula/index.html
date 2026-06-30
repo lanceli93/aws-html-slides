@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neon Cyber — WebGL Nebula Cover</title>
+<style>
+  /* ============================================================
+     SELF-CONTAINED, OFFLINE, ZERO-DEPENDENCY styles.
+     All fonts are system stacks so nothing is fetched at runtime.
+     ============================================================ */
+  :root {
+    --neon-cyan:    #00ffcc;
+    --neon-magenta: #ff00aa;
+    --neon-blue:    #00aaff;
+    --bg-deep:      #0a0f1c;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0f1c; /* matches the shader's deep navy so any gap is invisible */
+  }
+
+  /* The CSS radial-gradient fallback. It sits BEHIND the canvas.
+     If WebGL fails to init we add .no-webgl to <body>, which keeps this
+     visible (the canvas would otherwise be transparent / blank). It also
+     guarantees we never show a pure-blank screen even for a frame. */
+  body {
+    /* Neon Cyber dark gradient. Mirrors the shader: one soft nebula mass
+       biased to the RIGHT, with the left (headline) side and the corners left
+       deep-navy. Keeps the fallback close to the live look. */
+    background:
+      radial-gradient(ellipse 55% 60% at 72% 42%, rgba(0, 255, 204, 0.42), transparent 62%),
+      radial-gradient(ellipse 40% 45% at 80% 58%, rgba(255, 0, 170, 0.34), transparent 60%),
+      radial-gradient(ellipse 60% 50% at 64% 64%, rgba(0, 170, 255, 0.22), transparent 66%),
+      #0a0f1c;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 Helvetica, Arial, sans-serif;
+  }
+
+  /* The WebGL canvas fills the viewport. alpha:false means it is opaque,
+     so when WebGL works it fully covers the CSS fallback above. */
+  #gl {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 0;
+  }
+  /* When WebGL is unavailable we hide the canvas so the CSS gradient shows. */
+  body.no-webgl #gl { display: none; }
+
+  /* ---------------- Slide-cover title overlay ---------------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 8vw;
+    pointer-events: none; /* let mouse-drag reach the canvas for the warp nudge */
+    user-select: none;
+  }
+
+  /* Subtle dark scrim behind the text block so the headline stays legible
+     over the brightest nebula regions, without flattening the whole scene. */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 70% 80% at 20% 50%,
+      rgba(10, 15, 28, 0.55) 0%,
+      rgba(10, 15, 28, 0.25) 45%,
+      transparent 75%
+    );
+    z-index: -1;
+  }
+
+  .eyebrow {
+    font-size: clamp(11px, 1.4vw, 16px);
+    letter-spacing: 0.42em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.78);
+    margin-bottom: 1.1rem;
+    text-shadow: 0 1px 18px rgba(0, 0, 0, 0.6);
+  }
+  .eyebrow .tick {
+    color: var(--neon-magenta);
+  }
+
+  h1 {
+    font-size: clamp(38px, 7vw, 104px);
+    line-height: 1.02;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    /* gradient headline across the Neon Cyber palette */
+    background: linear-gradient(
+      100deg,
+      #ffffff 0%,
+      #c9fff4 28%,
+      var(--neon-magenta) 62%,
+      var(--neon-blue) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    max-width: 18ch;
+    filter: drop-shadow(0 4px 30px rgba(0, 255, 204, 0.25));
+  }
+
+  .subtitle {
+    margin-top: 1.4rem;
+    font-size: clamp(14px, 1.9vw, 22px);
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.72);
+    max-width: 46ch;
+    line-height: 1.5;
+    text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 26px;
+    left: 8vw;
+    z-index: 1;
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.40);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <!-- WebGL target. Opaque (alpha:false) so it covers the CSS fallback. -->
+  <canvas id="gl"></canvas>
+
+  <!-- Slide-cover presentation overlay -->
+  <div class="overlay">
+    <div class="scrim"></div>
+    <div class="eyebrow">NEON<span class="tick">:</span>CYBER</div>
+    <h1>Powered by the Cloud</h1>
+    <p class="subtitle">
+      Reimagining what's possible — generative AI, serverless, and the
+      infrastructure powering the next generation of builders.
+    </p>
+  </div>
+  <div class="hint">Drag or move your mouse to shift the nebula</div>
+
+<script>
+"use strict";
+(function () {
+  // =====================================================================
+  //  Neon Cyber — WebGL1 Nebula / Aurora background
+  //  Single file, zero dependencies, works from file://.
+  //  Strategy notes are inline; the shader and the throttle / context-loss
+  //  logic are heavily commented because this file is a skill reference.
+  // =====================================================================
+
+  var canvas = document.getElementById("gl");
+
+  // --- Reduced-motion preference: if set, we render exactly ONE frame
+  //     and never start the animation loop. Checked once at startup. ---
+  var reduceMotion =
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Cap device pixel ratio. High-DPI displays would otherwise render the
+  // fragment-heavy shader at huge resolutions, hammering the GPU/battery.
+  var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
+
+  // Throttle target. The nebula drifts slowly, so 30fps is imperceptible
+  // versus 60fps but roughly halves GPU work and power draw.
+  var FPS = 30;
+  var FRAME_MS = 1000 / FPS;
+
+  // ------------------------------------------------------------------
+  //  GLSL SOURCE — kept on the CPU side as strings so we can REBUILD all
+  //  GL resources after a context-loss/restore without re-fetching anything.
+  // ------------------------------------------------------------------
+
+  // Vertex shader: draws a single full-screen triangle. We pass clip-space
+  // positions directly from an attribute buffer (no gl_VertexID — that is
+  // WebGL2-only). Three verts that over-cover the screen avoid a diagonal
+  // seam and are cheaper than a 2-triangle quad.
+  var VERT_SRC = [
+    "attribute vec2 a_pos;",
+    "void main() {",
+    "  gl_Position = vec4(a_pos, 0.0, 1.0);",
+    "}"
+  ].join("\n");
+
+  // Fragment shader: the nebula. Built from Ashima/Gustavson 2D simplex
+  // noise -> domain-warped fbm -> Neon Cyber palette + vignette + glow.
+  var FRAG_SRC = [
+    "precision highp float;",
+    "",
+    "uniform vec2  u_res;    // canvas resolution in pixels",
+    "uniform float u_time;   // seconds since start (slow drift)",
+    "uniform vec2  u_mouse;  // normalized mouse pos (0..1), nudges the warp",
+    "",
+    "// =================================================================",
+    "//  Description : Array- and textureless GLSL 2D simplex noise.",
+    "//       Author : Ian McEwan, Ashima Arts.",
+    "//   Maintainer : stegu",
+    "//      Lastmod : 2011-08-22",
+    "//      License : Copyright (C) 2011 Ashima Arts. All rights reserved.",
+    "//                Distributed under the MIT License. See LICENSE file.",
+    "//                https://github.com/ashima/webgl-noise",
+    "//                https://github.com/stegu/webgl-noise",
+    "//",
+    "//  Permission is hereby granted, free of charge, to any person obtaining a",
+    "//  copy of this software and associated documentation files (the 'Software'),",
+    "//  to deal in the Software without restriction, including without limitation",
+    "//  the rights to use, copy, modify, merge, publish, distribute, sublicense,",
+    "//  and/or sell copies of the Software, and to permit persons to whom the",
+    "//  Software is furnished to do so, subject to the following conditions:",
+    "//  The above copyright notice and this permission notice shall be included",
+    "//  in all copies or substantial portions of the Software.",
+    "// =================================================================",
+    "vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }",
+    "vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }",
+    "vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }",
+    "",
+    "float snoise(vec2 v) {",
+    "  const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0",
+    "                      0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)",
+    "                     -0.577350269189626,  // -1.0 + 2.0 * C.x",
+    "                      0.024390243902439); // 1.0 / 41.0",
+    "  // First corner",
+    "  vec2 i  = floor(v + dot(v, C.yy));",
+    "  vec2 x0 = v -   i + dot(i, C.xx);",
+    "  // Other corners",
+    "  vec2 i1;",
+    "  i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);",
+    "  vec4 x12 = x0.xyxy + C.xxzz;",
+    "  x12.xy -= i1;",
+    "  // Permutations",
+    "  i = mod289(i);",
+    "  vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 ))",
+    "                          + i.x + vec3(0.0, i1.x, 1.0 ));",
+    "  vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),",
+    "                          dot(x12.zw,x12.zw)), 0.0);",
+    "  m = m*m; m = m*m;",
+    "  // Gradients: 41 points uniformly over a line, mapped onto a diamond.",
+    "  vec3 x = 2.0 * fract(p * C.www) - 1.0;",
+    "  vec3 h = abs(x) - 0.5;",
+    "  vec3 ox = floor(x + 0.5);",
+    "  vec3 a0 = x - ox;",
+    "  // Normalise gradients implicitly by scaling m",
+    "  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);",
+    "  // Compute final noise value at P",
+    "  vec3 g;",
+    "  g.x  = a0.x  * x0.x  + h.x  * x0.y;",
+    "  g.yz = a0.yz * x12.xz + h.yz * x12.yw;",
+    "  return 130.0 * dot(m, g);",
+    "}",
+    "",
+    "// Fractional Brownian motion: sum a fixed number of noise octaves.",
+    "// The loop bound MUST be a compile-time constant for WebGL1 -> const int.",
+    "float fbm(vec2 p) {",
+    "  float value = 0.0;",
+    "  float amp = 0.5;",
+    "  float freq = 1.0;",
+    "  // 4 octaves (was 5). Dropping the finest octave removes the hair-thin",
+    "  // ridges that made the field read as 'cracked glass' rather than gas.",
+    "  const int OCTAVES = 4;",
+    "  for (int i = 0; i < OCTAVES; i++) {",
+    "    value += amp * snoise(p * freq);",
+    "    freq *= 1.9;",   // slightly < 2 lacunarity -> smoother octave blend
+    "    amp  *= 0.52;",
+    "  }",
+    "  return value;",
+    "}",
+    "",
+    "void main() {",
+    "  // Aspect-correct UVs centered around 0.",
+    "  vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;",
+    "",
+    "  // Slow time. Kept tiny so the drift is calm and keynote-appropriate.",
+    "  float t = u_time * 0.04;",
+    "",
+    "  // Mouse nudge: shift the sampling domain a little based on cursor.",
+    "  // (0,0) at startup -> no shift, so it is a no-op until the user moves.",
+    "  vec2 mouseShift = (u_mouse - 0.5) * 0.4;",
+    "",
+    "  // Low base frequency -> large, soft flowing forms (not high-freq marble).",
+    "  vec2 p = uv * 0.7 + mouseShift;",
+    "",
+    "  // ---- Domain warping (single, gentle layer) ----",
+    "  // q warps the base coordinates ONCE. The earlier version warped twice with",
+    "  // high gain, which produces tight closed-loop vortices = the 'liquid marble'",
+    "  // curl. A single low-gain warp keeps broad, drifting, gaseous streaks.",
+    "  vec2 q = vec2(",
+    "    fbm(p + vec2(0.0, 0.0) + t),",
+    "    fbm(p + vec2(5.2, 1.3) - t * 0.75)",
+    "  );",
+    "  float f = fbm(p + 0.9 * q);",
+    "",
+    "  // Remap the fbm result to a 0..1 cloud value. Softer gain (0.45) keeps the",
+    "  // mid-tones gentle so the cloud reads as diffuse gas, not sharp veins.",
+    "  float cloud = clamp(f * 0.45 + 0.5, 0.0, 1.0);",
+    "",
+    "  // ---- Spatial concentration mask ----",
+    "  // The single biggest fix vs the old 'liquid marble' look: instead of",
+    "  // lighting every pixel, confine the nebula to a soft elliptical mass",
+    "  // biased RIGHT-of-center (the headline sits on the left, so this keeps",
+    "  // the text side and all four corners deep black). The cloud noise also",
+    "  // multiplies in, so the mass edge stays organic, not a clean ellipse.",
+    "  vec2 c = vec2(0.5, 0.0);                         // nebula centre (right side)",
+    "  float rad = length((uv - c) * vec2(0.58, 1.05)); // squashed -> wide, low oval",
+    "  float mass = smoothstep(1.05, 0.08, rad);        // 1 at centre -> 0 at edge",
+    "",
+    "  // Apply the mask, THEN soft-threshold so thin cloud fades to pure black.",
+    "  // This is what creates the negative space the old version lacked. The wide",
+    "  // smoothstep band (0.18..0.98) keeps the falloff gradual = soft gas edges.",
+    "  float density = cloud * mass;",
+    "  density = smoothstep(0.18, 0.98, density);",
+    "  density = pow(density, 1.35);",
+    "",
+    "  // ---- Neon Cyber palette ----",
+    "  // Grade from deep navy, into cyan, magenta, then blue highlights.",
+    "  vec3 cDeep    = vec3(0.039, 0.059, 0.110);  // #0a0f1c deep navy",
+    "  vec3 cCyan    = vec3(0.000, 1.000, 0.800);  // #00ffcc",
+    "  vec3 cMagenta = vec3(1.000, 0.000, 0.667);  // #ff00aa",
+    "  vec3 cBlue    = vec3(0.000, 0.667, 1.000);  // #00aaff",
+    "",
+    "  // Use the warp field to vary hue across the mass so it is not a uniform",
+    "  // wash. Bias the mix toward cyan (the 0.35 floor) so the nebula stays",
+    "  // on-brand cyan-dominant rather than drifting cold blue; blue only at the fringes.",
+    "  float hueMix = clamp(0.35 + 0.45 * (q.x - q.y), 0.0, 1.0);",
+    "  vec3 base = mix(cCyan, cBlue, hueMix);",
+    "",
+    "  // Start from deep navy and only paint where density is real (>~0.18),",
+    "  // so the bulk of the frame keeps the #0a0f1c base.",
+    "  vec3 col = cDeep;",
+    "  col = mix(col, base, smoothstep(0.18, 0.82, density));",
+    "  // Magenta blooms across the upper-mid densities -> warm core, not just tips.",
+    "  col = mix(col, cMagenta, smoothstep(0.62, 1.0, density) * 0.55);",
+    "",
+    "  // ---- Soft additive glow in the bright regions ----",
+    "  float glow = smoothstep(0.45, 1.0, density);",
+    "  col += base * glow * 0.45;",
+    "  col += cMagenta * pow(glow, 2.4) * 0.30;",
+    "",
+    "  // ---- Vignette ---- darken the edges for a premium framed look.",
+    "  vec2 vpos = gl_FragCoord.xy / u_res; // 0..1",
+    "  float vig = smoothstep(1.2, 0.4, length(vpos - 0.5));",
+    "  col *= mix(0.5, 1.0, vig);",
+    "",
+    "  // Gentle filmic-ish tone curve + tiny lift so blacks aren't dead flat.",
+    "  col = col / (col + vec3(0.85));",
+    "  col = pow(col, vec3(0.88));",
+    "  col += vec3(0.010, 0.005, 0.018);",
+    "",
+    "  gl_FragColor = vec4(col, 1.0);",
+    "}"
+  ].join("\n");
+
+  // ------------------------------------------------------------------
+  //  GL state. These are (re)created in initGL() and torn down on loss.
+  // ------------------------------------------------------------------
+  var gl = null;
+  var program = null;
+  var buffer = null;
+  var u_res = null, u_time = null, u_mouse = null;
+  var rafId = 0;          // requestAnimationFrame handle (0 = not scheduled)
+  var running = false;    // is the loop currently active?
+  var startTime = 0;      // performance.now() baseline for u_time
+  var lastDraw = 0;       // last frame timestamp (for the FPS throttle)
+
+  // Mouse target + smoothed value (we lerp toward the target each frame so
+  // the warp nudge eases rather than snapping). Default 0.5,0.5 = centered.
+  var mouseTarget = { x: 0.5, y: 0.5 };
+  var mouseSmooth = { x: 0.5, y: 0.5 };
+
+  // ---- Shader compile / link helpers ----
+  function compile(type, src) {
+    var sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      // Surface the error to the console; caller treats null as failure.
+      console.error("Shader compile error:\n" + gl.getShaderInfoLog(sh));
+      gl.deleteShader(sh);
+      return null;
+    }
+    return sh;
+  }
+
+  function buildProgram() {
+    var vs = compile(gl.VERTEX_SHADER, VERT_SRC);
+    var fs = compile(gl.FRAGMENT_SHADER, FRAG_SRC);
+    if (!vs || !fs) return null;
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error("Program link error:\n" + gl.getProgramInfoLog(prog));
+      return null;
+    }
+    return prog;
+  }
+
+  // Create the GL context and all resources. Returns true on success.
+  // Called at startup AND on context-restore.
+  function initGL() {
+    var opts = {
+      antialias: false,
+      alpha: false,            // opaque -> covers the CSS fallback
+      depth: false,
+      stencil: false,
+      powerPreference: "low-power"
+    };
+    gl = canvas.getContext("webgl", opts) ||
+         canvas.getContext("experimental-webgl", opts);
+    if (!gl) return false;
+
+    program = buildProgram();
+    if (!program) return false;
+
+    // Full-screen triangle in clip space. The triangle is larger than the
+    // [-1,1] viewport so it fully covers it; the off-screen part is clipped.
+    var verts = new Float32Array([
+      -1.0, -1.0,
+       3.0, -1.0,
+      -1.0,  3.0
+    ]);
+    buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+    var loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    gl.useProgram(program);
+    u_res = gl.getUniformLocation(program, "u_res");
+    u_time = gl.getUniformLocation(program, "u_time");
+    u_mouse = gl.getUniformLocation(program, "u_mouse");
+
+    resize(); // size the drawing buffer to the viewport
+    return true;
+  }
+
+  // Match the canvas backing store to the viewport * capped DPR.
+  function resize() {
+    var w = Math.floor(window.innerWidth * DPR);
+    var h = Math.floor(window.innerHeight * DPR);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    if (gl) {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  // Render a single frame at time `nowMs`.
+  function drawFrame(nowMs) {
+    if (!gl || !program) return;
+    var elapsed = (nowMs - startTime) / 1000.0;
+
+    // Ease the mouse-driven warp toward its target.
+    mouseSmooth.x += (mouseTarget.x - mouseSmooth.x) * 0.08;
+    mouseSmooth.y += (mouseTarget.y - mouseSmooth.y) * 0.08;
+
+    gl.useProgram(program);
+    gl.uniform2f(u_res, canvas.width, canvas.height);
+    gl.uniform1f(u_time, elapsed);
+    gl.uniform2f(u_mouse, mouseSmooth.x, mouseSmooth.y);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  // ---- The throttled animation loop ----
+  // We request frames at the display rate but only DRAW when at least
+  // FRAME_MS has elapsed since the last draw. This pins us to ~30fps while
+  // letting rAF naturally pause when the tab is hidden.
+  function loop(nowMs) {
+    if (!running) return;
+    rafId = requestAnimationFrame(loop);
+    if (nowMs - lastDraw >= FRAME_MS) {
+      // Keep lastDraw aligned to the cadence (minus drift) for smoothness.
+      lastDraw = nowMs - ((nowMs - lastDraw) % FRAME_MS);
+      drawFrame(nowMs);
+    }
+  }
+
+  function start() {
+    if (running || reduceMotion) return;
+    running = true;
+    lastDraw = 0;
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function stop() {
+    running = false;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  //  Event wiring
+  // ------------------------------------------------------------------
+
+  // Resize: keep the buffer matched to the viewport. If reduced-motion,
+  // redraw the single static frame at the new size.
+  window.addEventListener("resize", function () {
+    resize();
+    if (reduceMotion && gl) drawFrame(performance.now());
+  });
+
+  // Visibility: pause the loop entirely when the tab/window is hidden,
+  // resume when it comes back. Saves GPU/battery and avoids backlog.
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      stop();
+    } else if (!reduceMotion) {
+      // Reset the clock baseline so we don't jump forward after a long hide.
+      startTime = performance.now() - (lastDraw ? 0 : 0);
+      start();
+    }
+  });
+
+  // Mouse / drag -> normalized 0..1 position fed into u_mouse. pointer-events
+  // on the overlay are disabled so these reach the window even over the text.
+  function updateMouse(clientX, clientY) {
+    mouseTarget.x = clientX / window.innerWidth;
+    // flip Y so "up" on screen maps to higher value (matches gl_FragCoord)
+    mouseTarget.y = 1.0 - clientY / window.innerHeight;
+  }
+  window.addEventListener("mousemove", function (e) {
+    updateMouse(e.clientX, e.clientY);
+  });
+  window.addEventListener("touchmove", function (e) {
+    if (e.touches && e.touches.length) {
+      updateMouse(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: true });
+
+  // ---- WebGL context loss / restore ----
+  // On loss: prevent default (so the browser will fire 'restored'), stop the
+  // loop, and drop our handles. We keep the GLSL source on the CPU side so we
+  // can rebuild everything cleanly on restore.
+  canvas.addEventListener("webglcontextlost", function (e) {
+    e.preventDefault();
+    stop();
+    program = null;
+    buffer = null;
+  }, false);
+
+  canvas.addEventListener("webglcontextrestored", function () {
+    if (initGL()) {
+      if (reduceMotion) {
+        startTime = performance.now();
+        drawFrame(performance.now());
+      } else {
+        startTime = performance.now();
+        start();
+      }
+    }
+  }, false);
+
+  // ------------------------------------------------------------------
+  //  Boot
+  // ------------------------------------------------------------------
+  if (!initGL()) {
+    // No WebGL (or shader failed): reveal the CSS radial-gradient fallback.
+    document.body.classList.add("no-webgl");
+    return;
+  }
+
+  startTime = performance.now();
+  if (reduceMotion) {
+    // Render exactly one static frame; no loop is ever started.
+    drawFrame(performance.now());
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>

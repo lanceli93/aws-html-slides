@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **Zero Dependencies** — Single HTML files with inline CSS/JS. No npm, no build tools, no frameworks.
 - **Visual Style Discovery** — Browse 2 curated specialty styles (Neon Cyber, re:Invent Keynote) and pick by preview.
 - **Rich Layouts** — re:Invent Keynote ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, and more) so long decks never look monotonous.
-- **Experimental 3D & Motion Effects** — Optional, self-contained, offline effects for re:Invent Keynote: real Three.js WebGL, CSS 3D, pointer-driven tilt, shader backgrounds, and GSAP kinetic type. See [3D & Motion Effects](#3d--motion-effects-experimental) below.
+- **Experimental 3D & Motion Effects** — Optional, self-contained, offline effects for **both specialty styles**: CSS 3D, pointer-driven tilt, WebGL shader backgrounds, GSAP kinetic type (plus Three.js for re:Invent). Each ships in a re:Invent purple tint and, for four of them, a Neon Cyber cyan tint. See [3D & Motion Effects](#3d--motion-effects-experimental) below.
 - **PPT Conversion** — Convert existing `.pptx` files to web presentations, preserving images, text, and notes.
 - **Anti-AI-Slop** — Distinctive styles that avoid generic AI aesthetics. Custom fonts, curated palettes, purposeful animations.
 - **Chart.js Support** — Embed responsive charts (line, bar, doughnut, pie, radar, polar) directly in slides using simple markdown syntax — auto-themed to match your chosen style.
@@ -126,29 +126,30 @@ my-presentation/
 
 | # | Style | Vibe | Theme |
 |---|-------|------|-------|
-| 1 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
+| 1 | Neon Cyber | Futuristic, techy, neon glow, 3D-ready | Specialty |
 | 2 | re:Invent Keynote | Futuristic, keynote-stage, high-tech, 3D-ready | Specialty |
 
-**Neon Cyber** — black-and-neon aesthetic with cyan/magenta glow, scanlines, and grid. Best for technical, futuristic, or product-launch topics that want energy.
+**Neon Cyber** — black-and-neon aesthetic with cyan/magenta glow, scanlines, and grid. Best for technical, futuristic, or product-launch topics that want energy. Now supports the optional 3D/motion effects below in a cyan/magenta tint ([`demos/neon/`](demos/neon/)).
 
-**re:Invent Keynote** — the most developed style, modeled on AWS keynote stages. Ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, process flows, timelines, big-number slides) so long decks never look monotonous, and it's the style wired for the optional 3D/motion effects below.
+**re:Invent Keynote** — the most developed style, modeled on AWS keynote stages. Ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, process flows, timelines, big-number slides) so long decks never look monotonous, and it supports the optional 3D/motion effects below in its purple/pink tint.
 
 ## 3D & Motion Effects (Experimental)
 
-Optional, **fully offline and self-contained** ways to add depth and motion to a re:Invent Keynote deck — no CDN at runtime, libraries vendored locally. These are a deliberate, per-deck menu rather than the default flow; the lightweight CSS animated-blob cover stays the default. The reference and its licensing red-lines live in [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md), and each technique ships a working demo under [`demos/`](demos/):
+Optional, **fully offline and self-contained** ways to add depth and motion to **either specialty style** — no CDN at runtime, libraries vendored locally. These are a deliberate, per-deck menu rather than the default flow; the lightweight CSS default stays the baseline. The palette-agnostic reference and its licensing red-lines live in [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md). Each technique ships a working demo in the **re:Invent purple** tint under [`demos/`](demos/); four of them also ship a **Neon Cyber cyan** tint under [`demos/neon/`](demos/neon/):
 
-| Technique | What it gives you | Demo |
-|-----------|-------------------|------|
-| **Three.js (real WebGL)** | Genuine 3D hero — emissive morphing core, fresnel rim, orbiting lights, particle cloud, inline bloom | [`demos/threejs-hero/`](demos/threejs-hero/) |
-| **CSS 3D** | Pure-CSS rotating geometry + 2.5D parallax via `preserve-3d` / `perspective` — no JS library | [`demos/css-3d-hero/`](demos/css-3d-hero/) |
-| **Pointer tilt** | Cards that tilt toward the cursor with layered `translateZ` depth and a specular sheen | [`demos/pointer-tilt/`](demos/pointer-tilt/) |
-| **WebGL shader background** | Hand-written animated nebula shader behind the slide | [`demos/webgl-nebula/`](demos/webgl-nebula/) |
-| **2D-canvas particles** | Lightweight constellation/network background, no WebGL | [`demos/particles-network/`](demos/particles-network/) |
-| **GSAP kinetic type & micro-motion** | Orchestrated title reveals and content micro-effects (GSAP 3.13, vendored) | [`demos/gsap-title/`](demos/gsap-title/), [`demos/gsap-micro/`](demos/gsap-micro/) |
+| Technique | What it gives you | Purple demo | Neon demo |
+|-----------|-------------------|-------------|-----------|
+| **WebGL shader background** | Hand-written animated nebula shader behind the slide | [`demos/webgl-nebula/`](demos/webgl-nebula/) | [`demos/neon/webgl-nebula/`](demos/neon/webgl-nebula/) |
+| **2D-canvas particles** | Lightweight constellation/network background, no WebGL | [`demos/particles-network/`](demos/particles-network/) | [`demos/neon/particles-network/`](demos/neon/particles-network/) |
+| **Pointer tilt** | Cards that tilt toward the cursor with layered `translateZ` depth and a specular sheen | [`demos/pointer-tilt/`](demos/pointer-tilt/) | [`demos/neon/pointer-tilt/`](demos/neon/pointer-tilt/) |
+| **GSAP kinetic type** | Orchestrated title reveals (GSAP 3.13, vendored) | [`demos/gsap-title/`](demos/gsap-title/) | [`demos/neon/gsap-title/`](demos/neon/gsap-title/) |
+| **CSS 3D** | Pure-CSS rotating geometry + 2.5D parallax via `preserve-3d` / `perspective` — no JS library | [`demos/css-3d-hero/`](demos/css-3d-hero/) | — (re-tint) |
+| **GSAP micro-motion** | Content micro-effects: number count-up, text scramble, SVG path-draw | [`demos/gsap-micro/`](demos/gsap-micro/) | — (re-tint) |
+| **Three.js (real WebGL)** | Genuine 3D hero — emissive morphing core, fresnel rim, orbiting lights, inline bloom | [`demos/threejs-hero/`](demos/threejs-hero/) | — (purple only) |
 
-[`demos/qa-runs/nova-core/`](demos/qa-runs/nova-core/) shows all three 3D techniques integrated into one deck, with per-slide animated backgrounds and an `IntersectionObserver` that runs each effect only while its slide is on screen.
+[`demos/qa-runs/nova-core/`](demos/qa-runs/nova-core/) shows the 3D techniques integrated into one re:Invent deck, with per-slide animated backgrounds and an `IntersectionObserver` that runs each effect only while its slide is on screen.
 
-> **Status:** these effects are not yet auto-wired into the default generation flow — you opt in per deck. Licensing is documented up front (always-safe: Three.js, GSAP, tsParticles, lottie-web, Lucide; avoid Spline/Shadertoy/LYGIA for commercial use).
+> **Status:** these effects are not yet auto-wired into the default generation flow — you opt in per deck. The Neon Cyber set excludes Three.js by design (the CSS/WebGL/GSAP effects carry the look at a fraction of the weight). Licensing is documented up front (always-safe: Three.js, GSAP, tsParticles, lottie-web, Lucide; avoid Spline/Shadertoy/LYGIA for commercial use).
 
 ## Requirements
 
@@ -187,7 +188,7 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **零依赖** —— 单个 HTML 文件，内联所有 CSS/JS。无需 npm、构建工具或框架。
 - **视觉化风格发现** —— 浏览 2 种精选特色风格（Neon Cyber、re:Invent Keynote），通过预览选择。
 - **丰富排版** —— re:Invent Keynote 内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏等），长篇幻灯片不再单调。
-- **实验性 3D 与动效** —— re:Invent Keynote 可选用自包含、离线可用的特效：真实 Three.js WebGL、CSS 3D、跟随鼠标的倾斜、shader 背景、GSAP 动态文字。详见下方 [3D 与动效](#3d-与动效实验性)。
+- **实验性 3D 与动效** —— **两种特色风格**均可选用自包含、离线可用的特效：CSS 3D、跟随鼠标的倾斜、WebGL shader 背景、GSAP 动态文字（re:Invent 另含真实 Three.js）。每种特效都提供 re:Invent 紫色配色版本，其中四种还提供 Neon Cyber 青色配色版本。详见下方 [3D 与动效](#3d-与动效实验性)。
 - **PPT 转换** —— 将已有的 `.pptx` 文件转换为网页演示文稿，保留图片、文字和备注。
 - **拒绝 AI 味** —— 独特的设计风格，避免千篇一律的 AI 审美。定制字体、精选配色、有目的的动画。
 - **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表（折线、柱状、环形、饼图、雷达、极坐标），并自动套用所选风格的配色。
@@ -286,29 +287,30 @@ my-presentation/
 
 | # | 风格 | 氛围 | 主题 |
 |---|------|------|------|
-| 1 | Neon Cyber | 未来感、科技、霓虹光效 | 特色 |
+| 1 | Neon Cyber | 未来感、科技、霓虹光效、支持 3D | 特色 |
 | 2 | re:Invent Keynote | 未来感、主题演讲、高科技、支持 3D | 特色 |
 
-**Neon Cyber** —— 黑底霓虹美学，青/品红辉光、扫描线和网格背景。适合技术、未来感或产品发布类、想要冲击力的主题。
+**Neon Cyber** —— 黑底霓虹美学，青/品红辉光、扫描线和网格背景。适合技术、未来感或产品发布类、想要冲击力的主题。现也支持下方可选的 3D/动效（青/品红配色版，见 [`demos/neon/`](demos/neon/)）。
 
-**re:Invent Keynote** —— 最完善的风格，仿照 AWS 主题演讲舞台。内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏、流程图、时间线、大数字页），长篇幻灯片不再单调；下方可选的 3D/动效也是为这个风格接入的。
+**re:Invent Keynote** —— 最完善的风格，仿照 AWS 主题演讲舞台。内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏、流程图、时间线、大数字页），长篇幻灯片不再单调；同样支持下方可选的 3D/动效（紫/粉配色版）。
 
 ## 3D 与动效（实验性）
 
-为 re:Invent Keynote 增加纵深与动感的可选方案，**完全离线、自包含** —— 运行时不依赖 CDN，所有库都本地内置。这些是按需逐个 deck 选用的菜单，而非默认流程；轻量的 CSS 流体动画封面仍是默认。参考与授权红线见 [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md)，每种技术在 [`demos/`](demos/) 下都有可运行的示例：
+为**两种特色风格**增加纵深与动感的可选方案，**完全离线、自包含** —— 运行时不依赖 CDN，所有库都本地内置。这些是按需逐个 deck 选用的菜单，而非默认流程；轻量的 CSS 默认效果仍是基线。配色无关的参考与授权红线见 [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md)。每种技术在 [`demos/`](demos/) 下都有 **re:Invent 紫色**版本示例，其中四种另在 [`demos/neon/`](demos/neon/) 下提供 **Neon Cyber 青色**版本：
 
-| 技术 | 效果 | 示例 |
-|------|------|------|
-| **Three.js（真实 WebGL）** | 真正的 3D 主视觉 —— 自发光形变核心、菲涅尔边缘光、环绕光源、粒子云、内联泛光 | [`demos/threejs-hero/`](demos/threejs-hero/) |
-| **CSS 3D** | 纯 CSS 旋转几何体 + 通过 `preserve-3d` / `perspective` 实现的 2.5D 视差，无需 JS 库 | [`demos/css-3d-hero/`](demos/css-3d-hero/) |
-| **鼠标倾斜** | 卡片随鼠标倾斜，配合 `translateZ` 分层纵深与高光扫光 | [`demos/pointer-tilt/`](demos/pointer-tilt/) |
-| **WebGL shader 背景** | 手写的星云动画 shader 作为幻灯片背景 | [`demos/webgl-nebula/`](demos/webgl-nebula/) |
-| **2D Canvas 粒子** | 轻量的星座/网络背景，无需 WebGL | [`demos/particles-network/`](demos/particles-network/) |
-| **GSAP 动态文字与微动效** | 编排式标题入场与内容微动效（内置 GSAP 3.13） | [`demos/gsap-title/`](demos/gsap-title/)、[`demos/gsap-micro/`](demos/gsap-micro/) |
+| 技术 | 效果 | 紫色示例 | 青色示例 |
+|------|------|----------|----------|
+| **WebGL shader 背景** | 手写的星云动画 shader 作为幻灯片背景 | [`demos/webgl-nebula/`](demos/webgl-nebula/) | [`demos/neon/webgl-nebula/`](demos/neon/webgl-nebula/) |
+| **2D Canvas 粒子** | 轻量的星座/网络背景，无需 WebGL | [`demos/particles-network/`](demos/particles-network/) | [`demos/neon/particles-network/`](demos/neon/particles-network/) |
+| **鼠标倾斜** | 卡片随鼠标倾斜，配合 `translateZ` 分层纵深与高光扫光 | [`demos/pointer-tilt/`](demos/pointer-tilt/) | [`demos/neon/pointer-tilt/`](demos/neon/pointer-tilt/) |
+| **GSAP 动态文字** | 编排式标题入场（内置 GSAP 3.13） | [`demos/gsap-title/`](demos/gsap-title/) | [`demos/neon/gsap-title/`](demos/neon/gsap-title/) |
+| **CSS 3D** | 纯 CSS 旋转几何体 + 通过 `preserve-3d` / `perspective` 实现的 2.5D 视差，无需 JS 库 | [`demos/css-3d-hero/`](demos/css-3d-hero/) | —（自行改色） |
+| **GSAP 微动效** | 内容微动效：数字滚动、文字解码、SVG 路径绘制 | [`demos/gsap-micro/`](demos/gsap-micro/) | —（自行改色） |
+| **Three.js（真实 WebGL）** | 真正的 3D 主视觉 —— 自发光形变核心、菲涅尔边缘光、环绕光源、内联泛光 | [`demos/threejs-hero/`](demos/threejs-hero/) | —（仅紫色） |
 
-[`demos/qa-runs/nova-core/`](demos/qa-runs/nova-core/) 演示了三种 3D 技术整合进同一个 deck，配合逐页动画背景，以及只在对应幻灯片可见时才运行特效的 `IntersectionObserver`。
+[`demos/qa-runs/nova-core/`](demos/qa-runs/nova-core/) 演示了多种 3D 技术整合进同一个 re:Invent deck，配合逐页动画背景，以及只在对应幻灯片可见时才运行特效的 `IntersectionObserver`。
 
-> **状态：** 这些特效尚未自动接入默认生成流程 —— 需逐个 deck 主动选用。授权情况已提前标注（始终安全：Three.js、GSAP、tsParticles、lottie-web、Lucide；商用请避开 Spline/Shadertoy/LYGIA）。
+> **状态：** 这些特效尚未自动接入默认生成流程 —— 需逐个 deck 主动选用。Neon Cyber 版按设计不含 Three.js（CSS/WebGL/GSAP 特效已能以极低体积撑起观感）。授权情况已提前标注（始终安全：Three.js、GSAP、tsParticles、lottie-web、Lucide；商用请避开 Spline/Shadertoy/LYGIA）。
 
 ## 环境要求
 

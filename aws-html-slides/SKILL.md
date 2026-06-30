@@ -159,7 +159,7 @@ Show the 2 available presets. Available presets are defined in [STYLE_PRESETS.md
 
 | # | Preset | Vibe | Theme |
 |---|--------|------|-------|
-| 1 | Neon Cyber | Futuristic, techy, neon glow | Specialty |
+| 1 | Neon Cyber | Futuristic, techy, neon glow, 3D-ready | Specialty |
 | 2 | re:Invent Keynote | Futuristic, keynote-stage, high-tech, 3D-ready | Specialty |
 
 **Open the preview directory in Finder** so the user can browse and double-click any style to preview it. The preview files are bundled inside the skill directory at `preview/` (relative to the skill base directory).
@@ -170,7 +170,7 @@ open <skill-base-dir>/preview/
 
 User picks a number (1-2) or says "Mix elements".
 
-> **3D & motion effects (optional, experimental):** re:Invent Keynote (#2) can be enriched with self-contained, offline 3D/motion effects — CSS 3D heroes, hand-written WebGL shader backgrounds, and GSAP-orchestrated titles. These are standalone demos + a reference, not part of the default flow — see [effects-reference.md](effects-reference.md) and the `demos/` directory. The CSS animated-blob cover remains the lightweight default.
+> **3D & motion effects (optional, experimental):** **Both specialty styles** can be enriched with self-contained, offline 3D/motion effects — CSS 3D heroes, hand-written WebGL shader backgrounds, and GSAP-orchestrated titles. Each technique ships in two palettes: re:Invent purple (`demos/`) and Neon Cyber cyan (`demos/neon/`). These are standalone demos + a reference, not part of the default flow — see [effects-reference.md](effects-reference.md) and the `demos/` directory. The lightweight CSS default (animated-blob cover for #2, particle/grid background for #1) remains the baseline.
 
 ### PPT Conversion — Extract + Generate (end of PPT path)
 
@@ -244,6 +244,7 @@ Generate the full presentation using content from Step 4 and style from Step 3.
 - **Layout patterns file for the chosen style** (if available) — CSS classes + HTML templates for rich layouts. These are extracted from preview files and contain the actual implementation details. Read the matching file:
   - Style #2 re:Invent Keynote → [layout-reinvent.md](layout-reinvent.md)
   - (Style #1 Neon Cyber: use STYLE_PRESETS.md + the preview file directly)
+- **[effects-reference.md](effects-reference.md)** (optional, either specialty style) — only when the user wants richer 3D/motion. The catalog is palette-agnostic; use the matching token set and demo dir: style #1 Neon → `demos/neon/`, style #2 re:Invent → `demos/`.
 
 **Layout rule: Never use plain left-aligned bullet lists.** Always use a layout pattern from the layout reference file (pill cards, feature grid, split divider, process flow, etc.). Match content type to the recommended layout in the "Layout Selection Guide" table.
 
@@ -327,7 +328,7 @@ After generation:
 | [chart-reference.md](chart-reference.md) | Chart.js integration patterns, theme color palettes, parsing rules | Step 5 (when charts used) |
 | [diagram-reference.md](diagram-reference.md) | draw.io diagram patterns (flowchart, AWS architecture, sequence/UML/ER, network, mindmap) via the drawio skill — parsing, theme-matching, PNG embedding, fallbacks | Step 5 (when `### diagram` blocks used) |
 | [layout-reinvent.md](layout-reinvent.md) | re:Invent Keynote layout patterns — CSS + HTML for all slide types | Step 5 (style #2) |
-| [effects-reference.md](effects-reference.md) | 3D & motion effects catalog (CSS 3D, WebGL shaders, GSAP, View Transitions) — license red-lines, offline rules, demos in `../demos/` | Optional (richer 3D/motion) |
+| [effects-reference.md](effects-reference.md) | 3D & motion effects catalog (CSS 3D, WebGL shaders, GSAP, View Transitions) — palette-agnostic; license red-lines, offline rules, demos in `../demos/` (purple) and `../demos/neon/` (cyan) | Optional (richer 3D/motion, either specialty style) |
 | [scripts/extract-pptx.py](scripts/extract-pptx.py) | Python script for PPT content extraction | Step 3 (PPT conversion) |
 | [scripts/gen-content.py](scripts/gen-content.py) | Generate content.md template by page count (no AI needed) | Step 3 (project setup) |
 | [preview/](preview/) | 2 pre-built style preview HTML files (bundled with skill) | Step 3 (style selection) |

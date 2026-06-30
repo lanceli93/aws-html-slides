@@ -20,9 +20,44 @@ is useless here.
 > offline with no conflict. The four single-effect demos (`webgl-nebula/`,
 > `gsap-title/`, `css-3d-hero/`) remain as focused, copy-paste references.
 
-The aesthetic target is the re:Invent Keynote look (style #2): near-black `#0A0A0A`,
-purple `#8B5CF6` / pink `#D946EF` / blue, glow, futuristic. See
-[STYLE_PRESETS.md](STYLE_PRESETS.md) and [layout-reinvent.md](layout-reinvent.md).
+**These effects serve both specialty styles.** The *techniques* are palette-agnostic
+— each ships in two tints, with a working demo per tint:
+
+- **re:Invent Keynote (style #2):** near-black `#0A0A0A`, purple `#8B5CF6` / pink
+  `#D946EF` / blue, Urbanist + Albert Sans. Demos in `../demos/`.
+- **Neon Cyber (style #1):** deep navy `#0a0f1c`, cyan `#00ffcc` / magenta `#ff00aa` /
+  blue `#00aaff`, Clash Display + Satoshi. Demos in `../demos/neon/`.
+
+Pick the token set for your chosen style (full table in **"Palette token sets"** below),
+then copy the matching demo. See [STYLE_PRESETS.md](STYLE_PRESETS.md) and
+[layout-reinvent.md](layout-reinvent.md).
+
+> **Coverage note:** four techniques have a Neon-Cyber variant under `../demos/neon/`
+> — WebGL nebula, constellation network, pointer tilt, and GSAP kinetic title. The
+> remaining demos (CSS 3D hero, GSAP micro-effects, the combined `all-effects` deck)
+> and **Three.js** exist in the re:Invent palette only; re-tint them per the token table
+> if you need them for a Neon deck. Three.js is intentionally not part of the Neon set.
+
+---
+
+## Palette token sets
+
+Every demo bypasses `:root` with hardcoded `rgba()`, JS color arrays, and GLSL `vec3`
+constants — so re-tinting a purple demo to Neon (or vice-versa) means changing all of
+them, not just the tokens. Use this map:
+
+| Role | re:Invent purple (`demos/`) | Neon Cyber cyan (`demos/neon/`) |
+|------|-----------------------------|----------------------------------|
+| Background | `#0A0A0A` / `#06030d` / `#07030f` | `#0a0f1c` |
+| Primary accent | purple `#8B5CF6` = `rgb(139,92,246)` | cyan `#00ffcc` = `rgb(0,255,204)` |
+| Secondary accent | pink `#D946EF` = `rgb(217,70,239)` | magenta `#ff00aa` = `rgb(255,0,170)` |
+| Tertiary accent | blue `#38BDF8` / `#3B82F6` = `rgb(56,189,248)` | blue `#00aaff` = `rgb(0,170,255)` |
+| Display font | Urbanist | Clash Display |
+| Body font | Albert Sans | Satoshi |
+
+GLSL note (`vec3`, normalized 0–1): cyan `vec3(0.0,1.0,0.8)`, magenta
+`vec3(1.0,0.0,0.667)`, blue `vec3(0.0,0.667,1.0)`, navy `vec3(0.039,0.059,0.110)`.
+When porting, keep each `rgba()` **alpha** unchanged — only swap the RGB triple.
 
 ---
 
@@ -76,14 +111,14 @@ Ranked by leverage for an offline dark-keynote deck. ⭐ = a working demo exists
 
 | Technique | Offline | Wow | Effort | Notes |
 |-----------|---------|-----|--------|-------|
-| **CSS animated gradients / aurora blobs** | ✅ Inline | 5 | Low | The re:Invent look itself. Already used in style #2. |
-| ⭐ **CSS 3D (cube / 2.5D parallax)** | ✅ Inline | 5 | Med | `demos/css-3d-hero/`. Zero deps, Baseline since 2015. |
-| ⭐ **Pointer-driven 3D tilt** | ✅ Inline | 5 | Med | `demos/pointer-tilt/`. Hand-written; cards/hero tilt toward cursor + specular sheen. Zero deps. |
-| ⭐ **Hand-written WebGL shader bg** (snoise) | ✅ Inline | 5 | Med | `demos/webgl-nebula/`. ~5 KB, MIT noise, total control. |
-| ⭐ **Three.js real 3D** (emissive + bloom) | ✅ Vendorable | 5 | High | `demos/threejs-hero/`. Genuine 3D centerpiece: emissive core, fresnel shell, **inline hand-rolled bloom** (no ESM addons), ACES. r160 UMD global, ~654 KB raw. |
-| ⭐ **GSAP timelines / kinetic type** | ✅ Vendorable | 5 | Med | `demos/gsap-title/`. Free+commercial, ~71 KB+. Orchestration, SplitText, DrawSVG, MorphSVG. |
-| ⭐ **GSAP content micro-effects** | ✅ Vendorable | 4 | Med | `demos/gsap-micro/`. Number count-up, text scramble/decode, SVG path-draw + staggered timeline. |
-| ⭐ **Hand-written constellation / network** | ✅ Inline | 4 | Low | `demos/particles-network/`. 2D-canvas linked dots + cursor-grab. ~5 KB, zero deps (see note on tsParticles below). |
+| **CSS animated gradients / aurora blobs** | ✅ Inline | 5 | Low | The re:Invent look itself (style #2); the grid + glow background is the style #1 default. |
+| ⭐ **CSS 3D (cube / 2.5D parallax)** | ✅ Inline | 5 | Med | `demos/css-3d-hero/` (purple only). Zero deps, Baseline since 2015. |
+| ⭐ **Pointer-driven 3D tilt** | ✅ Inline | 5 | Med | `demos/pointer-tilt/` + `demos/neon/pointer-tilt/`. Hand-written; cards/hero tilt toward cursor + specular sheen. Zero deps. |
+| ⭐ **Hand-written WebGL shader bg** (snoise) | ✅ Inline | 5 | Med | `demos/webgl-nebula/` + `demos/neon/webgl-nebula/`. ~5 KB, MIT noise, total control. |
+| ⭐ **Three.js real 3D** (emissive + bloom) | ✅ Vendorable | 5 | High | `demos/threejs-hero/` (purple only). Genuine 3D centerpiece: emissive core, fresnel shell, **inline hand-rolled bloom** (no ESM addons), ACES. r160 UMD global, ~654 KB raw. |
+| ⭐ **GSAP timelines / kinetic type** | ✅ Vendorable | 5 | Med | `demos/gsap-title/` + `demos/neon/gsap-title/`. Free+commercial, ~71 KB+. Orchestration, SplitText, DrawSVG, MorphSVG. |
+| ⭐ **GSAP content micro-effects** | ✅ Vendorable | 4 | Med | `demos/gsap-micro/` (purple only). Number count-up, text scramble/decode, SVG path-draw + staggered timeline. |
+| ⭐ **Hand-written constellation / network** | ✅ Inline | 4 | Low | `demos/particles-network/` + `demos/neon/particles-network/`. 2D-canvas linked dots + cursor-grab. ~5 KB, zero deps (see note on tsParticles below). |
 | **View Transitions API** (slide morph) | ✅ Inline | 5 | Low | Baseline Oct 2025; 1-line fallback to plain cut. Same-document only (no CORS, works file://). |
 | **`@property` spinning conic gradient** | ✅ Inline | 5 | Low | Rotating neon ring/halo. Baseline 2024; degrades to static. Must set `initial-value`. |
 | **Self-drawing neon SVG line** | ✅ Inline | 4 | Med | `stroke-dashoffset` animation. Use CSS (not SMIL). Few paths only. See `demos/gsap-micro/`. |
@@ -93,12 +128,14 @@ Ranked by leverage for an offline dark-keynote deck. ⭐ = a working demo exists
 
 ---
 
-## ⭐ Demo 1 — WebGL nebula background (`demos/webgl-nebula/`)
+## ⭐ Demo 1 — WebGL nebula background (`demos/webgl-nebula/` · Neon: `demos/neon/webgl-nebula/`)
 
 Hand-written **WebGL1** fragment shader: single-layer domain-warped fBm over MIT
 `snoise`, confined to a soft off-center elliptical **mass** and graded to the
-re:Invent palette, with vignette + additive glow. Replaces the earlier
-procedural-earth attempt with a cleaner, more "premium backdrop" look.
+palette, with vignette + additive glow. Replaces the earlier
+procedural-earth attempt with a cleaner, more "premium backdrop" look. The Neon
+variant grades the same shader to cyan/magenta (the GLSL `vec3` constants are swapped
+per the token table — a `:root` swap alone won't change the rendered colors).
 
 **Why it's the recommended primary 3D-ish route:** zero dependencies, zero license
 risk (snoise is MIT, keep its header comment), ~5 KB inline, total aesthetic control.
@@ -128,14 +165,17 @@ const gl = canvas.getContext("webgl", {antialias:false, alpha:false,
 - **Confine it spatially.** Don't light every pixel — multiply by a soft elliptical
   `mass` (biased away from the headline) then soft-threshold, so corners stay pure
   black. The negative space is what makes it read as a nebula, not a texture.
-- **Bias hue warm.** Floor the purple↔blue mix toward purple so it stays on-brand
-  instead of drifting cold blue; let magenta bloom across upper-mid densities.
+- **Bias hue on-brand.** Floor the primary↔blue mix toward the primary accent so it
+  stays on-brand instead of drifting cold blue; let the secondary accent bloom across
+  upper-mid densities. (re:Invent: floor toward purple. Neon: floor toward cyan.)
 
-## ⭐ Demo 2 — GSAP kinetic title (`demos/gsap-title/`)
+## ⭐ Demo 2 — GSAP kinetic title (`demos/gsap-title/` · Neon: `demos/neon/gsap-title/`)
 
 GSAP **3.13** vendored locally (`vendor/gsap.min.js` + `SplitText` + `DrawSVGPlugin`).
 A load timeline: per-character headline reveal → SVG underline draw → staggered cards
-→ infinite glow pulse. `prefers-reduced-motion` jumps to the end state.
+→ infinite glow pulse. `prefers-reduced-motion` jumps to the end state. The Neon variant
+carries its own copy of `vendor/` and re-tints the headline gradient, the SVG underline
+`<linearGradient>` stops, and the JS glow-pulse color to cyan/magenta.
 
 **Licensing:** GSAP became **fully free including all former Club plugins** after the
 2025 Webflow acquisition — commercial use allowed, no attribution. The only restriction
@@ -161,10 +201,12 @@ char-splitting + manual `stroke-dashoffset` (works with `gsap.min.js` alone).
 > inline Lucide SVG paths (ISC) rather than the usual CDN, so they stay offline.
 > Emoji-as-icons is banned by [SKILL.md](SKILL.md).
 
-## ⭐ Demo 3 — CSS 3D hero (`demos/css-3d-hero/`)
+## ⭐ Demo 3 — CSS 3D hero (`demos/css-3d-hero/`, purple only)
 
 Pure CSS, **zero JS dependency**: a rotating `preserve-3d` cube (6 faces, Lucide-icon
-glyphs, neon edges) + a 2.5D parallax title using layered `translateZ`.
+glyphs, neon edges) + a 2.5D parallax title using layered `translateZ`. No Neon variant
+ships yet — re-tint per the token table if you need it for a style #1 deck (colors live
+in `:root` plus ~21 inline `rgba` glow/light-pool spots).
 
 **The flattening gotcha (bake into every CSS-3D template):** an element with
 `transform-style: preserve-3d` must NOT also have `opacity<1`, `filter`,
@@ -187,18 +229,21 @@ the `preserve-3d` parent.
 
 ## Which effect for what
 
-| You want… | Use | Where |
-|-----------|-----|-------|
-| A living dark background behind any slide | CSS aurora blobs (light) or WebGL nebula (rich) | style #2 / `demos/webgl-nebula/` |
-| A "wow" hero object on a title/section slide | CSS 3D cube or 2.5D parallax | `demos/css-3d-hero/` |
-| An interactive, cursor-responsive hero/cards | Pointer-driven 3D tilt | `demos/pointer-tilt/` |
-| A genuine 3D model/object centerpiece | Three.js r160 (emissive + inline bloom) | `demos/threejs-hero/` |
-| Choreographed title / kinetic typography | GSAP timeline + SplitText | `demos/gsap-title/` |
-| Animated metrics / decoding text / drawn timeline | GSAP content micro-effects | `demos/gsap-micro/` |
-| Network/constellation backdrop | Hand-written 2D-canvas constellation | `demos/particles-network/` |
-| Every effect at once (integration test) | Combined 5-slide deck | `demos/all-effects/` |
-| Slide-to-slide "magic move" morph | View Transitions API | research only |
-| A pre-made animated illustration | lottie-web + a **free** Lottie JSON (inlined) | research only |
+Paths show the re:Invent (purple) demo; append `neon/` for the Neon-Cyber (cyan) variant
+where one exists (✅ Neon column).
+
+| You want… | Use | Where (purple) | Neon |
+|-----------|-----|----------------|------|
+| A living dark background behind any slide | CSS aurora blobs (light) or WebGL nebula (rich) | `demos/webgl-nebula/` | ✅ `demos/neon/webgl-nebula/` |
+| A "wow" hero object on a title/section slide | CSS 3D cube or 2.5D parallax | `demos/css-3d-hero/` | — (re-tint) |
+| An interactive, cursor-responsive hero/cards | Pointer-driven 3D tilt | `demos/pointer-tilt/` | ✅ `demos/neon/pointer-tilt/` |
+| A genuine 3D model/object centerpiece | Three.js r160 (emissive + inline bloom) | `demos/threejs-hero/` | — (purple only) |
+| Choreographed title / kinetic typography | GSAP timeline + SplitText | `demos/gsap-title/` | ✅ `demos/neon/gsap-title/` |
+| Animated metrics / decoding text / drawn timeline | GSAP content micro-effects | `demos/gsap-micro/` | — (re-tint) |
+| Network/constellation backdrop | Hand-written 2D-canvas constellation | `demos/particles-network/` | ✅ `demos/neon/particles-network/` |
+| Every effect at once (integration test) | Combined 5-slide deck | `demos/all-effects/` | — (purple only) |
+| Slide-to-slide "magic move" morph | View Transitions API | research only | — |
+| A pre-made animated illustration | lottie-web + a **free** Lottie JSON (inlined) | research only | — |
 
 For weight discipline: a deck should lean on **inline CSS/shader** effects first.
 Reserve a vendored engine (GSAP, Three.js) for the one or two slides that truly need
@@ -243,9 +288,12 @@ loads fine offline. **But in this skill's offline verification the bundled v3
 `tsparticles.bundle.min.js` populated its particle model yet never painted a single
 pixel to its canvas** (a manual `fillRect` on the same 2D context worked, so the
 context was fine — the engine's own render loop didn't reach the screen). Rather than
-ship an effect that couldn't be verified, `demos/particles-network/` is a **hand-written
+ship an effect that couldn't be verified, `demos/particles-network/` (purple) and
+`demos/neon/particles-network/` (cyan) are a **hand-written
 2D-canvas constellation** (~5 KB, zero deps): drifting dots, squared-distance link test,
-cursor-grab lines, click-to-add. It's lighter and fully controllable. **Lesson:** for an
+cursor-grab lines, click-to-add. It's lighter and fully controllable. The Neon variant
+re-tints the JS `COLORS` RGB-triple array and the link/grab stroke strings, not just
+`:root`. **Lesson:** for an
 effect this simple, a hand-written canvas loop beats a ~180 KB engine — and always
 confirm pixels actually render (sample the canvas / screenshot), not just that the
 library "loaded".
