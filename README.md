@@ -22,6 +22,55 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 
 **aws-html-slides** helps non-designers create beautiful web presentations without knowing CSS or JavaScript. Instead of asking you to describe your aesthetic preferences in words, it provides **2 pre-built visual previews** and lets you pick what you like.
 
+## Layout Gallery
+
+A peek at the built-in content layouts. Every shot below is a real frame from the two preview decks (`aws-html-slides/preview/`) — captured live, animations and all. Open the previews to see them move.
+
+### Neon Cyber
+
+<table>
+<tr>
+<td width="50%"><img src="docs/layouts/neon-title.png" alt="Neon kinetic title over WebGL aurora"><br><sub><b>Kinetic title</b> — per-character reveal over a WebGL aurora background.</sub></td>
+<td width="50%"><img src="docs/layouts/neon-bento.png" alt="Neon bento grid with border-beam hero"><br><sub><b>Bento grid</b> — asymmetric cards with a rotating border-beam hero.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/neon-metrics.png" alt="Neon gauge rings with count-up"><br><sub><b>Data HUD</b> — SVG gauge rings with count-up animation.</sub></td>
+<td width="50%"><img src="docs/layouts/neon-comparison.png" alt="Neon VS comparison"><br><sub><b>VS compare</b> — before/after columns with a glowing pivot.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/neon-pipeline.png" alt="Neon circuit pipeline with pulse dots"><br><sub><b>Circuit pipeline</b> — staged flow with traveling pulse dots.</sub></td>
+<td width="50%"><img src="docs/layouts/neon-orbit.png" alt="Neon orbit ecosystem diagram"><br><sub><b>Orbit diagram</b> — a hub with satellites on animated rings.</sub></td>
+</tr>
+</table>
+
+### re:Invent Keynote
+
+<table>
+<tr>
+<td width="50%"><img src="docs/layouts/reinvent-metrics.png" alt="re:Invent metric cards with deltas"><br><sub><b>Metric cards</b> — big numbers with up/down deltas and an insight bar.</sub></td>
+<td width="50%"><img src="docs/layouts/reinvent-bento.png" alt="re:Invent bento grid with border-beam hero"><br><sub><b>Bento grid</b> — border-beam hero card beside a tidy feature matrix.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/reinvent-comparison.png" alt="re:Invent two-column comparison"><br><sub><b>Comparison</b> — two framed columns of bulleted trade-offs.</sub></td>
+<td width="50%"><img src="docs/layouts/reinvent-timeline.png" alt="re:Invent numbered process flow"><br><sub><b>Process flow</b> — numbered steps from idea to production.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/reinvent-quote.png" alt="re:Invent executive quote"><br><sub><b>Executive quote</b> — a single line with attribution, spotlit.</sub></td>
+<td width="50%"><img src="docs/layouts/reinvent-outlook.png" alt="re:Invent numbered outlook columns"><br><sub><b>Outlook columns</b> — numbered forward-looking themes on a gradient.</sub></td>
+</tr>
+</table>
+
+### Native SVG Diagrams
+
+Described in plain language in `content.md`, drawn as animated inline SVG — zero dependencies, request packets flowing along the edges.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/layouts/diagram-iso3d.png" alt="Isometric 3D architecture diagram"><br><sub><b>Isometric 3D architecture</b> — layered nodes with request/response packets.</sub></td>
+<td width="50%"><img src="docs/layouts/diagram-sequence.png" alt="Sequence / API flow diagram"><br><sub><b>Sequence / API flow</b> — messages animate down the lifelines in order.</sub></td>
+</tr>
+</table>
+
 ## Key Features
 
 - **Zero Dependencies** — Single HTML files with inline CSS/JS. No npm, no build tools, no frameworks.
@@ -133,55 +182,6 @@ my-presentation/
 
 **re:Invent Keynote** — the most developed style, modeled on AWS keynote stages. Ships ~19 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, process flows, timelines, big-number slides, plus bento grid with border-beam hero, cursor-spotlight cards, and dual marquee rows) with motion defaults (title word-reveal + gradient shimmer, count-up metrics) so long decks never look monotonous, and it supports the optional 3D/motion effects below in its purple/pink tint.
 
-## Layout Gallery
-
-A peek at the built-in content layouts. Every shot below is a real frame from the two preview decks (`aws-html-slides/preview/`) — captured live, animations and all. Open the previews to see them move.
-
-### Neon Cyber
-
-<table>
-<tr>
-<td width="50%"><img src="docs/layouts/neon-title.png" alt="Neon kinetic title over WebGL aurora"><br><sub><b>Kinetic title</b> — per-character reveal over a WebGL aurora background.</sub></td>
-<td width="50%"><img src="docs/layouts/neon-bento.png" alt="Neon bento grid with border-beam hero"><br><sub><b>Bento grid</b> — asymmetric cards with a rotating border-beam hero.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/neon-metrics.png" alt="Neon gauge rings with count-up"><br><sub><b>Data HUD</b> — SVG gauge rings with count-up animation.</sub></td>
-<td width="50%"><img src="docs/layouts/neon-comparison.png" alt="Neon VS comparison"><br><sub><b>VS compare</b> — before/after columns with a glowing pivot.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/neon-pipeline.png" alt="Neon circuit pipeline with pulse dots"><br><sub><b>Circuit pipeline</b> — staged flow with traveling pulse dots.</sub></td>
-<td width="50%"><img src="docs/layouts/neon-orbit.png" alt="Neon orbit ecosystem diagram"><br><sub><b>Orbit diagram</b> — a hub with satellites on animated rings.</sub></td>
-</tr>
-</table>
-
-### re:Invent Keynote
-
-<table>
-<tr>
-<td width="50%"><img src="docs/layouts/reinvent-metrics.png" alt="re:Invent metric cards with deltas"><br><sub><b>Metric cards</b> — big numbers with up/down deltas and an insight bar.</sub></td>
-<td width="50%"><img src="docs/layouts/reinvent-bento.png" alt="re:Invent bento grid with border-beam hero"><br><sub><b>Bento grid</b> — border-beam hero card beside a tidy feature matrix.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/reinvent-comparison.png" alt="re:Invent two-column comparison"><br><sub><b>Comparison</b> — two framed columns of bulleted trade-offs.</sub></td>
-<td width="50%"><img src="docs/layouts/reinvent-timeline.png" alt="re:Invent numbered process flow"><br><sub><b>Process flow</b> — numbered steps from idea to production.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/reinvent-quote.png" alt="re:Invent executive quote"><br><sub><b>Executive quote</b> — a single line with attribution, spotlit.</sub></td>
-<td width="50%"><img src="docs/layouts/reinvent-outlook.png" alt="re:Invent numbered outlook columns"><br><sub><b>Outlook columns</b> — numbered forward-looking themes on a gradient.</sub></td>
-</tr>
-</table>
-
-### Native SVG Diagrams
-
-Described in plain language in `content.md`, drawn as animated inline SVG — zero dependencies, request packets flowing along the edges.
-
-<table>
-<tr>
-<td width="50%"><img src="docs/layouts/diagram-iso3d.png" alt="Isometric 3D architecture diagram"><br><sub><b>Isometric 3D architecture</b> — layered nodes with request/response packets.</sub></td>
-<td width="50%"><img src="docs/layouts/diagram-sequence.png" alt="Sequence / API flow diagram"><br><sub><b>Sequence / API flow</b> — messages animate down the lifelines in order.</sub></td>
-</tr>
-</table>
-
 ## 3D & Motion Effects (Experimental)
 
 Optional, **fully offline and self-contained** ways to add depth and motion to **either specialty style** — no CDN at runtime, libraries vendored locally. These are a deliberate, per-deck menu rather than the default flow; the lightweight CSS default stays the baseline. The palette-agnostic reference and its licensing red-lines live in [`aws-html-slides/effects-reference.md`](aws-html-slides/effects-reference.md). Each technique ships a working demo in the **re:Invent purple** tint under [`demos/`](demos/); four of them also ship a **Neon Cyber cyan** tint under [`demos/neon/`](demos/neon/):
@@ -231,6 +231,55 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 ## 这是什么
 
 **aws-html-slides** 帮助非设计师在不了解 CSS 或 JavaScript 的情况下创建漂亮的网页演示文稿。它不要求你用文字描述审美偏好，而是提供 **2 个预构建的视觉预览**，让你直接挑选喜欢的风格。
+
+## 布局展示
+
+内置内容排版一览。下方每张图都是从两个预览 deck（`aws-html-slides/preview/`）中实时截取的真实画面 —— 连动画一起。打开预览即可看到它们动起来。
+
+### Neon Cyber
+
+<table>
+<tr>
+<td width="50%"><img src="docs/layouts/neon-title.png" alt="Neon 逐字动态标题 + WebGL 极光背景"><br><sub><b>逐字动态标题</b> —— 标题逐字浮现，叠加 WebGL 极光背景。</sub></td>
+<td width="50%"><img src="docs/layouts/neon-bento.png" alt="Neon Bento 网格 + 旋转光束主卡"><br><sub><b>Bento 网格</b> —— 非对称卡片，主卡带旋转光束描边。</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/neon-metrics.png" alt="Neon SVG 仪表盘 + 数字滚动"><br><sub><b>数据 HUD</b> —— SVG 仪表盘环，配合数字滚动动画。</sub></td>
+<td width="50%"><img src="docs/layouts/neon-comparison.png" alt="Neon VS 对比"><br><sub><b>VS 对比</b> —— 前后两栏，中间发光轴心。</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/neon-pipeline.png" alt="Neon 电路流程 + 脉冲点"><br><sub><b>电路流程</b> —— 分段流程，脉冲点沿线流动。</sub></td>
+<td width="50%"><img src="docs/layouts/neon-orbit.png" alt="Neon 轨道生态图"><br><sub><b>轨道生态图</b> —— 中心节点，卫星沿动画轨道环绕。</sub></td>
+</tr>
+</table>
+
+### re:Invent Keynote
+
+<table>
+<tr>
+<td width="50%"><img src="docs/layouts/reinvent-metrics.png" alt="re:Invent 带涨跌的指标卡"><br><sub><b>指标卡</b> —— 大数字配涨跌箭头，底部洞察条。</sub></td>
+<td width="50%"><img src="docs/layouts/reinvent-bento.png" alt="re:Invent Bento 网格 + 光束主卡"><br><sub><b>Bento 网格</b> —— 光束描边主卡，搭配整齐的功能矩阵。</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/reinvent-comparison.png" alt="re:Invent 双栏对比"><br><sub><b>对比页</b> —— 两个边框栏，逐条列出取舍。</sub></td>
+<td width="50%"><img src="docs/layouts/reinvent-timeline.png" alt="re:Invent 编号流程"><br><sub><b>流程图</b> —— 编号步骤，从想法到上线。</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/layouts/reinvent-quote.png" alt="re:Invent 高管引言"><br><sub><b>引言页</b> —— 单句引言配署名，聚光呈现。</sub></td>
+<td width="50%"><img src="docs/layouts/reinvent-outlook.png" alt="re:Invent 编号展望栏"><br><sub><b>展望栏</b> —— 渐变背景上的编号前瞻主题。</sub></td>
+</tr>
+</table>
+
+### 原生 SVG 架构图/图表
+
+在 `content.md` 中用自然语言描述，绘制为动画内联 SVG —— 零依赖，请求包沿连线流动。
+
+<table>
+<tr>
+<td width="50%"><img src="docs/layouts/diagram-iso3d.png" alt="等轴测 3D 架构图"><br><sub><b>等轴测 3D 架构</b> —— 分层节点，请求/响应包实时流转。</sub></td>
+<td width="50%"><img src="docs/layouts/diagram-sequence.png" alt="时序 / API 流程图"><br><sub><b>时序 / API 流程</b> —— 报文沿生命线逐条向下流动。</sub></td>
+</tr>
+</table>
 
 ## 核心特性
 
@@ -342,55 +391,6 @@ my-presentation/
 **Neon Cyber** —— 黑底霓虹赛博 HUD 美学，青/品红辉光、扫描线、网格背景与四角括号边框。内置约 11 种 HUD 级排版（逐字动态标题、终端打字机、带旋转光束描边主卡的 Bento 网格、鼠标追光卡片、SVG 仪表盘数字滚动、VS 对比、脉冲电路流程、双向跑马灯、故障风引言、轨道生态图），见 `aws-html-slides/layout-neon.md`。适合技术、未来感或产品发布类、想要冲击力的主题。也支持下方可选的 3D/动效（青/品红配色版，见 [`demos/neon/`](demos/neon/)）。
 
 **re:Invent Keynote** —— 最完善的风格，仿照 AWS 主题演讲舞台。内置约 19 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏、流程图、时间线、大数字页，以及带光束描边主卡的 Bento 网格、鼠标追光卡片、双向跑马灯），并默认启用动效（标题逐词浮现 + 渐变微光、指标数字滚动），长篇幻灯片不再单调；同样支持下方可选的 3D/动效（紫/粉配色版）。
-
-## 布局展示
-
-内置内容排版一览。下方每张图都是从两个预览 deck（`aws-html-slides/preview/`）中实时截取的真实画面 —— 连动画一起。打开预览即可看到它们动起来。
-
-### Neon Cyber
-
-<table>
-<tr>
-<td width="50%"><img src="docs/layouts/neon-title.png" alt="Neon 逐字动态标题 + WebGL 极光背景"><br><sub><b>逐字动态标题</b> —— 标题逐字浮现，叠加 WebGL 极光背景。</sub></td>
-<td width="50%"><img src="docs/layouts/neon-bento.png" alt="Neon Bento 网格 + 旋转光束主卡"><br><sub><b>Bento 网格</b> —— 非对称卡片，主卡带旋转光束描边。</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/neon-metrics.png" alt="Neon SVG 仪表盘 + 数字滚动"><br><sub><b>数据 HUD</b> —— SVG 仪表盘环，配合数字滚动动画。</sub></td>
-<td width="50%"><img src="docs/layouts/neon-comparison.png" alt="Neon VS 对比"><br><sub><b>VS 对比</b> —— 前后两栏，中间发光轴心。</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/neon-pipeline.png" alt="Neon 电路流程 + 脉冲点"><br><sub><b>电路流程</b> —— 分段流程，脉冲点沿线流动。</sub></td>
-<td width="50%"><img src="docs/layouts/neon-orbit.png" alt="Neon 轨道生态图"><br><sub><b>轨道生态图</b> —— 中心节点，卫星沿动画轨道环绕。</sub></td>
-</tr>
-</table>
-
-### re:Invent Keynote
-
-<table>
-<tr>
-<td width="50%"><img src="docs/layouts/reinvent-metrics.png" alt="re:Invent 带涨跌的指标卡"><br><sub><b>指标卡</b> —— 大数字配涨跌箭头，底部洞察条。</sub></td>
-<td width="50%"><img src="docs/layouts/reinvent-bento.png" alt="re:Invent Bento 网格 + 光束主卡"><br><sub><b>Bento 网格</b> —— 光束描边主卡，搭配整齐的功能矩阵。</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/reinvent-comparison.png" alt="re:Invent 双栏对比"><br><sub><b>对比页</b> —— 两个边框栏，逐条列出取舍。</sub></td>
-<td width="50%"><img src="docs/layouts/reinvent-timeline.png" alt="re:Invent 编号流程"><br><sub><b>流程图</b> —— 编号步骤，从想法到上线。</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/layouts/reinvent-quote.png" alt="re:Invent 高管引言"><br><sub><b>引言页</b> —— 单句引言配署名，聚光呈现。</sub></td>
-<td width="50%"><img src="docs/layouts/reinvent-outlook.png" alt="re:Invent 编号展望栏"><br><sub><b>展望栏</b> —— 渐变背景上的编号前瞻主题。</sub></td>
-</tr>
-</table>
-
-### 原生 SVG 架构图/图表
-
-在 `content.md` 中用自然语言描述，绘制为动画内联 SVG —— 零依赖，请求包沿连线流动。
-
-<table>
-<tr>
-<td width="50%"><img src="docs/layouts/diagram-iso3d.png" alt="等轴测 3D 架构图"><br><sub><b>等轴测 3D 架构</b> —— 分层节点，请求/响应包实时流转。</sub></td>
-<td width="50%"><img src="docs/layouts/diagram-sequence.png" alt="时序 / API 流程图"><br><sub><b>时序 / API 流程</b> —— 报文沿生命线逐条向下流动。</sub></td>
-</tr>
-</table>
 
 ## 3D 与动效（实验性）
 
