@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<!-- =====================================================================
+     Neon Cyber — Native SVG Sequence Diagram (API Request Flow)
+     ---------------------------------------------------------------------
+     ONE self-contained, OFFLINE, ZERO-DEPENDENCY file. No CDN, no web
+     fonts, no images, no libraries. Double-click via file:// and it runs.
+
+     WHAT this is: a hand-written, animated SVG *sequence diagram* tracing
+     one POST /orders request as it flows Client -> API Gateway -> Lambda
+     -> DynamoDB and all the way back. The whole point is the choreography:
+     messages fire strictly 1..7, each drawing its arrow, sliding a glowing
+     packet along it (SMIL animateMotion + mpath), then flashing the target
+     card and growing its activation bar.
+
+     TWO CLOCKS, ONE SOURCE OF TRUTH: packets are driven by SMIL
+     (<animateMotion begin="prevPacket.end + gap">, chained), while the arrow
+     draw-ins / card flashes / activation bars / number badges are driven by
+     CSS animations with hardcoded `animation-delay`s. To keep them in sync
+     both read from the SAME delay table documented right below. Change a
+     number in the CSS/SMIL? Change it in the table comment too.
+
+     ┌──────────────────────────────────────────────────────────────────┐
+     │  DELAY TABLE  (seconds, from cycle start t=0)                      │
+     │  ----------------------------------------------------------------  │
+     │  INTRO   cards pop:      0.00 .. 0.86  (4 cards, staggered 0.12)    │
+     │          lifelines drop: 0.55 .. 1.15                              │
+     │  ── per-message: arrow draw @A (0.35s); packet @A+0.15 (dur 0.60); │
+     │     arrival FX (badge/bar/card-glow) @A+0.75 = packet end. ──       │
+     │           slot  arrow A  packet    arrival   note                  │
+     │  MSG 1   POST /orders   0   1.40   1.55→2.15   2.15   cyan solid    │
+     │  MSG 2   鉴权 + 路由    1   pill @2.30 (no packet)   blue pill      │
+     │  MSG 3   Invoke         2   3.20   3.35→3.95   3.95   blue solid    │
+     │  MSG 4   PutItem        3   4.10   4.25→4.85   4.85   blue solid    │
+     │  MSG 5   200 OK (item)  4   5.00   5.15→5.75   5.75   magenta dash  │
+     │  MSG 6   result         5   5.90   6.05→6.65   6.65   magenta dash  │
+     │  MSG 7   201 Created    6   6.80   6.95→7.55   7.55   magenta dash+ │
+     │  END     plays ONCE, freezes on the final drawn state (no loop).    │
+     │  ----------------------------------------------------------------  │
+     │  Per-message cadence = 0.90s.  A_N = 1.40 + 0.90*slot.              │
+     │  TWO CLOCKS, ONE SEED: a hidden SMIL <animate id="clock"> is kicked │
+     │  by JS beginElement() at each cycle start; EVERY packet begins at   │
+     │  "clock.begin + <absolute offset>" (the packet column above), and   │
+     │  the CSS .play animation-delays use the SAME absolute offsets. So   │
+     │  editing a row here means editing that packet's begin AND its CSS   │
+     │  delay to match — they are two readings of this one table.          │
+     └──────────────────────────────────────────────────────────────────┘
+
+     REDUCED MOTION: `prefers-reduced-motion: reduce` => body.reduced-motion,
+     which freezes every CSS animation at its final frame (all arrows drawn,
+     bars grown, badges shown) and hides the moving packets. No motion, no
+     JS loop. The diagram is fully legible as a static final state.
+     ===================================================================== -->
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neon Cyber — Sequence / API Flow</title>
+<style>
+  /* ============================================================
+     SELF-CONTAINED, OFFLINE styles. Fallback font stacks only —
+     no @font-face, no network. The named display/mono faces are
+     used if the viewer happens to have them; everyone else gets
+     the graceful system fallback.
+     ============================================================ */
+  :root {
+    --bg:       #0a0f1c;                    /* deep navy base            */
+    --cyan:     #00ffcc;                    /* requests (client->server) */
+    --magenta:  #ff00aa;                    /* responses (return path)   */
+    --blue:     #00aaff;                    /* internal service calls    */
+    --text:     #e0e0ff;                    /* primary text              */
+    --muted:    rgba(224,224,255,0.55);     /* secondary text            */
+    --sans: 'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif;
+    --mono: 'JetBrains Mono','SF Mono',Menlo,monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100vh; height: 100dvh;          /* exact viewport, no scroll */
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+  }
+
+  /* ---- Ambient background: faint cyan grid + two blurred glow orbs ----
+     Pure CSS, sits behind everything. The grid is two low-alpha
+     repeating-linear-gradients (vertical + horizontal); the orbs are
+     big blurred radial gradients biased to opposite corners. */
+  .backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .backdrop::before {                        /* the grid */
+    content: ""; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg,  rgba(0,255,204,0.045) 0 1px, transparent 1px 46px),
+      repeating-linear-gradient(90deg, rgba(0,255,204,0.045) 0 1px, transparent 1px 46px);
+    mask-image: radial-gradient(ellipse 90% 80% at 50% 45%, #000 55%, transparent 100%);
+  }
+  .orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.5; }
+  .orb.a { width: 46vw; height: 46vw; left: -12vw; top: -14vw;
+           background: radial-gradient(circle, rgba(0,170,255,0.40), transparent 70%); }
+  .orb.b { width: 42vw; height: 42vw; right: -12vw; bottom: -16vw;
+           background: radial-gradient(circle, rgba(255,0,170,0.34), transparent 70%); }
+
+  /* ---- Page shell: header / diagram / footer stacked to fill 100vh ---- */
+  .page {
+    position: relative; z-index: 1;
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column;
+    padding: 3.2vh 4vw 2.4vh;
+  }
+
+  header { flex: 0 0 auto; text-align: center; }
+  .eyebrow {
+    font-size: clamp(10px, 1.05vw, 13px); letter-spacing: 0.34em; font-weight: 600;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem;
+  }
+  .eyebrow .tick { color: var(--cyan); }
+  h1 {
+    font-size: clamp(24px, 3.6vw, 46px); line-height: 1.05; font-weight: 800;
+    letter-spacing: -0.01em;
+    background: linear-gradient(100deg, #fff 0%, #b9fff0 34%, var(--cyan) 70%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 3px 22px rgba(0,255,204,0.22));
+  }
+  .sub {
+    margin-top: 0.7rem; font-size: clamp(12px, 1.5vw, 17px); font-weight: 400;
+    color: var(--muted); font-family: var(--mono); letter-spacing: 0.01em;
+  }
+
+  /* ---- Diagram stage: the SVG scales to width, capped by height ---- */
+  .stage {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    margin: 1.6vh 0;
+  }
+  svg.seq { width: 100%; height: auto; max-height: 66vh; display: block; }
+
+  /* ---- Footer: caption (left) + Replay button (right) ---- */
+  footer {
+    flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .caption {
+    font-family: var(--mono); font-size: clamp(10px, 1.15vw, 13px);
+    color: var(--muted); letter-spacing: 0.02em;
+  }
+  #replay {
+    font-family: var(--sans); font-size: clamp(12px, 1.3vw, 15px); font-weight: 600;
+    color: var(--cyan); background: rgba(0,255,204,0.06);
+    border: 1px solid rgba(0,255,204,0.45); border-radius: 999px;
+    padding: 0.5em 1.2em; cursor: pointer; letter-spacing: 0.04em;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    box-shadow: 0 0 0 rgba(0,255,204,0);
+  }
+  #replay:hover { background: rgba(0,255,204,0.14); box-shadow: 0 0 22px rgba(0,255,204,0.35); }
+  #replay:active { transform: scale(0.96); }
+  #replay:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+  /* =====================================================================
+     ANIMATION LAYER (CSS half of the two-clock system)
+     ---------------------------------------------------------------------
+     Everything below is keyed to the DELAY TABLE at the top of the file.
+     The `.play` class on the <svg> arms the CSS animations; JS removes then
+     re-adds it (next frame) to restart a cycle. SMIL packets are kicked
+     separately by JS beginElement() on the same restart — see the script.
+
+     Reduced motion: body.reduced-motion forces every animated element to
+     its final state (opacity/scale/dashoffset) with NO animation, and
+     hides the packets. Handled by the override block at the very end.
+     ===================================================================== */
+
+  /* -----------------------------------------------------------------
+     DEFAULT (no .js) = FINAL VISIBLE STATE. If scripting is disabled the
+     diagram just shows fully drawn & static — never blank. JS adds `.js`
+     to the <svg> on boot, which switches ON the "initial hidden" states
+     below; adding `.play` then runs the reveal animations. Reduced motion
+     never adds `.js`, so it lands on this same static final state (packets
+     hidden by the @media block at the very end).
+     ----------------------------------------------------------------- */
+
+  /* transform-box/origin so scale()/translate() behave on SVG shapes.
+     Lifelines drop via a WRAPPER GROUP (.lifeline-wrap): a bare <line> has
+     a zero-width fill-box which makes scaleY unreliable; a <g> bbox is safe.
+     The inner <line> keeps its own marching-ants dashoffset animation. */
+  svg .card-g, svg .badge, svg .pill-g, svg .arrowhead { transform-box: fill-box; transform-origin: center; }
+  svg .activation, svg .lifeline-wrap { transform-box: fill-box; transform-origin: top center; }
+  .lifeline { stroke-dasharray: 5 7; }   /* dashed vertical, phase set by anim */
+
+  /* ---- initial hidden states — applied ONLY once JS is confirmed ---- */
+  svg.js .card-g       { opacity: 0; transform: translateY(-10px) scale(0.94); }
+  svg.js .lifeline-wrap{ opacity: 0; transform: scaleY(0); }   /* "drop down" */
+  /* solid arrows wipe in: each path carries pathLength="1", so a
+     dasharray/​offset of 1 is length-independent (no per-line --len math). */
+  svg.js .msg-line:not(.dashed) { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  svg.js .msg-line.dashed       { opacity: 0; }        /* dashed return: fade in */
+  svg.js .arrowhead { opacity: 0; transform: scale(0.4); }  /* lands with badge */
+  svg.js .badge     { opacity: 0; transform: scale(0.2); }
+  svg.js .msg-label { opacity: 0; }
+  svg.js .activation{ opacity: 0; transform: scaleY(0); }
+  svg.js .card-glow { opacity: 0; }
+  svg.js .pill-g    { opacity: 0; transform: scale(0.85); }
+
+  /* ---- reveal animations (armed by .play) ---- */
+  /* participant header cards: pop in staggered (scale + fade) */
+  svg.js.play .card-g { animation: cardPop 0.5s cubic-bezier(.2,.9,.3,1.2) forwards; }
+  svg.js.play .card-g.c0 { animation-delay: 0.00s; }
+  svg.js.play .card-g.c1 { animation-delay: 0.12s; }
+  svg.js.play .card-g.c2 { animation-delay: 0.24s; }
+  svg.js.play .card-g.c3 { animation-delay: 0.36s; }
+  @keyframes cardPop { to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  /* lifelines: wrapper "drops down" via scaleY (lifeDrop) during intro; the
+     inner <line> then shimmers forever via marching-ants (antsMarch). */
+  svg.js.play .lifeline-wrap { animation: lifeDrop 0.6s ease-out 0.55s forwards; }
+  svg.js.play .lifeline      { animation: antsMarch 5s linear 1.3s infinite; }
+  @keyframes lifeDrop  { to { opacity: 1; transform: scaleY(1); } }
+  @keyframes antsMarch { to { stroke-dashoffset: -240; } }
+
+  /* message arrows — solid wipe (dashoffset) vs dashed fade-in.
+     (A dashed stroke can't cleanly wipe-reveal, so returns fade instead.) */
+  svg.js.play .msg-line:not(.dashed) { animation: lineDraw 0.35s ease-out forwards; }
+  svg.js.play .msg-line.dashed       { animation: fadeIn   0.40s ease-out forwards; }
+  @keyframes lineDraw { to { stroke-dashoffset: 0; } }
+
+  /* number badge circles + digits: pop in on arrival */
+  svg.js.play .badge { animation: badgePop 0.4s cubic-bezier(.2,.9,.3,1.4) forwards; }
+  @keyframes badgePop { to { opacity: 1; transform: scale(1); } }
+
+  /* arrowheads: pop in at arrival (same delay as the badge) so the tip
+     appears when the wipe reaches the target — no floating marker glitch. */
+  svg.js.play .arrowhead { animation: badgePop 0.3s ease-out forwards; }
+
+  /* message labels: fade in with the arrow */
+  svg.js.play .msg-label { animation: fadeIn 0.4s ease-out forwards; }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  /* activation bars: grow downward (scaleY from the top) while active */
+  svg.js.play .activation { animation: barGrow 0.45s ease-out forwards; }
+  @keyframes barGrow { to { opacity: 1; transform: scaleY(1); } }
+
+  /* card glow pulse: a brief flash on the target card when a message lands */
+  svg.js.play .card-glow { animation: glowPulse 0.7s ease-out; }
+  @keyframes glowPulse { 0% { opacity: 0; } 30% { opacity: 0.9; } 100% { opacity: 0; } }
+
+  /* the self-note pill on the gateway lifeline (message 2) */
+  svg.js.play .pill-g { animation: badgePop 0.45s cubic-bezier(.2,.9,.3,1.3) forwards; animation-delay: 2.35s; }
+
+  /* ---- Per-message CSS delays (mirror of the DELAY TABLE) ----
+     arrow A_N = 1.40 + 0.90*slot; labels share the arrow delay;
+     arrival FX (badge/bar/glow) land at A_N + 0.75 (== packet end). */
+  /* message 1 (slot 0): A=1.40, arrival=2.15 */
+  svg.js.play .m1 .msg-line,  svg.js.play .m1 .msg-label { animation-delay: 1.40s; }
+  svg.js.play .m1 .badge, svg.js.play .m1 .arrowhead, svg.js.play .m1 .card-glow { animation-delay: 2.15s; }
+  /* message 3 (slot 2): A=3.20, arrival=3.95   (msg 2 pill handled above @2.30) */
+  svg.js.play .m3 .msg-line,  svg.js.play .m3 .msg-label { animation-delay: 3.20s; }
+  svg.js.play .m3 .badge, svg.js.play .m3 .arrowhead, svg.js.play .m3 .card-glow { animation-delay: 3.95s; }
+  /* message 4 (slot 3): A=4.10, arrival=4.85 */
+  svg.js.play .m4 .msg-line,  svg.js.play .m4 .msg-label { animation-delay: 4.10s; }
+  svg.js.play .m4 .badge, svg.js.play .m4 .arrowhead, svg.js.play .m4 .card-glow { animation-delay: 4.85s; }
+  /* message 5 return (slot 4): A=5.00, arrival=5.75 */
+  svg.js.play .m5 .msg-line,  svg.js.play .m5 .msg-label { animation-delay: 5.00s; }
+  svg.js.play .m5 .badge, svg.js.play .m5 .arrowhead, svg.js.play .m5 .card-glow { animation-delay: 5.75s; }
+  /* message 6 return (slot 5): A=5.90, arrival=6.65 */
+  svg.js.play .m6 .msg-line,  svg.js.play .m6 .msg-label { animation-delay: 5.90s; }
+  svg.js.play .m6 .badge, svg.js.play .m6 .arrowhead, svg.js.play .m6 .card-glow { animation-delay: 6.65s; }
+  /* message 7 return — the payoff (slot 6): A=6.80, arrival=7.55 */
+  svg.js.play .m7 .msg-line,  svg.js.play .m7 .msg-label { animation-delay: 6.80s; }
+  svg.js.play .m7 .badge, svg.js.play .m7 .arrowhead, svg.js.play .m7 .card-glow { animation-delay: 7.55s; }
+
+  /* ---- activation bars: one per participant, grown when it first goes
+     active (the message that reaches it). They simply stay grown through
+     the hold — a full teardown per participant would add clutter for a
+     preview. Gateway grows at msg1 arrival; Lambda at msg3; Dynamo at msg4. */
+  svg.js.play .act-gateway { animation-delay: 2.15s; }   /* msg1 lands on Gateway */
+  svg.js.play .act-lambda  { animation-delay: 3.95s; }   /* msg3 lands on Lambda  */
+  svg.js.play .act-dynamo  { animation-delay: 4.85s; }   /* msg4 lands on Dynamo  */
+  svg.js.play .act-client  { animation-delay: 1.40s; }   /* Client active from send */
+
+  /* =====================================================================
+     REDUCED MOTION OVERRIDE — final static state, no motion, no packets.
+     ===================================================================== */
+  @media (prefers-reduced-motion: reduce) {
+    /* handled via body.reduced-motion too (set in JS) for robustness */
+  }
+  body.reduced-motion svg .card-g,
+  body.reduced-motion svg .badge,
+  body.reduced-motion svg .activation,
+  body.reduced-motion svg .msg-label,
+  body.reduced-motion svg .pill-g { opacity: 1 !important; transform: none !important; animation: none !important; }
+  body.reduced-motion svg .lifeline,
+  body.reduced-motion svg .msg-line { stroke-dashoffset: 0 !important; animation: none !important; }
+  body.reduced-motion svg .card-glow { opacity: 0 !important; animation: none !important; }
+  body.reduced-motion svg .packet { display: none !important; }   /* no moving dots */
+</style>
+</head>
+<body>
+  <!-- ambient background: grid + glow orbs (pure CSS, behind everything) -->
+  <div class="backdrop"><div class="orb a"></div><div class="orb b"></div></div>
+
+  <div class="page">
+    <header>
+      <div class="eyebrow"><span class="tick">//</span>&nbsp; NATIVE SVG DIAGRAM — SEQUENCE / API FLOW</div>
+      <h1>一次 API 请求的完整流转</h1>
+      <div class="sub">POST /orders — 从客户端到数据库再回来</div>
+    </header>
+
+    <div class="stage">
+      <!-- ================================================================
+           THE SEQUENCE DIAGRAM. Design grid: 1400 x 640 user units.
+           Lifelines at x = 175 / 525 / 875 / 1225 (350 apart).
+           Message rows: y = 180, (pill 210), 280, 350, 420, 480, 545.
+           All coordinates hand-placed on this grid — edit numbers, not CSS.
+           ================================================================ -->
+      <svg id="seq" class="seq" viewBox="0 0 1400 640" role="img"
+           aria-label="Sequence diagram: POST /orders flows Client, API Gateway, Lambda, DynamoDB and back">
+        <defs>
+          <!-- soft neon glow used by packets, card flashes and the payoff arrow -->
+          <filter id="fGlow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="4" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- SMIL master clock: 0x0 rect, kicked by JS clock.beginElement().
+             Every packet's begin is "clock.begin + <offset from DELAY TABLE>". -->
+        <rect id="clockHost" width="0" height="0" fill="none">
+          <animate id="clock" attributeName="x" from="0" to="0" begin="indefinite" dur="9.2s"/>
+        </rect>
+
+        <!-- ===== PARTICIPANT HEADER CARDS (pop in staggered c0..c3) ===== -->
+        <!-- Client (cyan, Lucide "monitor") -->
+        <g class="card-g c0">
+          <rect x="70" y="18" width="210" height="60" rx="14"
+                fill="rgba(0,255,204,0.06)" stroke="#00ffcc" stroke-width="1.5"/>
+          <g transform="translate(92,36)" fill="none" stroke="#00ffcc" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="14" x="2" y="1" rx="2"/>
+            <line x1="8" x2="16" y1="19" y2="19"/><line x1="12" x2="12" y1="15" y2="19"/>
+          </g>
+          <text x="130" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
+                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">Client</text>
+        </g>
+        <!-- API Gateway (cyan, Lucide "server") -->
+        <g class="card-g c1">
+          <rect x="420" y="18" width="210" height="60" rx="14"
+                fill="rgba(0,255,204,0.06)" stroke="#00ffcc" stroke-width="1.5"/>
+          <g transform="translate(440,37)" fill="none" stroke="#00ffcc" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="8" x="2" y="0" rx="2"/><rect width="20" height="8" x="2" y="12" rx="2"/>
+            <line x1="6" x2="6.01" y1="4" y2="4"/><line x1="6" x2="6.01" y1="16" y2="16"/>
+          </g>
+          <text x="474" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
+                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">API Gateway</text>
+        </g>
+        <!-- Lambda (blue, Lucide "zap") -->
+        <g class="card-g c2">
+          <rect x="770" y="18" width="210" height="60" rx="14"
+                fill="rgba(0,170,255,0.07)" stroke="#00aaff" stroke-width="1.5"/>
+          <g transform="translate(792,36)" fill="none" stroke="#00aaff" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 0 3 12 12 12 11 20 21 8 12 8 13 0"/>
+          </g>
+          <text x="826" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
+                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">Lambda 函数</text>
+        </g>
+        <!-- DynamoDB (magenta, Lucide "database") -->
+        <g class="card-g c3">
+          <rect x="1120" y="18" width="210" height="60" rx="14"
+                fill="rgba(255,0,170,0.07)" stroke="#ff00aa" stroke-width="1.5"/>
+          <g transform="translate(1142,36)" fill="none" stroke="#ff00aa" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="3" rx="9" ry="3"/>
+            <path d="M3 3V17A9 3 0 0 0 21 17V3"/><path d="M3 10A9 3 0 0 0 21 10"/>
+          </g>
+          <text x="1176" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
+                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">DynamoDB</text>
+        </g>
+
+        <!-- ===== LIFELINES (wrapper <g> drops via scaleY; inner <line>
+                 carries the infinite marching-ants shimmer) ===== -->
+        <g class="lifeline-wrap"><line class="lifeline" x1="175"  y1="84" x2="175"  y2="600" stroke="rgba(0,255,204,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="525"  y1="84" x2="525"  y2="600" stroke="rgba(0,255,204,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="875"  y1="84" x2="875"  y2="600" stroke="rgba(0,170,255,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="1225" y1="84" x2="1225" y2="600" stroke="rgba(255,0,170,0.35)" stroke-width="1.5"/></g>
+
+        <!-- ===== ACTIVATION BARS (grow downward from the moment each
+                 participant first becomes active — delays in CSS) ===== -->
+        <rect class="activation act-client"  x="170"  y="150" width="10" height="410" rx="4" fill="rgba(0,255,204,0.16)" stroke="rgba(0,255,204,0.55)" stroke-width="1"/>
+        <rect class="activation act-gateway" x="520"  y="165" width="10" height="392" rx="4" fill="rgba(0,255,204,0.16)" stroke="rgba(0,255,204,0.55)" stroke-width="1"/>
+        <rect class="activation act-lambda"  x="870"  y="265" width="10" height="228" rx="4" fill="rgba(0,170,255,0.16)" stroke="rgba(0,170,255,0.55)" stroke-width="1"/>
+        <rect class="activation act-dynamo"  x="1220" y="335" width="10" height="98"  rx="4" fill="rgba(255,0,170,0.16)" stroke="rgba(255,0,170,0.55)" stroke-width="1"/>
+
+        <!-- ===== CARD GLOW FLASHES (brief pulse when a message lands;
+                 same geometry as the header cards, blurred + brighter) ===== -->
+        <rect class="card-glow g-gateway m1-glow" x="420"  y="18" width="210" height="60" rx="14" fill="none" stroke="#00ffcc" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-lambda"          x="770"  y="18" width="210" height="60" rx="14" fill="none" stroke="#00aaff" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-dynamo"          x="1120" y="18" width="210" height="60" rx="14" fill="none" stroke="#ff00aa" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-client"          x="70"   y="18" width="210" height="60" rx="14" fill="none" stroke="#00ffcc" stroke-width="3" filter="url(#fGlow)"/>
+
+        <!-- =================================================================
+             MESSAGES 1..7. Each group .mN contains:
+               .msg-path   invisible geometry for the packet's <mpath>
+               .msg-line   the visible arrow shaft (wipes in / fades in)
+               .arrowhead  hand-placed triangle at the target end (pops in
+                           on arrival — a <marker> can't be animated per-use)
+               .msg-label  mono label above the shaft
+               .badge      numbered circle at the source end
+             Row Ys per the comment grid. Packet dots live at the end of the
+             SVG so they render above everything.
+             ================================================================= -->
+
+        <!-- MSG 1: POST /orders — Client -> Gateway, cyan solid, y=180 -->
+        <g class="m1">
+          <path id="p1" class="msg-path" d="M 180 180 L 516 180" fill="none" stroke="none"/>
+          <line class="msg-line" x1="180" y1="180" x2="516" y2="180" pathLength="1"
+                stroke="#00ffcc" stroke-width="2.5"/>
+          <polygon class="arrowhead" points="516,180 502,173 502,187" fill="#00ffcc"/>
+          <text class="msg-label" x="348" y="166" text-anchor="middle" fill="#00ffcc"
+                font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">POST /orders</text>
+          <g class="badge"><circle cx="180" cy="180" r="12" fill="#0a0f1c" stroke="#00ffcc" stroke-width="1.5"/>
+            <text x="180" y="185" text-anchor="middle" fill="#00ffcc" font-size="13" font-weight="700"
+                  style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">1</text></g>
+        </g>
+
+        <!-- MSG 2: 鉴权 + 路由 — self-note pill on the Gateway lifeline, y≈215 -->
+        <g class="pill-g">
+          <rect x="447" y="200" width="156" height="32" rx="16"
+                fill="rgba(0,170,255,0.10)" stroke="rgba(0,170,255,0.6)" stroke-width="1.2"/>
+          <circle cx="467" cy="216" r="10" fill="#0a0f1c" stroke="#00aaff" stroke-width="1.4"/>
+          <text x="467" y="220.5" text-anchor="middle" fill="#00aaff" font-size="12" font-weight="700"
+                style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">2</text>
+          <text x="486" y="221" fill="#e0e0ff" font-size="14.5"
+                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">鉴权 + 路由</text>
+        </g>
+
+        <!-- MSG 3: Invoke — Gateway -> Lambda, blue solid, y=280 -->
+        <g class="m3">
+          <path id="p3" class="msg-path" d="M 530 280 L 866 280" fill="none" stroke="none"/>
+          <line class="msg-line" x1="530" y1="280" x2="866" y2="280" pathLength="1"
+                stroke="#00aaff" stroke-width="2.5"/>
+          <polygon class="arrowhead" points="866,280 852,273 852,287" fill="#00aaff"/>
+          <text class="msg-label" x="698" y="266" text-anchor="middle" fill="#00aaff"
+                font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">Invoke</text>
+          <g class="badge"><circle cx="530" cy="280" r="12" fill="#0a0f1c" stroke="#00aaff" stroke-width="1.5"/>
+            <text x="530" y="285" text-anchor="middle" fill="#00aaff" font-size="13" font-weight="700"
+                  style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">3</text></g>
+        </g>
+
+        <!-- MSG 4: PutItem — Lambda -> DynamoDB, blue solid, y=350 -->
+        <g class="m4">
+          <path id="p4" class="msg-path" d="M 880 350 L 1216 350" fill="none" stroke="none"/>
+          <line class="msg-line" x1="880" y1="350" x2="1216" y2="350" pathLength="1"
+                stroke="#00aaff" stroke-width="2.5"/>
+          <polygon class="arrowhead" points="1216,350 1202,343 1202,357" fill="#00aaff"/>
+          <text class="msg-label" x="1048" y="336" text-anchor="middle" fill="#00aaff"
+                font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">PutItem</text>
+          <g class="badge"><circle cx="880" cy="350" r="12" fill="#0a0f1c" stroke="#00aaff" stroke-width="1.5"/>
+            <text x="880" y="355" text-anchor="middle" fill="#00aaff" font-size="13" font-weight="700"
+                  style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">4</text></g>
+        </g>
+
+        <!-- MSG 5: 200 OK (item) — DynamoDB -> Lambda, magenta DASHED return, y=420 -->
+        <g class="m5">
+          <path id="p5" class="msg-path" d="M 1220 420 L 884 420" fill="none" stroke="none"/>
+          <line class="msg-line dashed" x1="1220" y1="420" x2="884" y2="420"
+                stroke="#ff00aa" stroke-width="2.2" stroke-dasharray="8 6"/>
+          <polygon class="arrowhead" points="884,420 898,413 898,427" fill="#ff00aa"/>
+          <text class="msg-label" x="1052" y="406" text-anchor="middle" fill="#ff00aa"
+                font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">200 OK (item)</text>
+          <g class="badge"><circle cx="1220" cy="420" r="12" fill="#0a0f1c" stroke="#ff00aa" stroke-width="1.5"/>
+            <text x="1220" y="425" text-anchor="middle" fill="#ff00aa" font-size="13" font-weight="700"
+                  style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">5</text></g>
+        </g>
+
+        <!-- MSG 6: result — Lambda -> Gateway, magenta dashed, y=480 -->
+        <g class="m6">
+          <path id="p6" class="msg-path" d="M 870 480 L 534 480" fill="none" stroke="none"/>
+          <line class="msg-line dashed" x1="870" y1="480" x2="534" y2="480"
+                stroke="#ff00aa" stroke-width="2.2" stroke-dasharray="8 6"/>
+          <polygon class="arrowhead" points="534,480 548,473 548,487" fill="#ff00aa"/>
+          <text class="msg-label" x="702" y="466" text-anchor="middle" fill="#ff00aa"
+                font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">result</text>
+          <g class="badge"><circle cx="870" cy="480" r="12" fill="#0a0f1c" stroke="#ff00aa" stroke-width="1.5"/>
+            <text x="870" y="485" text-anchor="middle" fill="#ff00aa" font-size="13" font-weight="700"
+                  style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">6</text></g>
+        </g>
+
+        <!-- MSG 7: 201 Created — Gateway -> Client, magenta dashed + glow (payoff), y=545 -->
+        <g class="m7">
+          <path id="p7" class="msg-path" d="M 520 545 L 184 545" fill="none" stroke="none"/>
+          <!-- NO filter on this line: a purely horizontal line has a zero-height
+               bounding box, and filter regions are sized in bbox PERCENTAGES —
+               so any filter (incl. fGlow) collapses to a 0-height region and the
+               line vanishes entirely. Emphasis comes from width instead. -->
+          <line class="msg-line dashed" x1="520" y1="545" x2="184" y2="545"
+                stroke="#ff00aa" stroke-width="3.2" stroke-dasharray="8 6"/>
+          <polygon class="arrowhead" points="184,545 198,538 198,552" fill="#ff00aa" filter="url(#fGlow)"/>
+          <text class="msg-label" x="352" y="531" text-anchor="middle" fill="#ff00aa" font-weight="700"
+                font-size="15.5" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">201 Created</text>
+          <g class="badge"><circle cx="520" cy="545" r="12" fill="#0a0f1c" stroke="#ff00aa" stroke-width="1.5"/>
+            <text x="520" y="550" text-anchor="middle" fill="#ff00aa" font-size="13" font-weight="700"
+                  style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">7</text></g>
+        </g>
+
+        <!-- =================================================================
+             PACKETS — glowing dots that ride each message path via SMIL
+             <animateMotion> + <mpath>. All begin at "clock.begin + offset"
+             (offsets = the packet column of the DELAY TABLE). fill="freeze"
+             is NOT used: each dot flips back to opacity 0 via its paired
+             <animate> so only the traveling window is visible.
+             ================================================================= -->
+        <g class="packet" opacity="0">
+          <circle r="6" fill="#00ffcc" filter="url(#fGlow)"/>
+          <animateMotion begin="clock.begin+1.55s" dur="0.6s" fill="remove"><mpath href="#p1"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+1.55s" dur="0.6s"/>
+        </g>
+        <g class="packet" opacity="0">
+          <circle r="6" fill="#00aaff" filter="url(#fGlow)"/>
+          <animateMotion begin="clock.begin+3.35s" dur="0.6s" fill="remove"><mpath href="#p3"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+3.35s" dur="0.6s"/>
+        </g>
+        <g class="packet" opacity="0">
+          <circle r="6" fill="#00aaff" filter="url(#fGlow)"/>
+          <animateMotion begin="clock.begin+4.25s" dur="0.6s" fill="remove"><mpath href="#p4"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+4.25s" dur="0.6s"/>
+        </g>
+        <g class="packet" opacity="0">
+          <circle r="6" fill="#ff00aa" filter="url(#fGlow)"/>
+          <animateMotion begin="clock.begin+5.15s" dur="0.6s" fill="remove"><mpath href="#p5"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+5.15s" dur="0.6s"/>
+        </g>
+        <g class="packet" opacity="0">
+          <circle r="6" fill="#ff00aa" filter="url(#fGlow)"/>
+          <animateMotion begin="clock.begin+6.05s" dur="0.6s" fill="remove"><mpath href="#p6"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+6.05s" dur="0.6s"/>
+        </g>
+        <g class="packet" opacity="0">
+          <circle r="7" fill="#ff00aa" filter="url(#fGlow)"/>
+          <animateMotion begin="clock.begin+6.95s" dur="0.6s" fill="remove"><mpath href="#p7"/></animateMotion>
+          <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+6.95s" dur="0.6s"/>
+        </g>
+      </svg>
+    </div>
+
+    <footer>
+      <div class="caption">报文沿生命线逐条流动 — SMIL animateMotion + CSS 编排</div>
+      <button id="replay" type="button" aria-label="Replay animation">↻ Replay</button>
+    </footer>
+  </div>
+
+  <script>
+    /* ==================================================================
+       ONE-SHOT DRIVER — the one tiny bit of JS (~25 lines of logic).
+       Mechanism (single, documented): CSS reveal animations are armed by
+       the .play class on the <svg>; SMIL packets all begin relative to
+       the master <animate id="clock">, which is kicked manually with
+       beginElement(). The choreography plays ONCE and freezes on the
+       fully-drawn final state (every CSS animation is fill:forwards).
+       No loop — the Replay button restarts it manually.
+       Reduced motion: never start anything; body.reduced-motion pins the
+       final state (see CSS) — diagram reads as a finished static figure.
+       ================================================================== */
+    (function () {
+      var svg = document.getElementById('seq');
+      var clock = document.getElementById('clock');
+
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) {                             // static final state, no motion
+        document.body.classList.add('reduced-motion');
+        return;
+      }
+
+      svg.classList.add('js');                   // arm "initial hidden" states
+
+      function play() {
+        svg.classList.remove('play');            // reset CSS animations…
+        void svg.getBoundingClientRect();        // …force style flush…
+        svg.classList.add('play');               // …and re-arm them
+        try { clock.beginElement(); }            // kick all SMIL packets
+        catch (e) { /* SMIL unsupported: arrows still animate via CSS */ }
+      }
+
+      document.getElementById('replay').addEventListener('click', play);
+      play();                                    // boot — plays once, freezes
+    })();
+  </script>
+</body>
+</html>

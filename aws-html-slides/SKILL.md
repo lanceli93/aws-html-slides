@@ -13,7 +13,7 @@ Create zero-dependency, animation-rich HTML presentations that run entirely in t
 
 This skill helps you create browser-based HTML presentations with rich animations. There are two paths:
 
-**Rich content blocks** (usable in any slide): images/video, data **charts**, comparison **tables**, and **diagrams** — flowcharts, AWS architecture, sequence/UML/ER, network, or mind maps (drawn via the drawio skill; needs the draw.io desktop CLI).
+**Rich content blocks** (usable in any slide): images/video, data **charts**, comparison **tables**, and **diagrams** — flowcharts, sequence/UML/ER, network, mind maps, and architecture drawn as **native animated SVG** (zero dependencies, packets flowing along edges, optional isometric 3D); AWS architecture diagrams with official service icons via the drawio skill (needs the draw.io desktop CLI).
 
 ### Two Paths
 
@@ -202,7 +202,7 @@ Where `<page_count>` is the middle value of the chosen range (Short=8, Medium=15
 **Also mention the optional rich blocks** so the user knows what's available (the template header in content.md documents each in full):
 - `### chart` — data charts (bar, line, pie, etc.)
 - `### table` — comparison tables
-- `### diagram` — flowcharts, **AWS architecture diagrams**, sequence/UML/ER, network topology, or mind maps, drawn via the drawio skill. Example: a slide with `### diagram` + `type: aws` + a plain-language description of the components. **Note:** diagrams require the draw.io desktop CLI (`brew install --cask drawio`); if it's not installed, I'll flag it at review and fall back to a CSS layout. See [diagram-reference.md](diagram-reference.md).
+- `### diagram` — flowcharts, sequence/UML/ER, network topology, mind maps, or architecture, drawn as **native animated SVG** right in the slide (no install needed; supports `animate: flow` request-packet animation and an isometric-3D architecture look). Only `type: aws` (official AWS service icons) uses the drawio skill and requires the draw.io desktop CLI (`brew install --cask drawio`); if it's missing I'll flag it at review and draw natively instead. See [diagram-reference.md](diagram-reference.md).
 
 **IMPORTANT: Do NOT fill in or modify content.md on behalf of the user.** The content must come from the user. If the user asks you to draft content, confirm the topic and outline with them first via AskUserQuestion before writing anything. Never assume or auto-generate slide content without explicit user approval.
 
@@ -221,7 +221,7 @@ Read the completed content.md and perform a review before proceeding:
    - Media files referenced but not found
    - Chart blocks: validate `type` is one of line/bar/doughnut/pie/radar/polarArea, labels count matches data count
    - Table blocks: validate markdown table syntax is well-formed
-   - Diagram blocks: validate `type` (if present) is one of flowchart/aws/sequence/class/er/network/mindmap, and the description is non-empty. If the deck has any `### diagram` block, note that rendering needs the draw.io desktop CLI (`drawio`) — flag once here if it's missing, and mention the fallbacks in [diagram-reference.md](diagram-reference.md)
+   - Diagram blocks: validate `type` (if present) is one of flowchart/sequence/class/er/network/mindmap/arch/aws, and the description is non-empty. Native types need no prerequisites. Only if the deck has a `type: aws` block: note that AWS icon rendering needs the draw.io desktop CLI (`drawio`) — flag once here if it's missing, and mention the fallbacks in [diagram-reference.md](diagram-reference.md)
 4. **Present a summary table** to the user showing: slide number, title, content preview, media count, any warnings
 5. **Ask for confirmation** via AskUserQuestion (header: "Review"):
    - "Looks good, proceed" — Continue to Step 5
@@ -240,10 +240,10 @@ Generate the full presentation using content from Step 4 and style from Step 3.
 - [viewport-base.css](viewport-base.css) — Mandatory CSS (include in full)
 - [animation-patterns.md](animation-patterns.md) — Animation reference for the chosen feeling
 - [chart-reference.md](chart-reference.md) — Chart.js patterns (only if content.md contains `### chart` blocks)
-- [diagram-reference.md](diagram-reference.md) — draw.io diagram patterns via the drawio skill (only if content.md contains `### diagram` blocks)
+- [diagram-reference.md](diagram-reference.md) — native animated SVG diagram framework + drawio-for-AWS path (only if content.md contains `### diagram` blocks); working demos in `../demos/diagrams/`
 - **Layout patterns file for the chosen style** (if available) — CSS classes + HTML templates for rich layouts. These are extracted from preview files and contain the actual implementation details. Read the matching file:
+  - Style #1 Neon Cyber → [layout-neon.md](layout-neon.md)
   - Style #2 re:Invent Keynote → [layout-reinvent.md](layout-reinvent.md)
-  - (Style #1 Neon Cyber: use STYLE_PRESETS.md + the preview file directly)
 - **[effects-reference.md](effects-reference.md)** (optional, either specialty style) — only when the user wants richer 3D/motion. The catalog is palette-agnostic; use the matching token set and demo dir: style #1 Neon → `demos/neon/`, style #2 re:Invent → `demos/`.
 
 **Layout rule: Never use plain left-aligned bullet lists.** Always use a layout pattern from the layout reference file (pill cards, feature grid, split divider, process flow, etc.). Match content type to the recommended layout in the "Layout Selection Guide" table.
@@ -299,7 +299,7 @@ When generating presentations with **8 or more slides**, use parallel sub-agents
 - All agents must use the **same CSS class names** — define these clearly in each prompt
 - Include HTML pattern examples (title slide, divider, grid, image, etc.) in each prompt
 - File naming with numeric prefixes (`00-`, `10-`, `20-`...) ensures correct concatenation order
-- **Diagram blocks**: export all `### diagram` PNGs to `assets/` (via the drawio skill) **before** launching slide batch agents. Give each batch agent only the relative `assets/diagram-N.png` path to embed — batch agents write `<section>` markup, they do not run the drawio CLI. See [diagram-reference.md](diagram-reference.md).
+- **Diagram blocks**: prepare every diagram **before** launching slide batch agents. Native types: the lead designs the inline-SVG `<figure>` block (adapting `../demos/diagrams/` patterns) and hands it to the batch agent to inline verbatim — batch agents never invent diagram geometry. `type: aws`: export the PNG to `assets/` via the drawio skill first and hand over only the relative `assets/diagram-N.png` path. See [diagram-reference.md](diagram-reference.md).
 
 ### Delivery
 
@@ -326,8 +326,9 @@ After generation:
 | [html-template.md](html-template.md) | HTML structure, JS features, code quality standards | Step 5 (generation) |
 | [animation-patterns.md](animation-patterns.md) | CSS/JS animation snippets and effect-to-feeling guide | Step 5 (generation) |
 | [chart-reference.md](chart-reference.md) | Chart.js integration patterns, theme color palettes, parsing rules | Step 5 (when charts used) |
-| [diagram-reference.md](diagram-reference.md) | draw.io diagram patterns (flowchart, AWS architecture, sequence/UML/ER, network, mindmap) via the drawio skill — parsing, theme-matching, PNG embedding, fallbacks | Step 5 (when `### diagram` blocks used) |
-| [layout-reinvent.md](layout-reinvent.md) | re:Invent Keynote layout patterns — CSS + HTML for all slide types | Step 5 (style #2) |
+| [diagram-reference.md](diagram-reference.md) | Native animated SVG diagram framework (flowchart, sequence, ER, network, mindmap, arch incl. isometric 3D — demos in `../demos/diagrams/`) + drawio path for `type: aws` — parsing, choreography, theme-matching, fallbacks | Step 5 (when `### diagram` blocks used) |
+| [layout-neon.md](layout-neon.md) | Neon Cyber layout patterns — HUD chrome, bento/spotlight/gauges/marquee/orbit + FX JS contract | Step 5 (style #1) |
+| [layout-reinvent.md](layout-reinvent.md) | re:Invent Keynote layout patterns — CSS + HTML for all slide types incl. bento/spotlight/marquee + motion defaults | Step 5 (style #2) |
 | [effects-reference.md](effects-reference.md) | 3D & motion effects catalog (CSS 3D, WebGL shaders, GSAP, View Transitions) — palette-agnostic; license red-lines, offline rules, demos in `../demos/` (purple) and `../demos/neon/` (cyan) | Optional (richer 3D/motion, either specialty style) |
 | [scripts/extract-pptx.py](scripts/extract-pptx.py) | Python script for PPT content extraction | Step 3 (PPT conversion) |
 | [scripts/gen-content.py](scripts/gen-content.py) | Generate content.md template by page count (no AI needed) | Step 3 (project setup) |

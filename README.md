@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **PPT Conversion** — Convert existing `.pptx` files to web presentations, preserving images, text, and notes.
 - **Anti-AI-Slop** — Distinctive styles that avoid generic AI aesthetics. Custom fonts, curated palettes, purposeful animations.
 - **Chart.js Support** — Embed responsive charts (line, bar, doughnut, pie, radar, polar) directly in slides using simple markdown syntax — auto-themed to match your chosen style.
-- **Diagram Support** — Draw flowcharts, AWS architecture diagrams, sequence/UML/ER, network topology, or mind maps via the [drawio-skill](https://github.com/Agents365-ai/drawio-skill). Just describe the diagram in plain language in `content.md` — the skill generates and embeds a PNG automatically.
+- **Diagram Support** — Describe a diagram in plain language in `content.md` and the skill draws it as **native animated SVG** right in the slide: flowcharts, sequence/UML/ER, network topology, mind maps, and architecture — with request packets flowing along the edges, staggered entrances, hover highlighting, and an optional **isometric 3D** architecture look. Zero dependencies, vector-crisp, theme-native colors. Only `type: aws` (official AWS service icons) uses the [drawio-skill](https://github.com/Agents365-ai/drawio-skill) to generate and embed a PNG.
 - **Tables & Media Lightbox** — Themed comparison tables from plain markdown, plus click-to-enlarge lightbox for any image or diagram.
 - **Inline Editing** — Press `E` to edit text directly in the browser, `Esc` to save.
 - **Save to File** — `Cmd/Ctrl+S` writes your edits back into the source `index.html`. No more "lost on cache clear" — edits become permanent changes to the file itself. Chrome / Edge only (uses the File System Access API).
@@ -129,9 +129,9 @@ my-presentation/
 | 1 | Neon Cyber | Futuristic, techy, neon glow, 3D-ready | Specialty |
 | 2 | re:Invent Keynote | Futuristic, keynote-stage, high-tech, 3D-ready | Specialty |
 
-**Neon Cyber** — black-and-neon aesthetic with cyan/magenta glow, scanlines, and grid. Best for technical, futuristic, or product-launch topics that want energy. Now supports the optional 3D/motion effects below in a cyan/magenta tint ([`demos/neon/`](demos/neon/)).
+**Neon Cyber** — black-and-neon cyberpunk-HUD aesthetic with cyan/magenta glow, scanlines, grid, and corner-bracket chrome. Ships ~11 HUD-grade layouts (kinetic per-char titles, terminal typing, bento grid with rotating border-beam hero, cursor-spotlight cards, SVG gauge rings with count-up, VS comparison, circuit pipeline with pulse dots, dual marquee rows, glitch quotes, orbit diagrams) — see `aws-html-slides/layout-neon.md`. Best for technical, futuristic, or product-launch topics that want energy. Also supports the optional 3D/motion effects below in a cyan/magenta tint ([`demos/neon/`](demos/neon/)).
 
-**re:Invent Keynote** — the most developed style, modeled on AWS keynote stages. Ships ~18 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, process flows, timelines, big-number slides) so long decks never look monotonous, and it supports the optional 3D/motion effects below in its purple/pink tint.
+**re:Invent Keynote** — the most developed style, modeled on AWS keynote stages. Ships ~19 keynote-grade content layouts (refined framed slides, metric cards with deltas, tagged card grids, numbered outlook columns, process flows, timelines, big-number slides, plus bento grid with border-beam hero, cursor-spotlight cards, and dual marquee rows) with motion defaults (title word-reveal + gradient shimmer, count-up metrics) so long decks never look monotonous, and it supports the optional 3D/motion effects below in its purple/pink tint.
 
 ## 3D & Motion Effects (Experimental)
 
@@ -155,7 +155,7 @@ Optional, **fully offline and self-contained** ways to add depth and motion to *
 
 - An AI IDE or agent that supports skills (e.g. [Claude Code](https://claude.ai/claude-code))
 - For PPT conversion: Python with `python-pptx` (auto-installed via `uv`)
-- For diagrams (optional): [draw.io desktop app](https://github.com/jgraph/drawio-desktop/releases) CLI on PATH (`brew install --cask drawio`) and the [drawio-skill](https://github.com/Agents365-ai/drawio-skill) installed
+- For AWS architecture diagrams with official icons only (`type: aws`, optional): [draw.io desktop app](https://github.com/jgraph/drawio-desktop/releases) CLI on PATH (`brew install --cask drawio`) and the [drawio-skill](https://github.com/Agents365-ai/drawio-skill) installed — all other diagram types are drawn natively with no prerequisites
 
 ## License
 
@@ -192,7 +192,7 @@ https://github.com/user-attachments/assets/54dfbf37-7a7a-44e1-ad7e-585b99e9c77a
 - **PPT 转换** —— 将已有的 `.pptx` 文件转换为网页演示文稿，保留图片、文字和备注。
 - **拒绝 AI 味** —— 独特的设计风格，避免千篇一律的 AI 审美。定制字体、精选配色、有目的的动画。
 - **Chart.js 图表支持** —— 通过简单的 Markdown 语法直接在幻灯片中嵌入响应式图表（折线、柱状、环形、饼图、雷达、极坐标），并自动套用所选风格的配色。
-- **架构图/流程图支持** —— 通过 [drawio-skill](https://github.com/Agents365-ai/drawio-skill) 绘制流程图、AWS 架构图、时序/UML/ER 图、网络拓扑或思维导图。在 `content.md` 中用自然语言描述即可，技能会自动生成并嵌入 PNG 图片。
+- **架构图/流程图支持** —— 在 `content.md` 中用自然语言描述，技能直接以**原生动画 SVG** 绘制在幻灯片中：流程图、时序/UML/ER 图、网络拓扑、思维导图和架构图 —— 支持请求包沿连线流动、分级入场动画、悬停高亮，以及可选的**等轴测 3D** 架构效果。零依赖、矢量清晰、配色天然贴合主题。仅 `type: aws`（官方 AWS 服务图标）通过 [drawio-skill](https://github.com/Agents365-ai/drawio-skill) 生成并嵌入 PNG。
 - **表格与媒体灯箱** —— 用纯 Markdown 生成套用主题配色的对比表格，图片和架构图均支持点击放大灯箱。
 - **浏览器内编辑** —— 按 `E` 进入编辑模式直接修改文字，按 `Esc` 保存。
 - **保存到源文件** —— `Cmd/Ctrl+S` 把编辑内容直接写回源 `index.html` 文件，不再"清缓存就丢失"，编辑真正成为文件本身的持久修改。仅支持 Chrome / Edge（基于 File System Access API）。
@@ -290,9 +290,9 @@ my-presentation/
 | 1 | Neon Cyber | 未来感、科技、霓虹光效、支持 3D | 特色 |
 | 2 | re:Invent Keynote | 未来感、主题演讲、高科技、支持 3D | 特色 |
 
-**Neon Cyber** —— 黑底霓虹美学，青/品红辉光、扫描线和网格背景。适合技术、未来感或产品发布类、想要冲击力的主题。现也支持下方可选的 3D/动效（青/品红配色版，见 [`demos/neon/`](demos/neon/)）。
+**Neon Cyber** —— 黑底霓虹赛博 HUD 美学，青/品红辉光、扫描线、网格背景与四角括号边框。内置约 11 种 HUD 级排版（逐字动态标题、终端打字机、带旋转光束描边主卡的 Bento 网格、鼠标追光卡片、SVG 仪表盘数字滚动、VS 对比、脉冲电路流程、双向跑马灯、故障风引言、轨道生态图），见 `aws-html-slides/layout-neon.md`。适合技术、未来感或产品发布类、想要冲击力的主题。也支持下方可选的 3D/动效（青/品红配色版，见 [`demos/neon/`](demos/neon/)）。
 
-**re:Invent Keynote** —— 最完善的风格，仿照 AWS 主题演讲舞台。内置约 18 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏、流程图、时间线、大数字页），长篇幻灯片不再单调；同样支持下方可选的 3D/动效（紫/粉配色版）。
+**re:Invent Keynote** —— 最完善的风格，仿照 AWS 主题演讲舞台。内置约 19 种主题演讲级内容排版（精致边框页、带涨跌的指标卡、标签卡片网格、编号展望栏、流程图、时间线、大数字页，以及带光束描边主卡的 Bento 网格、鼠标追光卡片、双向跑马灯），并默认启用动效（标题逐词浮现 + 渐变微光、指标数字滚动），长篇幻灯片不再单调；同样支持下方可选的 3D/动效（紫/粉配色版）。
 
 ## 3D 与动效（实验性）
 
@@ -316,7 +316,7 @@ my-presentation/
 
 - 支持技能的 AI IDE 或 Agent（如 [Claude Code](https://claude.ai/claude-code)）
 - PPT 转换需要：Python 及 `python-pptx`（通过 `uv` 自动安装）
-- 架构图/流程图（可选）：[draw.io 桌面版](https://github.com/jgraph/drawio-desktop/releases) CLI 已添加到 PATH（`brew install --cask drawio`），并安装 [drawio-skill](https://github.com/Agents365-ai/drawio-skill)
+- 仅带官方图标的 AWS 架构图（`type: aws`，可选）：[draw.io 桌面版](https://github.com/jgraph/drawio-desktop/releases) CLI 已添加到 PATH（`brew install --cask drawio`），并安装 [drawio-skill](https://github.com/Agents365-ai/drawio-skill) —— 其余图类型均为原生绘制，无需任何前置依赖
 
 ## 许可证
 

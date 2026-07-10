@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<!-- =====================================================================
+     Native SVG Diagram — Radial Mind Map  ·  "逆向工程方法论全景"
+     ---------------------------------------------------------------------
+     ONE self-contained, OFFLINE, ZERO-DEPENDENCY file. No CDN, no web
+     fonts, no build step, no libraries, no emoji — a hand-written radial
+     SVG mind map that replaces a static drawio PNG export.
+
+     WHY hand-written (not a drawio export): a mind map is just a center
+     node + N cubic-bezier limbs + labelled capsules. Authoring it as live
+     SVG (~1 file, a few KB) instead of a flat PNG buys us three things a
+     raster export can never give:
+       1. an ENTRANCE — the tree "blooms": center pulses in, limbs draw
+          themselves outward (stroke-dashoffset), capsules pop, leaves
+          cascade. All CSS keyframes, staggered by per-node --delay vars.
+       2. AMBIENCE — each branch group drifts ±3px on its own slow period
+          so the whole map breathes; the center glow pulses.
+       3. INTERACTION — hover/click a branch capsule to spotlight its whole
+          subtree (limb + capsule + leaves at full glow) and dim the rest.
+
+     HOW THE STATIC PICTURE IS BUILT (copy-paste reference):
+       * viewBox is a fixed 1400x760 design canvas; the <svg> scales to fit
+         with preserveAspectRatio, so all coordinates below are hand-placed
+         in that space and never need media queries.
+       * Center capsule sits at (700,380). Six branches radiate at roughly
+         even angles — 3 left, 3 right — for a symmetric, no-overlap layout.
+       * Each limb is ONE cubic bezier M700,380 C.. from the center to the
+         branch capsule. Leaf limbs are shorter beziers from the branch
+         capsule to each leaf pill. Coordinates were laid out and checked
+         for zero box-overlap at 1400x760 before being frozen here.
+       * pathLength="1" normalizes every path so a single dasharray/offset
+         of 1 -> 0 draws it, regardless of real length.
+
+     ACCESSIBILITY / ROBUSTNESS:
+       * prefers-reduced-motion  -> no bloom, no drift; the fully-bloomed
+         static tree is shown immediately (opacity/scale forced to final).
+       * Fits 100vh, no scrollbars. Console stays clean. file:// works.
+     ===================================================================== -->
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Native SVG — Radial Mind Map · 逆向工程方法论全景</title>
+<style>
+  /* ============================================================
+     SELF-CONTAINED, OFFLINE styles. Requested font stack first,
+     with generous fallbacks so it renders anywhere.
+     ============================================================ */
+  :root {
+    --bg:      #0a0f1c;   /* deep navy base */
+    --text:    #e0e0ff;   /* node / body text */
+    --cyan:    #00ffcc;
+    --magenta: #ff00aa;
+    --blue:    #00aaff;
+    --amber:   #ffaa00;
+    --violet:  #aa00ff;
+    --redpink: #ff5555;
+    --center:  #b9fff0;   /* center capsule accent */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100vh; height: 100dvh;   /* viewport fit, no scroll */
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Clash Display', 'Satoshi', 'Avenir Next', 'PingFang SC', sans-serif;
+  }
+
+  /* ---------------- background: starfield dots + faint grid + glow orbs ----
+     All pure CSS, painted on <body> behind the SVG. The two radial-gradient
+     "orbs" give the deck a soft neon wash; the layered small gradients are a
+     sparse starfield; the linear grid is barely-there structure. */
+  body {
+    position: relative;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(1.4px 1.4px at 12% 22%, rgba(224,224,255,0.55), transparent 60%),
+      radial-gradient(1.2px 1.2px at 78% 14%, rgba(0,255,204,0.45), transparent 60%),
+      radial-gradient(1.3px 1.3px at 63% 78%, rgba(255,0,170,0.40), transparent 60%),
+      radial-gradient(1.1px 1.1px at 32% 62%, rgba(0,170,255,0.42), transparent 60%),
+      radial-gradient(1.2px 1.2px at 88% 66%, rgba(224,224,255,0.35), transparent 60%),
+      radial-gradient(1.1px 1.1px at 46% 30%, rgba(255,255,255,0.30), transparent 60%),
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px),
+      var(--bg);
+    background-size:
+      auto, auto, auto, auto, auto, auto,
+      44px 44px, 44px 44px, auto;
+  }
+  /* two soft glow orbs, biased to opposite corners, pulsing gently */
+  body::before, body::after {
+    content: ""; position: fixed; z-index: 0; pointer-events: none;
+    border-radius: 50%; filter: blur(90px);
+  }
+  body::before {
+    width: 46vw; height: 46vw; left: -12vw; top: -14vw;
+    background: radial-gradient(circle, rgba(0,255,204,0.16), transparent 68%);
+    animation: orb 13s ease-in-out infinite;
+  }
+  body::after {
+    width: 50vw; height: 50vw; right: -14vw; bottom: -18vw;
+    background: radial-gradient(circle, rgba(170,0,255,0.15), transparent 68%);
+    animation: orb 17s ease-in-out infinite reverse;
+  }
+  @keyframes orb {
+    0%,100% { transform: translate(0,0) scale(1);    opacity: 0.85; }
+    50%     { transform: translate(3%, 4%) scale(1.08); opacity: 1;  }
+  }
+
+  /* ---------------- header ---------------- */
+  header {
+    position: relative; z-index: 2;
+    text-align: center; padding: 2.6vh 6vw 0.4vh;
+    flex: 0 0 auto; pointer-events: none;
+  }
+  .eyebrow {
+    font-size: clamp(10px, 1.15vw, 14px); letter-spacing: 0.4em; font-weight: 600;
+    text-transform: uppercase; color: rgba(224,224,255,0.62);
+  }
+  .eyebrow .tick { color: var(--cyan); }
+  h1 {
+    margin-top: 0.7rem;
+    font-size: clamp(26px, 4.2vw, 52px); line-height: 1.05; font-weight: 800;
+    letter-spacing: 0.01em;
+    background: linear-gradient(100deg, #fff 0%, #b9fff0 32%, var(--magenta) 70%, var(--blue) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 3px 26px rgba(0,255,204,0.22));
+  }
+  .sub {
+    margin-top: 0.7rem; font-size: clamp(12px, 1.5vw, 17px); font-weight: 400;
+    color: rgba(224,224,255,0.68); letter-spacing: 0.02em;
+  }
+
+  /* ---------------- SVG stage ---------------- */
+  .stage {
+    position: relative; z-index: 1; flex: 1 1 auto;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0; padding: 0 2vw;
+  }
+  svg#map {
+    width: 100%; max-width: 1400px; max-height: 70vh;
+    height: auto; display: block; overflow: visible;
+  }
+
+  /* ============================================================
+     NODE VISUALS
+     ============================================================ */
+  /* limbs: colored bezier strokes. --bc is set per branch group. */
+  .limb, .leaf-limb {
+    fill: none; stroke: var(--bc); stroke-linecap: round;
+    filter: drop-shadow(0 0 5px var(--bc));
+  }
+  .limb      { stroke-width: 3.5; }
+  .leaf-limb { stroke-width: 2;  opacity: 0.72; }
+
+  /* branch capsule */
+  .cap rect {
+    fill: rgba(10,15,28,0.72); stroke: var(--bc); stroke-width: 2.5;
+    filter: drop-shadow(0 0 10px var(--bc));
+  }
+  .cap-t {
+    fill: var(--text); font-size: 19px; font-weight: 700;
+    dominant-baseline: middle; text-anchor: start; letter-spacing: 0.01em;
+  }
+  .ic { fill: none; stroke: var(--bc); stroke-width: 2;
+        stroke-linecap: round; stroke-linejoin: round;
+        filter: drop-shadow(0 0 4px var(--bc)); }
+
+  /* leaf pill */
+  .leaf rect {
+    fill: rgba(10,15,28,0.55); stroke: var(--bc); stroke-width: 1.6;
+    opacity: 0.92;
+  }
+  .leaf-t {
+    fill: var(--text); font-size: 13.5px; font-weight: 500;
+    dominant-baseline: middle; text-anchor: middle; opacity: 0.94;
+  }
+
+  /* center node */
+  #center rect {
+    /* fully opaque: the six limbs terminate underneath this capsule — any
+       translucency would let them ghost through the label text */
+    fill: #0d1322;
+    stroke: var(--center); stroke-width: 3;
+    filter: drop-shadow(0 0 20px rgba(0,255,204,0.55));
+  }
+  #center .halo {
+    fill: rgba(0,255,204,0.10); stroke: none; filter: blur(2px);
+  }
+  #center text {
+    fill: #fff; font-size: 30px; font-weight: 800; letter-spacing: 0.02em;
+    dominant-baseline: middle; text-anchor: middle;
+    filter: drop-shadow(0 0 12px rgba(0,255,204,0.6));
+  }
+
+  /* ============================================================
+     BLOOM ENTRANCE  (default state = pre-bloom / hidden)
+     Each element carries its own --delay via inline style var; the
+     keyframes below give the spring-ish grow. When #map has .bloom the
+     animations play once and settle on their end state (fill: both).
+     ============================================================ */
+  /* center: scale-pulse in */
+  #center { transform-box: fill-box; transform-origin: center;
+            opacity: 0; transform: scale(0.4); }
+  #map.bloom #center { animation: centerIn 0.7s cubic-bezier(.2,1.5,.4,1) 0.05s both; }
+  @keyframes centerIn {
+    0%   { opacity: 0; transform: scale(0.4); }
+    70%  { opacity: 1; transform: scale(1.08); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* limbs: draw with dashoffset from tail to tip */
+  .limb, .leaf-limb {
+    stroke-dasharray: 1; stroke-dashoffset: 1;   /* pathLength=1 -> hidden */
+  }
+  #map.bloom .limb      { animation: draw 0.55s ease-out var(--ld)  both; }
+  #map.bloom .leaf-limb { animation: draw 0.4s  ease-out var(--lld) both; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  /* branch capsules: pop with spring */
+  .cap { transform-box: fill-box; transform-origin: center;
+         opacity: 0; transform: scale(0.3); }
+  #map.bloom .cap { animation: pop 0.5s cubic-bezier(.2,1.5,.4,1) var(--cd) both; }
+  @keyframes pop {
+    0%   { opacity: 0; transform: scale(0.3); }
+    70%  { opacity: 1; transform: scale(1.12); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* leaf pills: cascade in, slight rise */
+  .leaf { transform-box: fill-box; transform-origin: center;
+          opacity: 0; transform: scale(0.5); }
+  #map.bloom .leaf { animation: leafIn 0.45s cubic-bezier(.2,1.4,.4,1) var(--fd) both; }
+  @keyframes leafIn {
+    0%   { opacity: 0; transform: scale(0.5); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ============================================================
+     AMBIENT DRIFT  — each branch group breathes on its own period.
+     Applied only AFTER bloom settles (.settled) so it doesn't fight the
+     entrance transforms. Center gets a slow glow pulse.
+     --drift = period, --doff = negative delay to desync the phases.
+     ============================================================ */
+  #map.settled .branch {
+    animation: drift var(--drift) ease-in-out var(--doff) infinite;
+  }
+  @keyframes drift {
+    0%,100% { transform: translate(0px, 0px); }
+    33%     { transform: translate(2px, -3px); }
+    66%     { transform: translate(-2px, 2px); }
+  }
+  #map.settled #center .halo {
+    animation: glow 4.5s ease-in-out infinite;
+    transform-box: fill-box; transform-origin: center;
+  }
+  @keyframes glow {
+    0%,100% { opacity: 0.55; transform: scale(1);    }
+    50%     { opacity: 1;    transform: scale(1.14); }
+  }
+
+  /* ============================================================
+     SUBTREE SPOTLIGHT  — when #map has .focus and a branch has .active,
+     everything that is NOT the active branch dims. Active branch pops to
+     full glow. Center stays lit. Toggled by ~25 lines of JS below.
+     ============================================================ */
+  #map.focus .branch          { opacity: 0.22; transition: opacity 0.28s ease; }
+  #map.focus .branch.active   { opacity: 1; }
+  #map.focus .branch.active .cap rect  { stroke-width: 3.2; filter: drop-shadow(0 0 16px var(--bc)); }
+  #map.focus .branch.active .limb      { stroke-width: 4.2; }
+  #map.focus .branch.active .leaf rect { opacity: 1; stroke-width: 2.2; }
+  .branch .cap { cursor: pointer; }
+  /* keep the drift transform working under focus by not touching transform */
+
+  /* ---------------- controls + caption ---------------- */
+  .caption {
+    position: fixed; left: 26px; bottom: 20px; z-index: 3;
+    font-size: clamp(10px, 1.1vw, 13px); letter-spacing: 0.06em;
+    color: rgba(224,224,255,0.5); pointer-events: none; max-width: 60vw;
+  }
+  .caption b { color: rgba(224,224,255,0.78); font-weight: 600; }
+  #replay {
+    position: fixed; right: 26px; bottom: 20px; z-index: 3;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px; border-radius: 999px;
+    background: rgba(10,15,28,0.6); color: var(--text);
+    border: 1.5px solid rgba(0,255,204,0.55);
+    font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.06em;
+    cursor: pointer; backdrop-filter: blur(6px);
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  }
+  #replay:hover  { background: rgba(0,255,204,0.14); box-shadow: 0 0 18px rgba(0,255,204,0.4); }
+  #replay:active { transform: scale(0.96); }
+  #replay svg { width: 15px; height: 15px; stroke: var(--cyan); fill: none;
+                stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ============================================================
+     REDUCED MOTION  — no bloom, no drift, no orb pulse. Show the fully
+     bloomed static tree instantly by forcing every animated element to
+     its end state. Replay button is hidden (nothing to replay).
+     ============================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    body::before, body::after { animation: none; }
+    #center            { opacity: 1; transform: scale(1); }
+    .cap               { opacity: 1; transform: scale(1); }
+    .leaf              { opacity: 1; transform: scale(1); }
+    .limb, .leaf-limb  { stroke-dashoffset: 0; }
+    #map, #map.bloom, #map.settled { }
+    #map .branch       { animation: none; }
+    #replay            { display: none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">NATIVE SVG DIAGRAM<span class="tick"> // </span>RADIAL MIND MAP</div>
+    <h1>逆向工程方法论全景</h1>
+    <p class="sub">从中心概念放射生长 — 悬停高亮子树</p>
+  </header>
+
+  <div class="stage">
+    <!-- Design canvas is a fixed 1400x760; the SVG scales to fit. -->
+    <svg id="map" viewBox="0 0 1400 760" preserveAspectRatio="xMidYMid meet"
+         role="img" aria-label="逆向工程方法论雷达式思维导图：中心概念软件逆向工程，放射出白盒黑盒、数据即规格、特征测试、绞杀者模式、Vibe Coding、Skill 沉淀六大分支">
+
+      <!-- =================================================================
+           SIX BRANCHES. Each g.branch (with data-branch="N") carries CSS
+           vars: bc = branch color (limbs, capsule stroke, icon glow);
+           drift = ambient period; doff = phase offset.
+           Inside: one .limb (center to capsule), then per-leaf .leaf-limb +
+           .leaf pill, then the .cap capsule (icon + label) drawn last so it
+           sits above the limb origins. Every animated node has its own
+           ld / lld / cd / fd delay var to stagger the bloom.
+           (Coordinates hand-placed and overlap-checked at 1400x760.)
+           ================================================================= -->
+  <g class="branch" data-branch="1" style="--bc:#00ffcc;--drift:11s;--doff:-2s">
+    <path class="limb" pathLength="1" d="M700,380 C620,300 480,220 417,150" style="--ld:0.25s"/>
+    <path class="leaf-limb" pathLength="1" d="M345,150 C296,150 271,78 222,78" style="--lld:0.9s"/>
+    <g class="leaf" style="--fd:1.08s">
+      <rect x="78" y="53" width="144" height="50" rx="15"/>
+      <text class="leaf-t" x="150" y="78"><tspan x="150" dy="-10">有代码 · 读懂 +</tspan><tspan x="150" dy="20">剥离技术债</tspan></text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M345,150 C298,150 275,200 228,200" style="--lld:0.97s"/>
+    <g class="leaf" style="--fd:1.15s">
+      <rect x="72" y="175" width="156" height="50" rx="15"/>
+      <text class="leaf-t" x="150" y="200"><tspan x="150" dy="-10">无代码 · 观察行为</tspan><tspan x="150" dy="20">+ 抓包</tspan></text>
+    </g>
+    <g class="cap" style="--cd:0.7s">
+      <rect x="273" y="125" width="144" height="50" rx="25"/>
+      <g class="ic" transform="translate(291,138)"><path d="m13 13.5 2-2.5-2-2.5"/><path d="M9 8.5 7 11l2 2.5"/><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></g>
+      <text class="cap-t" x="323" y="150">白盒 / 黑盒</text>
+    </g>
+  </g>
+  <g class="branch" data-branch="2" style="--bc:#ff00aa;--drift:13s;--doff:-4s">
+    <path class="limb" pathLength="1" d="M700,380 C560,350 440,405 325,380" style="--ld:0.35s"/>
+    <path class="leaf-limb" pathLength="1" d="M258,380 C236,380 224,318 202,318" style="--lld:1.0s"/>
+    <g class="leaf" style="--fd:1.18s">
+      <rect x="34" y="303" width="168" height="30" rx="15"/>
+      <text class="leaf-t" x="118" y="318">Schema → 反推业务</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M258,380 C223,380 205,442 170,442" style="--lld:1.07s"/>
+    <g class="leaf" style="--fd:1.25s">
+      <rect x="66" y="417" width="104" height="50" rx="15"/>
+      <text class="leaf-t" x="118" y="442"><tspan x="118" dy="-10">真实数据</tspan><tspan x="118" dy="20">比文档可靠</tspan></text>
+    </g>
+    <g class="cap" style="--cd:0.8s">
+      <rect x="161" y="355" width="164" height="50" rx="25"/>
+      <g class="ic" transform="translate(179,368)"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g>
+      <text class="cap-t" x="211" y="380">数据即规格</text>
+    </g>
+  </g>
+  <g class="branch" data-branch="3" style="--bc:#00aaff;--drift:15s;--doff:-6s">
+    <path class="limb" pathLength="1" d="M700,380 C620,470 470,545 405,610" style="--ld:0.45s"/>
+    <path class="leaf-limb" pathLength="1" d="M345,610 C291,610 263,548 209,548" style="--lld:1.1s"/>
+    <g class="leaf" style="--fd:1.28s">
+      <rect x="91" y="533" width="118" height="30" rx="15"/>
+      <text class="leaf-t" x="150" y="548">黄金样本基线</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M345,610 C293,610 268,672 216,672" style="--lld:1.17s"/>
+    <g class="leaf" style="--fd:1.35s">
+      <rect x="84" y="657" width="132" height="30" rx="15"/>
+      <text class="leaf-t" x="150" y="672">逐人对比锁行为</text>
+    </g>
+    <g class="cap" style="--cd:0.9s">
+      <rect x="260" y="585" width="145" height="50" rx="25"/>
+      <g class="ic" transform="translate(278,598)"><path d="M10 2v7.31"/><path d="M14 9.3V1.99"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/></g>
+      <text class="cap-t" x="310" y="610">特征测试</text>
+    </g>
+  </g>
+  <g class="branch" data-branch="4" style="--bc:#ffaa00;--drift:12s;--doff:-8s">
+    <path class="limb" pathLength="1" d="M700,380 C780,300 900,220 988,150" style="--ld:0.55s"/>
+    <path class="leaf-limb" pathLength="1" d="M1055,150 C1113,150 1141,66 1199,66" style="--lld:1.2s"/>
+    <g class="leaf" style="--fd:1.38s">
+      <rect x="1199" y="51" width="118" height="30" rx="15"/>
+      <text class="leaf-t" x="1258" y="66">入口网关分流</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M1055,150 C1107,150 1133,160 1185,160" style="--lld:1.27s"/>
+    <g class="leaf" style="--fd:1.45s">
+      <rect x="1185" y="145" width="146" height="30" rx="15"/>
+      <text class="leaf-t" x="1258" y="160">防腐层隔离旧数据</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M1055,150 C1115,150 1146,254 1206,254" style="--lld:1.34s"/>
+    <g class="leaf" style="--fd:1.52s">
+      <rect x="1206" y="239" width="104" height="30" rx="15"/>
+      <text class="leaf-t" x="1258" y="254">逐模块替换</text>
+    </g>
+    <g class="cap" style="--cd:1.0s">
+      <rect x="988" y="125" width="164" height="50" rx="25"/>
+      <g class="ic" transform="translate(1006,138)"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3"/><path d="m15 9 6-6"/></g>
+      <text class="cap-t" x="1038" y="150">绞杀者模式</text>
+    </g>
+  </g>
+  <g class="branch" data-branch="5" style="--bc:#aa00ff;--drift:14s;--doff:-10s">
+    <path class="limb" pathLength="1" d="M700,380 C840,350 960,405 1046,380" style="--ld:0.65s"/>
+    <path class="leaf-limb" pathLength="1" d="M1142,380 C1183,380 1204,316 1245,316" style="--lld:1.3s"/>
+    <g class="leaf" style="--fd:1.48s">
+      <rect x="1245" y="301" width="90" height="30" rx="15"/>
+      <text class="leaf-t" x="1290" y="316">翻译需求</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M1142,380 C1183,380 1204,398 1245,398" style="--lld:1.37s"/>
+    <g class="leaf" style="--fd:1.55s">
+      <rect x="1245" y="383" width="90" height="30" rx="15"/>
+      <text class="leaf-t" x="1290" y="398">拆解任务</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M1142,380 C1183,380 1204,480 1245,480" style="--lld:1.44s"/>
+    <g class="leaf" style="--fd:1.62s">
+      <rect x="1245" y="465" width="90" height="30" rx="15"/>
+      <text class="leaf-t" x="1290" y="480">质量控制</text>
+    </g>
+    <g class="cap" style="--cd:1.1s">
+      <rect x="1046" y="355" width="185" height="50" rx="25"/>
+      <g class="ic" transform="translate(1064,368)"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></g>
+      <text class="cap-t" x="1096" y="380">Vibe Coding</text>
+    </g>
+  </g>
+  <g class="branch" data-branch="6" style="--bc:#ff5555;--drift:16s;--doff:-12s">
+    <path class="limb" pathLength="1" d="M700,380 C780,470 900,545 985,610" style="--ld:0.75s"/>
+    <path class="leaf-limb" pathLength="1" d="M1055,610 C1118,610 1150,556 1213,556" style="--lld:1.4s"/>
+    <g class="leaf" style="--fd:1.58s">
+      <rect x="1213" y="541" width="90" height="30" rx="15"/>
+      <text class="leaf-t" x="1258" y="556">分层索引</text>
+    </g>
+    <path class="leaf-limb" pathLength="1" d="M1055,610 C1113,610 1141,674 1199,674" style="--lld:1.47s"/>
+    <g class="leaf" style="--fd:1.65s">
+      <rect x="1199" y="659" width="118" height="30" rx="15"/>
+      <text class="leaf-t" x="1258" y="674">团队入职文档</text>
+    </g>
+    <g class="cap" style="--cd:1.2s">
+      <rect x="985" y="585" width="140" height="50" rx="25"/>
+      <g class="ic" transform="translate(1003,598)"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></g>
+      <text class="cap-t" x="1035" y="610">Skill 沉淀</text>
+    </g>
+  </g>
+
+      <!-- ===== center node — painted LAST so it sits ON TOP of the six
+           limbs (SVG paints in document order; all limbs start at 700,380
+           and must vanish underneath the opaque capsule, not cross it). -->
+      <g id="center">
+        <ellipse class="halo" cx="700" cy="380" rx="150" ry="70" />
+        <rect x="588" y="344" width="224" height="72" rx="36" />
+        <text x="700" y="382">软件逆向工程</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="caption">
+    <b>贝塞尔曲线枝干</b> · 分级绽放入场 · 子树悬停高亮
+  </div>
+
+  <button id="replay" type="button" aria-label="重播绽放动画">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/>
+    </svg>
+    Replay
+  </button>
+
+  <script>
+  "use strict";
+  (function () {
+    // =================================================================
+    //  ~25 lines of glue: bloom lifecycle + subtree spotlight + replay.
+    //  Everything visual is CSS; JS only toggles classes.
+    // =================================================================
+    var map = document.getElementById("map");
+    var replay = document.getElementById("replay");
+    var branches = map.querySelectorAll(".branch");
+    var settleTimer = 0;
+
+    var reduce = window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // ---- play the bloom, then flip to the ambient (.settled) state ----
+    function bloom() {
+      clearTimeout(settleTimer);
+      map.classList.remove("bloom", "settled");
+      // force reflow so re-adding .bloom restarts the animations
+      void map.getBoundingClientRect();
+      map.classList.add("bloom");
+      // after the full cascade (~2.2s) enable the breathing drift
+      settleTimer = setTimeout(function () { map.classList.add("settled"); }, 2200);
+    }
+
+    // ---- spotlight the hovered/clicked subtree, dim the rest ----
+    function focus(b) { map.classList.add("focus");
+                        branches.forEach(function (g) { g.classList.toggle("active", g === b); }); }
+    function clearFocus() { map.classList.remove("focus");
+                            branches.forEach(function (g) { g.classList.remove("active"); }); }
+
+    branches.forEach(function (g) {
+      var cap = g.querySelector(".cap");
+      cap.addEventListener("mouseenter", function () { focus(g); });
+      cap.addEventListener("click",      function () { focus(g); });
+    });
+    // leaving the whole SVG clears the spotlight
+    map.addEventListener("mouseleave", clearFocus);
+
+    replay.addEventListener("click", function () { clearFocus(); bloom(); });
+
+    // ---- boot: reduced-motion shows the static tree (CSS handles it);
+    //      otherwise run the bloom once on load. ----
+    if (!reduce) bloom();
+  })();
+  </script>
+</body>
+</html>

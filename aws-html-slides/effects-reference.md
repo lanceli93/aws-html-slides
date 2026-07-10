@@ -11,6 +11,12 @@ on whether it survives that bar: **does it still work when you double-click the
 `.html` with no network?** A beautiful effect that needs a live CDN or a paid export
 is useless here.
 
+> **Animated diagrams have their own reference.** The native SVG/CSS diagram
+> framework (flowchart/sequence/ER/mindmap + isometric-3D architecture, with
+> packet-flow animation) lives in [diagram-reference.md](diagram-reference.md),
+> with five Chrome-verified demos under `../demos/diagrams/`. The techniques
+> below are page-level effects; the diagram demos reuse the same offline rules.
+
 > **Combined integration demo: `../demos/all-effects/`.** A single 5-slide deck that
 > runs *every* effect below **together** in one document — WebGL nebula + GSAP kinetic
 > title (cover), CSS 3D cube + stage light-pool, 2.5D parallax, GSAP staggered cards

@@ -18,9 +18,15 @@ This skill ships **2 specialty presets**: **Neon Cyber** (#1) and **re:Invent Ke
 
 **Colors:** Deep navy (#0a0f1c), cyan accent (#00ffcc), magenta (#ff00aa)
 
-**Signature:** Particle backgrounds, neon glow, grid patterns
+**Signature:** Particle backgrounds, neon glow, grid patterns, cyberpunk HUD chrome (corner
+brackets + monospace `SYS.MODULE` labels), kinetic per-char titles, terminal typing, SVG gauge
+rings with count-up, glitch quotes, orbit diagrams, dual marquee rows
 
-See the bundled preview at `preview/01-neon-cyber.html` for the full implementation.
+**Layout System:** See [layout-neon.md](layout-neon.md) for the full set of ~11 HUD-grade layouts
+(kinetic title, terminal overview, bento grid with border-beam hero, spotlight cards, gauge
+metrics + scramble strip, VS comparison, circuit pipeline, marquee ecosystem, glitch quote, orbit
+integrations, CTA closing) — each with CSS classes + HTML skeletons. The bundled preview at
+`preview/01-neon-cyber.html` is the canonical implementation.
 
 **Optional 3D & motion effects:** Experimental, self-contained, offline effects can enrich this style — a cyan WebGL shader nebula, an upgraded constellation network, pointer-driven 3D tilt, and a GSAP-orchestrated kinetic title. Neon-palette demos live in `demos/neon/`; see [effects-reference.md](effects-reference.md) (palette-agnostic catalog, use the Neon token set). The particle/grid background remains the lightweight default.
 
@@ -64,7 +70,7 @@ See the bundled preview at `preview/01-neon-cyber.html` for the full implementat
 - Refined metric cards: category tag + large gradient number + unit + delta line (green up / amber down)
 - AWS orange (#FF9900) used sparingly — only for small accents, never dominant
 
-**Layout System:** See [layout-reinvent.md](layout-reinvent.md) for the full set of ~18 keynote-grade layouts (refined title, section divider, pill cards, metric-cards row, callout bar, tagged card grid, metric + side list, stats + feature grid, split divider, pipeline columns, quote, big number hero, comparison split, process flow, timeline zigzag, two-column reflection, numbered outlook, and more) — each with CSS classes + HTML skeletons.
+**Layout System:** See [layout-reinvent.md](layout-reinvent.md) for the full set of ~19 keynote-grade layouts (refined title, section divider, pill cards, metric-cards row, callout bar, tagged card grid, metric + side list, stats + feature grid, split divider, pipeline columns, quote, big number hero, comparison split, process flow, timeline zigzag, two-column reflection, numbered outlook, **bento grid with border-beam hero, spotlight cards, marquee**, and more) — each with CSS classes + HTML skeletons. Motion defaults: title word-reveal + gradient shimmer, count-up on every metric number.
 
 **Optional 3D & motion effects:** Experimental, self-contained, offline effects can enrich this style — CSS 3D heroes, hand-written WebGL shader backgrounds, and GSAP-orchestrated titles. See [effects-reference.md](effects-reference.md) and the `demos/` directory. The CSS animated-blob cover remains the lightweight default.
 
@@ -110,6 +116,12 @@ Each theme provides 6 harmonious colors for Chart.js datasets, plus grid/text co
 **Colors:** `#6366f1` (generic indigo), purple gradients on white
 
 **Layouts:** Everything centered, generic hero sections, identical card grids
+
+**Card accents:** The **solid colored `border-left: 3px` rail** on a filled rounded card (esp. paired
+with a rounded-square icon tile + round bullet dots) is the #1 AI/dashboard tell — avoid it. Carry
+color with an inline heading icon, a short underline tick, an outlined index, or a hairline divider
+instead of a full painted edge. (See Layout 12 in [layout-reinvent.md](layout-reinvent.md) for the
+editorial-split alternative.)
 
 **Decorations:** Realistic illustrations, gratuitous glassmorphism, drop shadows without purpose, emoji as icons (use Lucide)
 

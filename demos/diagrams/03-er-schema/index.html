@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Native SVG ER Diagram — Crow's-Foot Notation</title>
+
+<!--
+  ============================================================================
+  re:Invent Keynote — Native SVG ER Diagram (Crow's-Foot Notation)
+  ============================================================================
+  Self-contained, fully OFFLINE, zero network requests. Double-click to open
+  via file:// — no build, no CDN, no web fonts fetched over http(s).
+
+  WHY THIS FILE EXISTS
+  --------------------
+  This is a hand-written replacement for a botched draw.io ER export. draw.io's
+  built-in ER markers (style `endArrow=ERmany;startArrow=ERone`) rasterised as
+  tiny meaningless ticks in the PNG export — the "many" end did not read as a
+  crow's foot at all. So we draw the entities, the edges AND the crow's-foot
+  end-markers BY HAND in SVG, where we control every coordinate.
+
+  This doubles as a copy-paste reference for the aws-html-slides skill, so the
+  geometry and every non-obvious decision is commented.
+
+  ---------------------------------------------------------------------------
+  CROW'S-FOOT CRASH COURSE (what the markers mean)
+  ---------------------------------------------------------------------------
+  Crow's-foot (a.k.a. "Information Engineering") notation puts a small glyph at
+  EACH end of a relationship line describing that side's cardinality:
+
+    * "exactly one"  ->  two short perpendicular ticks (‖) crossing the line.
+                         Read as: min 1 (inner tick) and max 1 (outer tick).
+    * "many"         ->  a three-pronged "crow's foot" (⟨) that OPENS toward the
+                         entity, PLUS one tick just behind it. The foot = "many",
+                         the tick = "one-or-many" (i.e. 1..N, at least one).
+
+  In this schema every relationship is 1:N — one parent row relates to many
+  child rows — so each edge is  ‖ (one)  ————  ⟨ (many).
+
+  ---------------------------------------------------------------------------
+  WHY SVG <marker> DEFS ARE DRAWN WITH LITERAL FILLS/STROKES (not CSS vars)
+  ---------------------------------------------------------------------------
+  SVG <marker> contents are rendered in an isolated context. `context-stroke` /
+  `context-fill` (which would let a marker inherit its host line's color) have
+  patchy engine support, and CSS custom properties declared with var() do NOT
+  reliably cascade into <marker> children across browsers. So instead of one
+  var()-driven marker, we hand-write ONE explicit marker per (notation x color)
+  with literal hex fills/strokes. That's 3 colors x 2 notations = 6 markers,
+  named e.g. `one-blue`, `many-purple`. Verbose, but bullet-proof offline.
+
+  Markers use `orient="auto"` so they rotate to follow the line direction, and
+  we design each marker pointing along +X (the marker's local x-axis is the
+  line's travel direction), so ticks are vertical bars and the foot opens back
+  toward the "one" side.
+
+  ---------------------------------------------------------------------------
+  ACCESSIBILITY / MOTION
+  ---------------------------------------------------------------------------
+  * prefers-reduced-motion: reduce -> all entrance/draw-in/breathing animation
+    is disabled and the diagram is shown in its final static state.
+  * Hover-highlight also works on CLICK (toggle), so it demos on projectors /
+    touch where hover is unavailable.
+  ============================================================================
+-->
+
+<style>
+  /* ---------------------------------------------------------------- *
+   *  re:Invent Keynote palette + tokens                              *
+   * ---------------------------------------------------------------- */
+  :root {
+    --bg:        #0A0A0A;              /* base near-black               */
+    --purple:    #8B5CF6;             /* Order entity accent           */
+    --pink:      #D946EF;             /* OrderItem entity + FK tags     */
+    --blue:      #38BDF8;             /* Customer entity accent        */
+    --green:     #34D399;             /* Product entity accent         */
+    --text:      #FFFFFF;             /* primary text                  */
+    --muted:     rgba(255,255,255,0.6);
+    --entity-fill: rgba(139,92,246,0.07); /* translucent card fill     */
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;                /* fits 100vh, never scrolls      */
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    /* Deck font stack — Urbanist/Albert Sans first (if installed),
+       then graceful system fallbacks. No web font is FETCHED (offline). */
+    font-family: 'Urbanist', 'Albert Sans', 'Avenir Next', 'PingFang SC', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Ambient blurred background orbs — depth behind the diagram.     *
+   *  Purely decorative; sit at z 0 behind all content.               *
+   * ---------------------------------------------------------------- */
+  .orbs { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .orb {
+    position: absolute; border-radius: 50%;
+    filter: blur(90px); opacity: 0.45; will-change: transform;
+  }
+  .orb.o1 { width: 520px; height: 520px; top: -140px; left: -120px;
+            background: radial-gradient(circle, var(--purple), transparent 70%);
+            animation: drift1 24s ease-in-out infinite alternate; }
+  .orb.o2 { width: 460px; height: 460px; bottom: -160px; right: -100px;
+            background: radial-gradient(circle, var(--pink), transparent 70%);
+            animation: drift2 28s ease-in-out infinite alternate; }
+  .orb.o3 { width: 400px; height: 400px; top: 45%; left: 60%;
+            background: radial-gradient(circle, var(--blue), transparent 70%);
+            opacity: 0.28; animation: drift3 32s ease-in-out infinite alternate; }
+  @keyframes drift1 { from { transform: translate(0,0) scale(1);    }
+                      to   { transform: translate(70px,50px) scale(1.15); } }
+  @keyframes drift2 { from { transform: translate(0,0) scale(1);    }
+                      to   { transform: translate(-60px,-40px) scale(1.2); } }
+  @keyframes drift3 { from { transform: translate(0,0) scale(0.9);  }
+                      to   { transform: translate(-50px,30px) scale(1.05); } }
+
+  /* ---------------------------------------------------------------- *
+   *  Header — eyebrow + bilingual title + subtitle                   *
+   * ---------------------------------------------------------------- */
+  header {
+    position: relative; z-index: 2;
+    padding: clamp(18px, 3.4vh, 34px) 5vw 0;
+    flex: 0 0 auto;
+  }
+  .eyebrow {
+    display: inline-block;
+    font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--blue);
+    border: 1px solid rgba(56,189,248,0.4);
+    padding: 6px 14px; border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  header h1 {
+    margin: 0; font-size: clamp(26px, 3.6vh, 40px); font-weight: 800;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, var(--blue), var(--purple), var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header .sub {
+    margin: 8px 0 0; color: var(--muted);
+    font-size: clamp(13px, 1.9vh, 16px); letter-spacing: 0.3px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Diagram stage — the SVG scales to fit, capped at 68vh.          *
+   * ---------------------------------------------------------------- */
+  .stage {
+    position: relative; z-index: 1;
+    flex: 1 1 auto;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0;                  /* allow flex child to shrink      */
+    padding: 0 3vw;
+  }
+  svg.er {
+    width: 100%;
+    max-width: 1400px;
+    max-height: 68vh;
+    height: auto;
+    display: block;
+    overflow: visible;              /* hover glows may bleed past box  */
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Footer — caption (left) + replay button (right)                 *
+   * ---------------------------------------------------------------- */
+  footer {
+    position: relative; z-index: 2;
+    flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px;
+    padding: 0 5vw clamp(16px, 3vh, 30px);
+  }
+  .caption {
+    color: var(--muted); font-size: clamp(11px, 1.6vh, 14px);
+    letter-spacing: 0.2px; max-width: 70ch;
+  }
+  .caption .k { color: var(--text); font-weight: 700; }
+  #replay {
+    flex: 0 0 auto;
+    font-family: inherit; font-size: 13px; letter-spacing: 1px;
+    color: var(--text); cursor: pointer;
+    background: rgba(139,92,246,0.12);
+    border: 1px solid rgba(139,92,246,0.5);
+    border-radius: 999px; padding: 9px 18px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  }
+  #replay:hover { background: rgba(139,92,246,0.24); border-color: var(--purple); }
+  #replay:active { transform: scale(0.96); }
+  #replay svg { width: 15px; height: 15px; stroke: currentColor; fill: none;
+                stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ================================================================ *
+   *  SVG PRESENTATION LAYER                                          *
+   * ================================================================ */
+
+  /* Entity card body + header band. Fill/stroke set per-entity below. */
+  .entity .card {
+    fill: var(--entity-fill);
+    stroke: currentColor;            /* group `color` = the entity accent  */
+    stroke-width: 1.5;
+    /* soft outer glow appears on hover via .dg-hot (see below) */
+    transition: filter 0.25s ease;
+  }
+  .entity .band { fill: currentColor; opacity: 0.16; } /* accent header band */
+  .entity .band-line { stroke: currentColor; opacity: 0.32; stroke-width: 1; }
+  .entity .ename {
+    font-weight: 800; font-size: 19px; fill: var(--text);
+    letter-spacing: 0.4px;
+  }
+  .entity .eicon { stroke: currentColor; stroke-width: 1.7; fill: none;
+                   stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Field rows are monospace so PK/FK columns line up like real DDL. */
+  .field {
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 13px; fill: var(--text);
+  }
+  .field.muted { fill: var(--muted); }
+  .tag {                 /* PK / FK pill text */
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  }
+  .tag-pk-bg { fill: rgba(255,255,255,0.12); rx: 3; }
+  .tag-fk-bg { fill: rgba(217,70,239,0.18); rx: 3; }
+  .tag-pk    { fill: rgba(255,255,255,0.85); }
+  .tag-fk    { fill: var(--pink); }
+  .keyicon   { stroke: rgba(255,255,255,0.7); stroke-width: 1.5; fill: none;
+               stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Relationship edges. The crow's-foot is a <marker> (colored per edge). */
+  .edge {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .edge-label-bg { rx: 8; }
+  .edge-label {
+    font-size: 13px; font-weight: 600; fill: var(--text);
+    letter-spacing: 0.3px;
+  }
+
+  /* Insight footer strip inside the SVG bottom */
+  .insight { fill: var(--muted); font-size: 13px; font-style: italic;
+             letter-spacing: 0.2px; }
+  .insight .em { fill: rgba(255,255,255,0.8); font-style: normal; font-weight: 600; }
+
+  /* ---------------------------------------------------------------- *
+   *  HOVER / CLICK HIGHLIGHT                                          *
+   *  JS toggles `.dg-dim` on the <svg> root and `.dg-hot` on the      *
+   *  active entity/edges. When the root is dimmed, everything fades   *
+   *  to 35%; .dg-hot elements are pulled back to full opacity.        *
+   * ---------------------------------------------------------------- */
+  svg.er .hl { transition: opacity 0.28s ease, filter 0.28s ease; }
+  svg.er.dg-dim .hl { opacity: 0.35; }
+  svg.er.dg-dim .hl.dg-hot { opacity: 1; }
+  /* hot entity gets an outer glow */
+  .entity.dg-hot .card { filter: drop-shadow(0 0 10px currentColor); }
+
+  /* PK key-icon ambient breathing glow (very slow) */
+  .keyicon { animation: keyPulse 4.5s ease-in-out infinite; }
+  @keyframes keyPulse {
+    0%, 100% { filter: drop-shadow(0 0 0px rgba(255,255,255,0)); opacity: 0.7; }
+    50%      { filter: drop-shadow(0 0 5px rgba(255,255,255,0.8)); opacity: 1; }
+  }
+
+  /* ================================================================ *
+   *  ENTRANCE ANIMATIONS                                             *
+   *  - entities pop in staggered (scale + fade)                       *
+   *  - edges draw in via stroke-dashoffset                            *
+   *  - field rows cascade-fade                                        *
+   *  All are re-triggerable by toggling the `.play` class (Replay).   *
+   * ================================================================ */
+  /* Entities start hidden; .play adds the pop animation with a stagger. */
+  svg.er.play .entity {
+    opacity: 0;
+    transform-box: fill-box;        /* transform-origin relative to bbox */
+    transform-origin: center;
+    animation: pop 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
+  }
+  svg.er.play .entity.e-delay1 { animation-delay: 0.05s; }
+  svg.er.play .entity.e-delay2 { animation-delay: 0.20s; }
+  svg.er.play .entity.e-delay3 { animation-delay: 0.35s; }
+  svg.er.play .entity.e-delay4 { animation-delay: 0.50s; }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.82); }
+    60%  { opacity: 1; transform: scale(1.03); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Edges: dasharray set inline == path length; animate offset to 0.   */
+  svg.er.play .edge {
+    stroke-dasharray: 620;
+    stroke-dashoffset: 620;
+    animation: draw 0.9s ease forwards;
+    animation-delay: 0.7s;
+  }
+  svg.er.play .edge-label-group {
+    opacity: 0;
+    animation: fadeIn 0.5s ease forwards;
+    animation-delay: 1.45s;
+  }
+  @keyframes draw    { to { stroke-dashoffset: 0; } }
+  @keyframes fadeIn  { to { opacity: 1; } }
+
+  /* Field rows cascade — grouped per card via .row-N delay classes.    */
+  svg.er.play .field-row {
+    opacity: 0;
+    animation: fadeIn 0.4s ease forwards;
+    animation-delay: 0.6s;
+  }
+  svg.er.play .field-row.r1 { animation-delay: 0.60s; }
+  svg.er.play .field-row.r2 { animation-delay: 0.68s; }
+  svg.er.play .field-row.r3 { animation-delay: 0.76s; }
+  svg.er.play .field-row.r4 { animation-delay: 0.84s; }
+  svg.er.play .field-row.r5 { animation-delay: 0.92s; }
+
+  /* ================================================================ *
+   *  REDUCED MOTION — freeze everything at final state.              *
+   * ================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none !important; }
+    .keyicon { animation: none !important; opacity: 1 !important; }
+    svg.er.play .entity,
+    svg.er.play .edge,
+    svg.er.play .field-row,
+    svg.er.play .edge-label-group {
+      animation: none !important;
+      opacity: 1 !important;
+      stroke-dashoffset: 0 !important;
+      transform: none !important;
+    }
+    #replay { display: none; }      /* nothing to replay when static    */
+  }
+
+  /* small-height safety */
+  @media (max-height: 620px) {
+    header { padding-top: 12px; }
+    .eyebrow { margin-bottom: 8px; }
+  }
+</style>
+</head>
+<body>
+  <!-- ambient background orbs (decorative, offline) -->
+  <div class="orbs" aria-hidden="true">
+    <div class="orb o1"></div>
+    <div class="orb o2"></div>
+    <div class="orb o3"></div>
+  </div>
+
+  <header>
+    <span class="eyebrow">Native SVG Diagram — ER / Crow's Foot</span>
+    <h1>数据 / Schema 即规格</h1>
+    <p class="sub">即使没有源码，Schema + 真实数据就是最可靠的需求文档</p>
+  </header>
+
+  <main class="stage">
+    <!--
+      viewBox 1400x720. Coordinate plan:
+        Customer  (blue)  outer translate(110, 95)   card 300x160
+        Order     (purple)outer translate(990, 80)   card 300x220
+        Product   (green) outer translate(110, 430)  card 300x160
+        OrderItem (pink)  outer translate(990, 395)  card 300x220
+      Each entity is an OUTER <g transform="translate(...)"> (positioning via
+      SVG attribute) wrapping an INNER <g class="entity"> that receives the CSS
+      pop animation. This split is CRITICAL: a CSS `transform: scale()` on an
+      element REPLACES its SVG `transform` attribute, so if we animated the same
+      <g> that carries translate(x,y) the card would jump to the origin. Outer
+      attribute-translate + inner CSS-scale compose cleanly instead.
+    -->
+    <svg class="er play" viewBox="0 0 1400 720" role="img"
+         aria-label="电商 Schema 的 ER 图：Customer、Order、OrderItem、Product 四个实体及其 1:N 关系（鸦脚记号）">
+
+      <!-- ================================================================ *
+        *  <defs> — hand-built crow's-foot markers.                          *
+        *  Six markers = 3 edge colors (purple/pink/green) x 2 notations     *
+        *  (one / many). We do NOT use one var()-driven marker because CSS   *
+        *  custom properties and context-stroke do not reliably reach into   *
+        *  <marker> content across engines — so each marker hard-codes its   *
+        *  literal color. markerUnits="userSpaceOnUse" makes marker size      *
+        *  independent of the 2px line stroke-width (otherwise everything     *
+        *  would be scaled x2).                                              *
+        *                                                                    *
+        *  LOCAL FRAME: every marker is drawn as if the line travels along   *
+        *  +X. orient="auto" then rotates it to match each edge.             *
+        *    ONE  (‖) : two vertical ticks just off the entity border.        *
+        *               refX=4 -> the ticks sit on the line side of the       *
+        *               start vertex (min/max = exactly one).                 *
+        *    MANY (⟨) : crow's foot converging at x=8, prongs fanning to      *
+        *               x=22 (the entity side) + one tick at x=4 behind it    *
+        *               -> "one or many" (1..N). refX=22 puts the prong tips  *
+        *               exactly on the entity border.                         *
+        * ================================================================ -->
+      <defs>
+        <!-- ONE (exactly one) — two perpendicular ticks -->
+        <marker id="one-purple" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="22" viewBox="0 0 26 22" refX="4" refY="11" orient="auto">
+          <line x1="10" y1="3" x2="10" y2="19" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round"/>
+          <line x1="17" y1="3" x2="17" y2="19" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round"/>
+        </marker>
+        <marker id="one-pink" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="22" viewBox="0 0 26 22" refX="4" refY="11" orient="auto">
+          <line x1="10" y1="3" x2="10" y2="19" stroke="#D946EF" stroke-width="2" stroke-linecap="round"/>
+          <line x1="17" y1="3" x2="17" y2="19" stroke="#D946EF" stroke-width="2" stroke-linecap="round"/>
+        </marker>
+        <marker id="one-green" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="22" viewBox="0 0 26 22" refX="4" refY="11" orient="auto">
+          <line x1="10" y1="3" x2="10" y2="19" stroke="#34D399" stroke-width="2" stroke-linecap="round"/>
+          <line x1="17" y1="3" x2="17" y2="19" stroke="#34D399" stroke-width="2" stroke-linecap="round"/>
+        </marker>
+
+        <!-- MANY — a clean textbook crow's foot: 3 prongs diverging from a
+             single junction ON the line, tips landing exactly on the entity
+             border (refX=22). The earlier version added an extra "one" tick
+             behind the foot (strict 1..N notation) but tick + foot together
+             read as a malformed double arrowhead at slide scale — clarity
+             beats notation pedantry in a presentation, so the tick is gone. -->
+        <marker id="many-purple" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="22" viewBox="0 0 26 22" refX="22" refY="11" orient="auto">
+          <path d="M10,11 L22,5 M10,11 L22,11 M10,11 L22,17" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-linecap="round"/>
+        </marker>
+        <marker id="many-pink" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="22" viewBox="0 0 26 22" refX="22" refY="11" orient="auto">
+          <path d="M10,11 L22,5 M10,11 L22,11 M10,11 L22,17" fill="none" stroke="#D946EF" stroke-width="2" stroke-linecap="round"/>
+        </marker>
+        <marker id="many-green" markerUnits="userSpaceOnUse" markerWidth="26" markerHeight="22" viewBox="0 0 26 22" refX="22" refY="11" orient="auto">
+          <path d="M10,11 L22,5 M10,11 L22,11 M10,11 L22,17" fill="none" stroke="#34D399" stroke-width="2" stroke-linecap="round"/>
+        </marker>
+      </defs>
+
+      <!-- ================================================================ *
+        *  EDGES (drawn BEFORE cards so cards sit on top of any overlap).    *
+        *  Each edge: a straight orthogonal segment with a ONE marker at its *
+        *  "one" end and a MANY crow's foot at its "many" end. Label pill    *
+        *  rides the midpoint on a dark rect with the edge-color border.     *
+        * ================================================================ -->
+
+      <!-- e1: Customer ‖——⟨ Order  (拥有 1:N) — horizontal, purple -->
+      <g class="edge-wrap">
+        <path id="ed-e1" class="edge hl" d="M410,178 L990,178"
+              stroke="#8B5CF6" marker-start="url(#one-purple)" marker-end="url(#many-purple)"/>
+        <g id="lb-e1" class="edge-label-group hl">
+          <rect class="edge-label-bg" x="652" y="165" width="96" height="26" fill="#0A0A0A" stroke="#8B5CF6" stroke-width="1.2"/>
+          <text class="edge-label" x="700" y="178" text-anchor="middle" dominant-baseline="middle">拥有 1:N</text>
+        </g>
+      </g>
+
+      <!-- e2: Order ‖——⟨ OrderItem  (包含 1:N) — vertical, pink -->
+      <g class="edge-wrap">
+        <path id="ed-e2" class="edge hl" d="M1140,300 L1140,395"
+              stroke="#D946EF" marker-start="url(#one-pink)" marker-end="url(#many-pink)"/>
+        <g id="lb-e2" class="edge-label-group hl">
+          <rect class="edge-label-bg" x="1092" y="334" width="96" height="26" fill="#0A0A0A" stroke="#D946EF" stroke-width="1.2"/>
+          <text class="edge-label" x="1140" y="347" text-anchor="middle" dominant-baseline="middle">包含 1:N</text>
+        </g>
+      </g>
+
+      <!-- e3: Product ‖——⟨ OrderItem  (出现于 1:N) — horizontal, green -->
+      <g class="edge-wrap">
+        <path id="ed-e3" class="edge hl" d="M410,510 L990,510"
+              stroke="#34D399" marker-start="url(#one-green)" marker-end="url(#many-green)"/>
+        <g id="lb-e3" class="edge-label-group hl">
+          <rect class="edge-label-bg" x="646" y="497" width="108" height="26" fill="#0A0A0A" stroke="#34D399" stroke-width="1.2"/>
+          <text class="edge-label" x="700" y="510" text-anchor="middle" dominant-baseline="middle">出现于 1:N</text>
+        </g>
+      </g>
+
+      <!-- ================================================================ *
+        *  ENTITY CARDS                                                      *
+        * ================================================================ -->
+
+      <!-- ---------- Customer (blue) ---------- -->
+      <g transform="translate(110,95)">
+        <g class="entity hl e-delay1" data-id="cust" style="color: var(--blue)">
+          <rect class="card" x="0" y="0" width="300" height="160" rx="12"/>
+          <path class="band" d="M0,12 a12,12 0 0 1 12,-12 h276 a12,12 0 0 1 12,12 v36 h-300 Z"/>
+          <line class="band-line" x1="0" y1="48" x2="300" y2="48"/>
+          <!-- lucide: users -->
+          <g class="eicon" transform="translate(18,13) scale(0.9)"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>
+          <text class="ename" x="52" y="32">Customer</text>
+          <!-- PK customer_id -->
+          <g class="field-row r1">
+            <g class="keyicon" transform="translate(12,66) scale(0.6)"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></g>
+            <rect class="tag-pk-bg" x="34" y="66" width="24" height="15"/>
+            <text class="tag tag-pk" x="46" y="77" text-anchor="middle">PK</text>
+            <text class="field" x="66" y="78">customer_id</text>
+          </g>
+          <!-- name -->
+          <g class="field-row r2"><text class="field muted" x="66" y="108">name</text></g>
+          <!-- tier + 客户分级 -->
+          <g class="field-row r3"><text class="field" x="66" y="138">tier<tspan class="field muted" dx="12">客户分级</tspan></text></g>
+        </g>
+      </g>
+
+      <!-- ---------- Order (purple) ---------- -->
+      <g transform="translate(990,80)">
+        <g class="entity hl e-delay2" data-id="order" style="color: var(--purple)">
+          <rect class="card" x="0" y="0" width="300" height="220" rx="12"/>
+          <path class="band" d="M0,12 a12,12 0 0 1 12,-12 h276 a12,12 0 0 1 12,12 v36 h-300 Z"/>
+          <line class="band-line" x1="0" y1="48" x2="300" y2="48"/>
+          <!-- lucide: shopping-cart -->
+          <g class="eicon" transform="translate(18,13) scale(0.9)"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></g>
+          <text class="ename" x="52" y="32">Order</text>
+          <!-- PK order_id -->
+          <g class="field-row r1">
+            <g class="keyicon" transform="translate(12,66) scale(0.6)"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></g>
+            <rect class="tag-pk-bg" x="34" y="66" width="24" height="15"/>
+            <text class="tag tag-pk" x="46" y="77" text-anchor="middle">PK</text>
+            <text class="field" x="66" y="78">order_id</text>
+          </g>
+          <!-- FK customer_id -->
+          <g class="field-row r2">
+            <rect class="tag-fk-bg" x="34" y="96" width="24" height="15"/>
+            <text class="tag tag-fk" x="46" y="107" text-anchor="middle">FK</text>
+            <text class="field" x="66" y="108">customer_id</text>
+          </g>
+          <!-- status -->
+          <g class="field-row r3"><text class="field muted" x="66" y="138">status</text></g>
+          <!-- total_amount -->
+          <g class="field-row r4"><text class="field muted" x="66" y="168">total_amount</text></g>
+          <!-- created_at -->
+          <g class="field-row r5"><text class="field muted" x="66" y="198">created_at</text></g>
+        </g>
+      </g>
+
+      <!-- ---------- Product (green) ---------- -->
+      <g transform="translate(110,430)">
+        <g class="entity hl e-delay3" data-id="prod" style="color: var(--green)">
+          <rect class="card" x="0" y="0" width="300" height="160" rx="12"/>
+          <path class="band" d="M0,12 a12,12 0 0 1 12,-12 h276 a12,12 0 0 1 12,12 v36 h-300 Z"/>
+          <line class="band-line" x1="0" y1="48" x2="300" y2="48"/>
+          <!-- lucide: package -->
+          <g class="eicon" transform="translate(18,13) scale(0.9)"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></g>
+          <text class="ename" x="52" y="32">Product</text>
+          <!-- PK product_id -->
+          <g class="field-row r1">
+            <g class="keyicon" transform="translate(12,66) scale(0.6)"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></g>
+            <rect class="tag-pk-bg" x="34" y="66" width="24" height="15"/>
+            <text class="tag tag-pk" x="46" y="77" text-anchor="middle">PK</text>
+            <text class="field" x="66" y="78">product_id</text>
+          </g>
+          <!-- name -->
+          <g class="field-row r2"><text class="field muted" x="66" y="108">name</text></g>
+          <!-- price -->
+          <g class="field-row r3"><text class="field muted" x="66" y="138">price</text></g>
+        </g>
+      </g>
+
+      <!-- ---------- OrderItem (pink) ---------- -->
+      <g transform="translate(990,395)">
+        <g class="entity hl e-delay4" data-id="item" style="color: var(--pink)">
+          <rect class="card" x="0" y="0" width="300" height="220" rx="12"/>
+          <path class="band" d="M0,12 a12,12 0 0 1 12,-12 h276 a12,12 0 0 1 12,12 v36 h-300 Z"/>
+          <line class="band-line" x1="0" y1="48" x2="300" y2="48"/>
+          <!-- lucide: list -->
+          <g class="eicon" transform="translate(18,13) scale(0.9)"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g>
+          <text class="ename" x="52" y="32">OrderItem</text>
+          <!-- PK item_id -->
+          <g class="field-row r1">
+            <g class="keyicon" transform="translate(12,66) scale(0.6)"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></g>
+            <rect class="tag-pk-bg" x="34" y="66" width="24" height="15"/>
+            <text class="tag tag-pk" x="46" y="77" text-anchor="middle">PK</text>
+            <text class="field" x="66" y="78">item_id</text>
+          </g>
+          <!-- FK order_id -->
+          <g class="field-row r2">
+            <rect class="tag-fk-bg" x="34" y="96" width="24" height="15"/>
+            <text class="tag tag-fk" x="46" y="107" text-anchor="middle">FK</text>
+            <text class="field" x="66" y="108">order_id</text>
+          </g>
+          <!-- FK product_id -->
+          <g class="field-row r3">
+            <rect class="tag-fk-bg" x="34" y="126" width="24" height="15"/>
+            <text class="tag tag-fk" x="46" y="137" text-anchor="middle">FK</text>
+            <text class="field" x="66" y="138">product_id</text>
+          </g>
+          <!-- qty -->
+          <g class="field-row r4"><text class="field muted" x="66" y="168">qty</text></g>
+          <!-- unit_price -->
+          <g class="field-row r5"><text class="field muted" x="66" y="198">unit_price</text></g>
+        </g>
+      </g>
+
+      <!-- ================================================================ *
+        *  Insight footer strip (inside the SVG) — derives requirement       *
+        *  hints from the schema. Muted, italic; key columns emphasized.     *
+        * ================================================================ -->
+      <line x1="110" y1="656" x2="1290" y2="656" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <text class="insight" x="700" y="690" text-anchor="middle"><tspan class="em">status</tspan> 枚举 → 订单状态机  ·  <tspan class="em">tier</tspan> → 分级折扣  ·  <tspan class="em">total_amount</tspan> ↔ OrderItem → 金额计算逻辑</text>
+    </svg>
+  </main>
+
+  <footer>
+    <p class="caption">
+      真正的鸦脚记号：一端 <span class="k">‖（恰好一）</span> · 多端 <span class="k">⟨爪（多）</span> — 悬停实体高亮其关系
+    </p>
+    <button id="replay" type="button" aria-label="重播动画">
+      <!-- lucide: rotate-ccw -->
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path></svg>
+      Replay
+    </button>
+  </footer>
+
+  <!--
+    TINY vanilla JS (~50 lines). Two jobs, no dependencies:
+      1) Hover/click an entity -> spotlight it, its edges, and the directly
+         connected entities; dim everything else to 35%.
+      2) Replay button -> re-run the entrance animation by toggling `.play`.
+    All purely presentational — the diagram is fully readable with JS disabled.
+  -->
+  <script>
+    (function () {
+      var svg = document.querySelector('svg.er');
+      if (!svg) return;
+
+      /* Relationship graph. For each entity id, list its edge groups and the
+         neighbor entities it connects to. Ids match data-id / edge id="ed-*".
+           cust --e1-- order --e2-- item --e3-- prod                        */
+      var GRAPH = {
+        cust:  { edges: ['e1'],       neighbors: ['order'] },
+        order: { edges: ['e1','e2'],  neighbors: ['cust','item'] },
+        item:  { edges: ['e2','e3'],  neighbors: ['order','prod'] },
+        prod:  { edges: ['e3'],       neighbors: ['item'] }
+      };
+
+      var entities = {};
+      Array.prototype.forEach.call(svg.querySelectorAll('.entity'), function (el) {
+        entities[el.getAttribute('data-id')] = el;
+      });
+
+      function el(id) { return document.getElementById(id); }
+
+      // add .dg-hot to an edge path + its label group
+      function hotEdge(eid) {
+        var p = el('ed-' + eid), l = el('lb-' + eid);
+        if (p) p.classList.add('dg-hot');
+        if (l) l.classList.add('dg-hot');
+      }
+
+      function highlight(id) {
+        var info = GRAPH[id];
+        if (!info) return;
+        svg.classList.add('dg-dim');            // fade the whole diagram
+        clear(false);                           // reset hot flags, keep dim
+        entities[id].classList.add('dg-hot');   // the focused entity
+        info.edges.forEach(hotEdge);            // its relationships
+        info.neighbors.forEach(function (n) {   // directly connected entities
+          if (entities[n]) entities[n].classList.add('dg-hot');
+        });
+      }
+
+      // remove all hot flags; optionally also un-dim the diagram
+      function clear(undim) {
+        Array.prototype.forEach.call(svg.querySelectorAll('.dg-hot'), function (n) {
+          n.classList.remove('dg-hot');
+        });
+        if (undim) svg.classList.remove('dg-dim');
+      }
+
+      var pinned = null;                         // click-toggled selection
+      Object.keys(entities).forEach(function (id) {
+        var node = entities[id];
+        node.style.cursor = 'pointer';
+        node.addEventListener('mouseenter', function () { if (!pinned) highlight(id); });
+        node.addEventListener('mouseleave', function () { if (!pinned) clear(true); });
+        node.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (pinned === id) { pinned = null; clear(true); }   // toggle off
+          else { pinned = id; highlight(id); }                 // pin on
+        });
+      });
+      // click empty SVG space clears a pinned selection
+      svg.addEventListener('click', function () { pinned = null; clear(true); });
+
+      /* Replay: strip .play, force reflow, re-add so the CSS animations run
+         again from the top. */
+      var btn = document.getElementById('replay');
+      if (btn) btn.addEventListener('click', function () {
+        svg.classList.remove('play');
+        void svg.getBBox();                      // force reflow
+        svg.classList.add('play');
+      });
+    })();
+  </script>
+</body>
+</html>

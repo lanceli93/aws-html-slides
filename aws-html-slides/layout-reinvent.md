@@ -356,13 +356,20 @@ colored delta line. Add an optional full-width `.callout-bar` summary strip belo
 .metric-delta.up { color:var(--up); } .metric-delta.down { color:var(--down); } .metric-delta.warn { color:var(--warn); }
 .metric-delta span { color:var(--text-faint); font-weight:400; }
 
+/* Callout: uniform border + soft horizontal gradient wash — NO solid colored
+   left rail (that reads as generic AI/dashboard slop). Direction comes from the
+   wash + a leading icon + a small monospace tag. */
 .callout-bar { display:flex; align-items:center; gap:clamp(.7rem,1.5vw,1.1rem); width:100%; max-width:var(--content-max);
-    margin-top:clamp(.7rem,1.6vh,1.2rem); padding:clamp(.7rem,1.4vw,1.05rem) clamp(.9rem,1.8vw,1.4rem);
-    background:rgba(139,92,246,.05); border:1px solid var(--card-border); border-left:3px solid var(--accent-pink);
-    border-radius:clamp(8px,1vw,12px); }
+    margin-top:clamp(.7rem,1.6vh,1.2rem); padding:clamp(.7rem,1.4vw,1.05rem) clamp(1rem,2vw,1.6rem);
+    background:linear-gradient(90deg, rgba(217,70,239,.10), rgba(139,92,246,.04) 45%, transparent);
+    border:1px solid var(--card-border); border-radius:clamp(10px,1.2vw,14px); }
 .callout-bar i { color:var(--accent-pink); flex-shrink:0; }
+.callout-bar .callout-tag { font-family:var(--font-body); font-size:var(--micro-size); font-weight:600;
+    letter-spacing:.18em; text-transform:uppercase; color:var(--accent-pink); flex-shrink:0;
+    padding-right:clamp(.7rem,1.5vw,1.1rem); border-right:1px solid var(--hairline); }
 .callout-bar p { font-size:var(--body-size); line-height:1.45; color:rgba(255,255,255,.85); }
 .callout-bar strong { font-weight:700; background:var(--grad-accent); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+@media (max-width:600px) { .callout-bar .callout-tag { display:none; } }
 ```
 
 **HTML** (inside `.slide-content`, after `.section-head`):
@@ -377,6 +384,7 @@ colored delta line. Add an optional full-width `.callout-bar` summary strip belo
 </div>
 <div class="callout-bar reveal d6">
     <i data-lucide="sparkles"></i>
+    <span class="callout-tag">Insight</span>
     <p><strong>Record year:</strong> generative AI adoption on AWS doubled across every region.</p>
 </div>
 ```
@@ -669,45 +677,55 @@ each with a colored dot title and bulleted list.
 
 ---
 
-## Layout 12: Two-Column Reflection
+## Layout 12: Two-Column Reflection (editorial split)
 
-**Use for:** Paired panels with a colored LEFT ACCENT — typically Challenges (`.warm`, amber) vs
-Learnings (`.cool`, green). Each panel: icon head + bulleted list. Default (no modifier) = purple.
+**Use for:** Paired lists — typically Challenges (`.warm`, amber) vs Learnings (`.cool`, green). Each
+column: inline-icon heading + numbered items. Default (no modifier) = purple.
+
+> **AVOID the AI-slop version.** The obvious take — two filled rounded cards, each with a solid
+> `border-left: 3px` colored rail and a rounded-square icon tile — is a generic dashboard cliché.
+> This layout deliberately drops all three: **no card fill, no left rail, no icon tile.** Instead it's
+> two open columns sharing ONE neutral center hairline; color is carried only by (a) a small inline
+> heading icon, (b) a short underline tick on the header hairline, and (c) hanging `01/02/03` indices.
+> When you need a color accent on a panel, prefer an inline icon + a short tick over a full border edge.
 
 **CSS:**
 ```css
-.reflect-grid { display:grid; grid-template-columns:1fr 1fr; gap:clamp(.8rem,2vw,1.5rem);
-    width:100%; max-width:var(--content-max); }
-.reflect-panel { background:var(--card-bg); border:1px solid var(--card-border);
-    border-left:3px solid var(--accent-purple); border-radius:clamp(10px,1.2vw,16px); padding:clamp(.9rem,2vw,1.5rem); }
-.reflect-panel.warm { border-left-color:var(--warn); }
-.reflect-panel.cool { border-left-color:var(--up); }
-.reflect-head { display:flex; align-items:center; gap:clamp(.5rem,1vw,.8rem); margin-bottom:clamp(.5rem,1.2vw,.9rem); }
-.reflect-head .ic { width:clamp(30px,3.4vw,42px); height:clamp(30px,3.4vw,42px); border-radius:clamp(8px,1vw,11px);
-    flex-shrink:0; display:flex; align-items:center; justify-content:center; background:rgba(139,92,246,.14); }
-.reflect-panel.warm .ic { background:rgba(251,191,36,.14); }
-.reflect-panel.cool .ic { background:rgba(52,211,153,.14); }
-.reflect-head .ic i { width:55%; height:55%; color:var(--accent-purple); }
-.reflect-panel.warm .ic i { color:var(--warn); } .reflect-panel.cool .ic i { color:var(--up); }
-.reflect-head h3 { font-family:var(--font-display); font-size:var(--h3-size); font-weight:700; line-height:1.2; }
-.reflect-list { list-style:none; display:flex; flex-direction:column; gap:clamp(.35rem,.9vw,.6rem); }
-.reflect-list li { font-size:var(--small-size); color:var(--text-secondary); line-height:1.45;
-    padding-left:clamp(.85rem,1.6vw,1.2rem); position:relative; }
-.reflect-list li::before { content:''; position:absolute; left:0; top:clamp(.4rem,.7vw,.55rem);
-    width:clamp(4px,.5vw,6px); height:clamp(4px,.5vw,6px); border-radius:50%; background:var(--accent-purple); }
-.reflect-panel.warm .reflect-list li::before { background:var(--warn); }
-.reflect-panel.cool .reflect-list li::before { background:var(--up); }
+.reflect-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; width:100%; max-width:min(90vw,1020px); }
+.reflect-col { padding:clamp(.3rem,1.2vw,.9rem) clamp(1.1rem,3.2vw,2.6rem); }
+.reflect-col + .reflect-col { border-left:1px solid var(--hairline); }   /* the ONLY divider */
+.reflect-head { position:relative; padding-bottom:clamp(.55rem,1.3vw,.95rem);
+    margin-bottom:clamp(.7rem,1.7vw,1.25rem); border-bottom:1px solid var(--hairline); }
+.reflect-head h3 { display:flex; align-items:center; gap:clamp(.4rem,.9vw,.65rem);
+    font-family:var(--font-display); font-size:var(--h3-size); font-weight:800; line-height:1.15; letter-spacing:-.01em; }
+.reflect-head h3 i { width:clamp(18px,2.2vw,26px); height:clamp(18px,2.2vw,26px); flex-shrink:0; color:var(--accent-purple); }
+.reflect-col.warm .reflect-head h3 i { color:var(--warn); }
+.reflect-col.cool .reflect-head h3 i { color:var(--up); }
+.reflect-head::after { content:''; position:absolute; left:0; bottom:-1.5px;
+    width:clamp(32px,5vw,54px); height:2.5px; border-radius:2px; background:var(--accent-purple); }   /* the tick */
+.reflect-col.warm .reflect-head::after { background:var(--warn); box-shadow:0 0 10px rgba(251,191,36,.4); }
+.reflect-col.cool .reflect-head::after { background:var(--up);  box-shadow:0 0 10px rgba(52,211,153,.4); }
+.reflect-list { list-style:none; display:flex; flex-direction:column; gap:clamp(.6rem,1.5vw,1.05rem); counter-reset:rf; }
+.reflect-list li { position:relative; padding-left:clamp(1.7rem,3.2vw,2.5rem);
+    font-size:var(--body-size); color:var(--text-secondary); line-height:1.5; counter-increment:rf; }
+.reflect-list li::before { content:counter(rf, decimal-leading-zero); position:absolute; left:0; top:.08em;
+    font-family:var(--font-display); font-weight:800; font-size:.82em; color:var(--accent-purple); font-variant-numeric:tabular-nums; }
+.reflect-col.warm .reflect-list li::before { color:var(--warn); }
+.reflect-col.cool .reflect-list li::before { color:var(--up); }
+@media (max-width:768px) { .reflect-grid { grid-template-columns:1fr; }
+    .reflect-col { padding-left:0; padding-right:0; }
+    .reflect-col + .reflect-col { border-left:none; border-top:1px solid var(--hairline); padding-top:clamp(.8rem,2vw,1.2rem); } }
 ```
 
 **HTML** (inside `.slide-content`, after `.section-head`):
 ```html
 <div class="reflect-grid">
-    <div class="reflect-panel warm reveal d2">
-        <div class="reflect-head"><div class="ic"><i data-lucide="alert-triangle"></i></div><h3>Challenges</h3></div>
+    <div class="reflect-col warm reveal d2">
+        <div class="reflect-head"><h3><i data-lucide="alert-triangle"></i>Challenges</h3></div>
         <ul class="reflect-list"><li>Scaling inference cost while latency expectations tightened.</li><!-- 3 items --></ul>
     </div>
-    <div class="reflect-panel cool reveal d3">
-        <div class="reflect-head"><div class="ic"><i data-lucide="lightbulb"></i></div><h3>Learnings</h3></div>
+    <div class="reflect-col cool reveal d3">
+        <div class="reflect-head"><h3><i data-lucide="lightbulb"></i>Learnings</h3></div>
         <ul class="reflect-list"><li>Managed services collapsed time-to-first-token dramatically.</li><!-- 3 items --></ul>
     </div>
 </div>
@@ -883,6 +901,211 @@ chrome but **omits `.slide-frame`**.
 
 ---
 
+## Layout 17: Bento Grid (asymmetric feature mosaic)
+
+**Use for:** A platform map / capability mosaic where ONE item deserves hero treatment — a 4-column
+grid with a 2×2 hero cell (rotating border-beam + big count-up stat), four 1×1 cells, and a
+full-width bottom strip. The most eye-catching content layout; use at most once per deck.
+
+**CSS:**
+```css
+.bento-grid { display:grid; grid-template-columns:repeat(4,1fr); grid-auto-rows:minmax(0,1fr);
+    gap:clamp(.5rem,1.1vw,.9rem); width:100%; max-width:var(--content-max); max-height:min(68vh,620px); }
+.bento-cell { background:var(--card-bg); border:1px solid var(--card-border);
+    border-radius:clamp(12px,1.4vw,18px); padding:clamp(.8rem,1.6vw,1.3rem);
+    display:flex; flex-direction:column; gap:clamp(.3rem,.7vw,.55rem); min-width:0; overflow:hidden;
+    transition:border-color .3s, box-shadow .3s, transform .3s; }
+.bento-cell:hover { border-color:var(--card-border-hover); box-shadow:0 0 28px rgba(139,92,246,.16); transform:translateY(-3px); }
+.bento-icon { width:clamp(28px,3vw,38px); height:clamp(28px,3vw,38px); border-radius:clamp(6px,.8vw,10px);
+    flex-shrink:0; background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(217,70,239,.1));
+    display:flex; align-items:center; justify-content:center; }
+.bento-icon i { width:55%; height:55%; color:var(--accent-purple); }
+.bento-cell h3 { font-family:var(--font-display); font-size:var(--h3-size); font-weight:700; line-height:1.2; }
+.bento-cell p { font-size:var(--small-size); color:var(--text-secondary); line-height:1.45; }
+.bento-hero { grid-column:span 2; grid-row:span 2; justify-content:flex-end;
+    gap:clamp(.4rem,1vw,.75rem); overflow:visible; /* let the border beam render outside */ }
+.bento-hero h3 { font-size:var(--h2-size); font-weight:800; letter-spacing:-.01em; line-height:1.1; }
+.bento-hero p { font-size:var(--body-size); }
+.bento-stat { font-family:var(--font-display); font-size:clamp(2rem,5.5vw,3.6rem); font-weight:800;
+    line-height:1; letter-spacing:-.02em; background:linear-gradient(135deg,var(--accent-purple),var(--accent-pink));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    display:inline-flex; align-items:baseline; margin-top:clamp(.1rem,.4vw,.3rem); }
+.bento-wide { grid-column:1 / -1; flex-direction:row; align-items:center; }
+.bento-wide p { margin-left:auto; text-align:right; }
+@media (max-width:900px) { .bento-grid { grid-template-columns:repeat(2,1fr); max-height:none; }
+    .bento-hero { grid-column:span 2; grid-row:span 1; } .bento-wide { grid-column:span 2; } }
+@media (max-width:600px) { .bento-grid { grid-template-columns:1fr; } .bento-hero, .bento-wide { grid-column:span 1; } }
+```
+
+Border beam (hero cell only; needs `@property`):
+```css
+@property --beam-angle { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+.beam-border { position:relative; }
+.beam-border::before { content:''; position:absolute; inset:-1px; border-radius:inherit; padding:1.5px;
+    background:conic-gradient(from var(--beam-angle), transparent 0 62%, #8B5CF6 78%, #D946EF 90%, #FF9900 96%, transparent 100%);
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    animation:beamSpin 6s linear infinite; pointer-events:none; }
+@keyframes beamSpin { to { --beam-angle:360deg; } }
+@media (prefers-reduced-motion:reduce){ .beam-border::before { animation:none; } }
+```
+
+**HTML** (inside `.slide-content`, after `.section-head`):
+```html
+<div class="bento-grid">
+    <div class="bento-cell bento-hero beam-border reveal d2">
+        <div class="bento-icon"><i data-lucide="layers"></i></div>
+        <h3>One Platform, Every Model</h3>
+        <p>From foundation models to custom silicon — build, tune, and ship without leaving AWS.</p>
+        <div class="bento-stat"><span class="count" data-count="200" data-decimals="0">0</span>+</div>
+    </div>
+    <div class="bento-cell reveal d3">
+        <div class="bento-icon"><i data-lucide="bot"></i></div>
+        <h3>Bedrock AgentCore</h3>
+        <p>Managed reasoning agents with memory and tool use.</p>
+    </div>
+    <!-- 4 small cells, stagger d3–d6; then one full-width strip: -->
+    <div class="bento-cell bento-wide reveal d7">
+        <div class="bento-icon"><i data-lucide="zap"></i></div>
+        <h3>Sub-second inference at global scale</h3>
+        <p>Optimized serving across 33 Regions and 600+ edge locations.</p>
+    </div>
+</div>
+```
+
+Keep small-cell copy to ONE short line — cells clip overflow. The hero's `.count` is animated by the
+controller's count-up (see Layout 19 notes).
+
+---
+
+## Layout 18: Spotlight Cards (pointer-follow glow)
+
+**Use for:** 3 pillar reasons / principles — outlined big number + icon + title + 2-line desc, with a
+radial glow that follows the cursor inside each card. Centered header.
+
+**CSS:**
+```css
+.spot-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(.8rem,2vw,1.5rem);
+    width:100%; max-width:var(--content-max); }
+.spot-card { position:relative; overflow:hidden; background:var(--card-bg);
+    border:1px solid var(--card-border); border-radius:clamp(12px,1.4vw,18px);
+    padding:clamp(1rem,2.2vw,1.8rem); display:flex; flex-direction:column; gap:clamp(.4rem,1vw,.7rem);
+    transition:border-color .3s, box-shadow .3s, transform .3s; }
+.spot-card:hover { border-color:var(--card-border-hover); box-shadow:0 0 28px rgba(139,92,246,.16); transform:translateY(-3px); }
+.spot-card::before { content:''; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%), rgba(139,92,246,.16), transparent 60%);
+    opacity:0; transition:opacity .35s; }
+.spot-card:hover::before { opacity:1; }
+.spot-card > * { position:relative; z-index:1; }
+.spot-num { font-family:var(--font-display); font-size:clamp(2rem,5vw,3.6rem); font-weight:800;
+    line-height:1; -webkit-text-stroke:1.5px rgba(196,181,253,.5); -webkit-text-fill-color:transparent; color:transparent; }
+.spot-icon { /* same tile treatment as .feat-icon, slightly larger */ }
+@media (max-width:768px) { .spot-grid { grid-template-columns:1fr; } }
+```
+
+JS (bind once, after the controller):
+```js
+document.querySelectorAll('.spot-card').forEach(card => {
+    card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+});
+```
+
+**HTML** (inside `.slide-content`, after `.section-head.center`):
+```html
+<div class="spot-grid">
+    <div class="spot-card reveal d2">
+        <span class="spot-num">01</span>
+        <div class="spot-icon"><i data-lucide="shield-check"></i></div>
+        <h3>Security by Design</h3>
+        <p>VPC isolation, end-to-end encryption, and fine-grained IAM protect every workload.</p>
+    </div>
+    <!-- 3 cards, stagger d2–d4 -->
+</div>
+```
+
+---
+
+## Layout 19: Marquee (dual scrolling keyword rows)
+
+**Use for:** Ecosystem / service-catalog slides — two full-bleed rows of oversized service names
+scrolling in opposite directions with soft masked edges; 1–2 highlighted gradient names per row.
+Centered header. Duplicate the item sequence TWICE inside each track (the -50% translate loops
+seamlessly only with an exact duplicate).
+
+**CSS:**
+```css
+.marquee-block { width:100%; display:flex; flex-direction:column; gap:clamp(.8rem,2vh,1.6rem); }
+.marquee { width:100vw; margin-left:calc(50% - 50vw); overflow:hidden;
+    -webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+            mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent); }
+.marquee-track { display:flex; align-items:center; gap:clamp(1.2rem,3vw,2.6rem);
+    width:max-content; animation:marqueeMove 32s linear infinite; }
+.marquee-track.rev { animation-duration:40s; animation-direction:reverse; }
+@keyframes marqueeMove { to { transform:translateX(-50%); } }
+.mq-item { font-family:var(--font-display); font-weight:700; font-size:clamp(1.3rem,3.2vw,2.4rem);
+    color:rgba(255,255,255,.22); white-space:nowrap; }
+.mq-item.hl { background:var(--grad-accent); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.mq-dot { width:clamp(6px,.9vw,10px); height:clamp(6px,.9vw,10px); flex-shrink:0;
+    background:var(--accent-pink); transform:rotate(45deg); border-radius:1px;
+    box-shadow:0 0 8px rgba(217,70,239,.5); }
+@media (prefers-reduced-motion:reduce) { .marquee-track { animation:none; } }
+```
+
+**HTML** (inside `.slide-content`, after `.section-head.center`):
+```html
+<div class="marquee-block reveal d2">
+    <div class="marquee"><div class="marquee-track">
+        <span class="mq-item">EC2</span><span class="mq-dot"></span>
+        <span class="mq-item">S3</span><span class="mq-dot"></span>
+        <span class="mq-item hl">Amazon Bedrock</span><span class="mq-dot"></span>
+        <!-- …rest of sequence, then the ENTIRE sequence duplicated once more verbatim -->
+    </div></div>
+    <div class="marquee"><div class="marquee-track rev">
+        <!-- second row, different services, same duplicate-twice rule -->
+    </div></div>
+</div>
+```
+
+Use `.mq-dot` separators — never a literal `◆` character.
+
+---
+
+## Motion upgrades (title + numbers) — apply to every deck
+
+**Title word reveal + shimmer.** Wrap each headline word in
+`<span class="tw" style="--i:0">Building</span>`; keep the gradient `<em>` as ONE unit inside its
+own span (`<span class="tw" style="--i:4"><em>Generative AI</em></span>`) — splitting a
+gradient-clipped `<em>` across spans breaks the clip.
+
+```css
+.title-main .tw { display:inline-block; opacity:0; transform:translateY(.5em); filter:blur(8px); }
+.slide.visible .title-main .tw { animation:wordRise .8s var(--ease-out-expo) both; animation-delay:calc(var(--i)*90ms); }
+@keyframes wordRise { to { opacity:1; transform:none; filter:blur(0); } }
+.title-main em { background-size:200% 100%; animation:emShimmer 5s ease-in-out 1.2s infinite; }
+@keyframes emShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+@media (prefers-reduced-motion:reduce){ .title-main .tw { opacity:1; transform:none; filter:none; } }
+```
+
+**Count-up numbers.** Wrap ONLY the numeric part:
+`<div class="metric-value"><span class="count" data-count="100" data-decimals="0">0</span><span class="metric-unit">K+</span></div>`.
+Applies to `.metric-value`, `.stat-value`, `.bignumber`, `.bento-stat`. Leave non-numeric values
+("24/7") untouched; decimals via `data-decimals`. The controller triggers once per slide inside the
+IntersectionObserver callback:
+
+```js
+if (!e.target.dataset.fx) { e.target.dataset.fx = '1'; runCounters(e.target); }
+```
+
+`runCounters` = rAF ease-out-cubic over ~1.3s; when `prefers-reduced-motion`, set the final value
+instantly. Full implementation in [animation-patterns.md](animation-patterns.md) "Signature Motion
+Patterns".
+
+---
+
 ## Layout Selection Guide
 
 | Content Type | Recommended Layout |
@@ -903,6 +1126,13 @@ chrome but **omits `.slide-frame`**.
 | Chronological milestones (5 points) | **Timeline Zigzag** (Layout 14) |
 | Executive quote / bold statement | **Quote** (Layout 15) |
 | Forward-looking 3-point agenda | **Numbered Outlook Columns** (Layout 16) |
+| Platform map with ONE hero item | **Bento Grid** (Layout 17) |
+| 3 pillar reasons / principles | **Spotlight Cards** (Layout 18) |
+| Ecosystem / service catalog | **Marquee** (Layout 19) |
 
 **Rule: never use plain left-aligned bullet lists.** Always wrap content in one of these layouts. If
 content doesn't fit any layout, default to **Pill Cards** (Layout 3) or **Tagged Card Grid** (Layout 5).
+
+**Motion defaults:** every deck gets the title word-reveal + em shimmer, and count-up on all metric
+numbers (see "Motion upgrades" above). Use **Bento Grid** and **Marquee** at most once each per deck —
+they are signature moments, not repeatable fillers.

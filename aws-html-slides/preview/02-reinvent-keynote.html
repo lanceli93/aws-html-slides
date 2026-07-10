@@ -463,21 +463,30 @@
 
         /* ============================================================
            NEW: CALLOUT BAR (id used inline under metric rows)
-           Full-width bordered strip + colored left accent + one sentence.
+           Editorial insight strip — NO solid colored left rail (that reads
+           as generic AI/dashboard slop). Direction is carried by a soft
+           horizontal gradient wash + a leading inline icon and a small
+           monospace tag; the border stays uniform.
            ============================================================ */
         .callout-bar {
             display: flex; align-items: center; gap: clamp(0.7rem, 1.5vw, 1.1rem);
             width: 100%; max-width: var(--content-max);
             margin-top: clamp(0.7rem, 1.6vh, 1.2rem);
-            padding: clamp(0.7rem, 1.4vw, 1.05rem) clamp(0.9rem, 1.8vw, 1.4rem);
-            background: rgba(139,92,246,0.05);
+            padding: clamp(0.7rem, 1.4vw, 1.05rem) clamp(1rem, 2vw, 1.6rem);
+            background: linear-gradient(90deg, rgba(217,70,239,0.10), rgba(139,92,246,0.04) 45%, transparent);
             border: 1px solid var(--card-border);
-            border-left: 3px solid var(--accent-pink);
-            border-radius: clamp(8px, 1vw, 12px);
+            border-radius: clamp(10px, 1.2vw, 14px);
         }
         .callout-bar i {
             width: clamp(18px, 2vw, 24px); height: clamp(18px, 2vw, 24px);
             color: var(--accent-pink); flex-shrink: 0;
+        }
+        .callout-bar .callout-tag {
+            font-family: var(--font-body); font-size: var(--micro-size); font-weight: 600;
+            letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-pink);
+            flex-shrink: 0; align-self: center;
+            padding-right: clamp(0.7rem, 1.5vw, 1.1rem);
+            border-right: 1px solid var(--hairline);
         }
         .callout-bar p {
             font-size: var(--body-size); line-height: 1.45; color: rgba(255,255,255,0.85);
@@ -487,6 +496,7 @@
             background: var(--grad-accent);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
+        @media (max-width: 600px) { .callout-bar .callout-tag { display: none; } }
 
         /* ============================================================
            NEW: TAGGED CARD GRID (id: tagged-grid)
@@ -597,53 +607,64 @@
 
         /* ============================================================
            NEW: TWO-COLUMN REFLECTION (id: reflection)
-           Two panels w/ colored LEFT ACCENT (warm/cool), head + bullets.
+           Editorial split — NO filled cards, NO colored left rail (that
+           combo reads as generic AI/dashboard slop). Two open columns share
+           a neutral center hairline; color is carried by an inline heading
+           icon, a short underline tick, and hanging leading-zero indices.
            ============================================================ */
         .reflect-grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: clamp(0.8rem, 2vw, 1.5rem);
-            width: 100%; max-width: var(--content-max);
+            display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+            width: 100%; max-width: min(90vw, 1020px);
         }
-        .reflect-panel {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-left: 3px solid var(--accent-purple);
-            border-radius: clamp(10px, 1.2vw, 16px);
-            padding: clamp(0.9rem, 2vw, 1.5rem);
-        }
-        .reflect-panel.warm { border-left-color: var(--warn); }
-        .reflect-panel.cool { border-left-color: var(--up); }
+        .reflect-col { padding: clamp(0.3rem, 1.2vw, 0.9rem) clamp(1.1rem, 3.2vw, 2.6rem); }
+        .reflect-col + .reflect-col { border-left: 1px solid var(--hairline); }
         .reflect-head {
-            display: flex; align-items: center; gap: clamp(0.5rem, 1vw, 0.8rem);
-            margin-bottom: clamp(0.5rem, 1.2vw, 0.9rem);
+            position: relative;
+            padding-bottom: clamp(0.55rem, 1.3vw, 0.95rem);
+            margin-bottom: clamp(0.7rem, 1.7vw, 1.25rem);
+            border-bottom: 1px solid var(--hairline);
         }
-        .reflect-head .ic {
-            width: clamp(30px, 3.4vw, 42px); height: clamp(30px, 3.4vw, 42px);
-            border-radius: clamp(8px, 1vw, 11px); flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(139,92,246,0.14);
-        }
-        .reflect-panel.warm .ic { background: rgba(251,191,36,0.14); }
-        .reflect-panel.cool .ic { background: rgba(52,211,153,0.14); }
-        .reflect-head .ic i { width: 55%; height: 55%; color: var(--accent-purple); }
-        .reflect-panel.warm .ic i { color: var(--warn); }
-        .reflect-panel.cool .ic i { color: var(--up); }
         .reflect-head h3 {
+            display: flex; align-items: center; gap: clamp(0.4rem, 0.9vw, 0.65rem);
             font-family: var(--font-display); font-size: var(--h3-size);
-            font-weight: 700; line-height: 1.2;
+            font-weight: 800; line-height: 1.15; letter-spacing: -0.01em;
         }
-        .reflect-list { list-style: none; display: flex; flex-direction: column; gap: clamp(0.35rem, 0.9vw, 0.6rem); }
+        .reflect-head h3 i {
+            width: clamp(18px, 2.2vw, 26px); height: clamp(18px, 2.2vw, 26px);
+            flex-shrink: 0; color: var(--accent-purple);
+        }
+        .reflect-col.warm .reflect-head h3 i { color: var(--warn); }
+        .reflect-col.cool .reflect-head h3 i { color: var(--up); }
+        /* the accent — a short thick tick sitting on the header hairline */
+        .reflect-head::after {
+            content: ''; position: absolute; left: 0; bottom: -1.5px;
+            width: clamp(32px, 5vw, 54px); height: 2.5px; border-radius: 2px;
+            background: var(--accent-purple);
+        }
+        .reflect-col.warm .reflect-head::after { background: var(--warn); box-shadow: 0 0 10px rgba(251,191,36,0.4); }
+        .reflect-col.cool .reflect-head::after { background: var(--up);  box-shadow: 0 0 10px rgba(52,211,153,0.4); }
+        .reflect-list {
+            list-style: none; display: flex; flex-direction: column;
+            gap: clamp(0.6rem, 1.5vw, 1.05rem); counter-reset: rf;
+        }
         .reflect-list li {
-            font-size: var(--small-size); color: var(--text-secondary); line-height: 1.45;
-            padding-left: clamp(0.85rem, 1.6vw, 1.2rem); position: relative;
+            position: relative; padding-left: clamp(1.7rem, 3.2vw, 2.5rem);
+            font-size: var(--body-size); color: var(--text-secondary); line-height: 1.5;
+            counter-increment: rf;
         }
         .reflect-list li::before {
-            content: ''; position: absolute; left: 0; top: clamp(0.4rem, 0.7vw, 0.55rem);
-            width: clamp(4px, 0.5vw, 6px); height: clamp(4px, 0.5vw, 6px);
-            border-radius: 50%; background: var(--accent-purple);
+            content: counter(rf, decimal-leading-zero);
+            position: absolute; left: 0; top: 0.08em;
+            font-family: var(--font-display); font-weight: 800; font-size: 0.82em;
+            color: var(--accent-purple); font-variant-numeric: tabular-nums;
         }
-        .reflect-panel.warm .reflect-list li::before { background: var(--warn); }
-        .reflect-panel.cool .reflect-list li::before { background: var(--up); }
+        .reflect-col.warm .reflect-list li::before { color: var(--warn); }
+        .reflect-col.cool .reflect-list li::before { color: var(--up); }
+        @media (max-width: 768px) {
+            .reflect-grid { grid-template-columns: 1fr; }
+            .reflect-col { padding-left: 0; padding-right: 0; }
+            .reflect-col + .reflect-col { border-left: none; border-top: 1px solid var(--hairline); padding-top: clamp(0.8rem, 2vw, 1.2rem); }
+        }
 
         /* ============================================================
            NEW: NUMBERED OUTLOOK COLUMNS (id: outlook)
@@ -984,6 +1005,207 @@
         }
         .chart-container { position: relative; width: 100%; height: clamp(150px, 32vh, 300px); }
 
+        /* ============================================================
+           NEW: BENTO GRID (id: bento) — asymmetric feature mosaic
+           ============================================================ */
+        .bento-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: minmax(0, 1fr);
+            gap: clamp(0.5rem, 1.1vw, 0.9rem);
+            width: 100%; max-width: var(--content-max); max-height: min(68vh, 620px);
+        }
+        .bento-cell {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: clamp(12px, 1.4vw, 18px);
+            padding: clamp(0.8rem, 1.6vw, 1.3rem);
+            display: flex; flex-direction: column;
+            gap: clamp(0.3rem, 0.7vw, 0.55rem);
+            min-width: 0; overflow: hidden;
+            transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+        }
+        .bento-cell:hover {
+            border-color: var(--card-border-hover);
+            box-shadow: 0 0 28px rgba(139,92,246,0.16);
+            transform: translateY(-3px);
+        }
+        .bento-icon {
+            width: clamp(28px, 3vw, 38px); height: clamp(28px, 3vw, 38px);
+            border-radius: clamp(6px, 0.8vw, 10px); flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(217,70,239,0.1));
+            display: flex; align-items: center; justify-content: center;
+        }
+        .bento-icon i { width: 55%; height: 55%; color: var(--accent-purple); }
+        .bento-cell h3 {
+            font-family: var(--font-display);
+            font-size: var(--h3-size); font-weight: 700; line-height: 1.2;
+        }
+        .bento-cell p {
+            font-size: var(--small-size); color: var(--text-secondary); line-height: 1.45;
+        }
+        .bento-hero {
+            grid-column: span 2; grid-row: span 2;
+            justify-content: flex-end; gap: clamp(0.4rem, 1vw, 0.75rem);
+            overflow: visible; /* let the border beam render outside the box */
+        }
+        .bento-hero h3 {
+            font-size: var(--h2-size); font-weight: 800; letter-spacing: -0.01em; line-height: 1.1;
+        }
+        .bento-hero p { font-size: var(--body-size); }
+        .bento-stat {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5.5vw, 3.6rem);
+            font-weight: 800; line-height: 1; letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            display: inline-flex; align-items: baseline; margin-top: clamp(0.1rem, 0.4vw, 0.3rem);
+        }
+        .bento-wide { grid-column: 1 / -1; flex-direction: row; align-items: center; }
+        .bento-wide h3 { font-size: var(--h3-size); }
+        .bento-wide p { margin-left: auto; text-align: right; }
+        /* Short viewports: 1fr rows shrink below the text height — drop the
+           small-cell descriptions (icon + title still read fine). */
+        @media (max-height: 700px) {
+            .bento-cell:not(.bento-hero):not(.bento-wide) p { display: none; }
+        }
+        @media (max-width: 900px) {
+            .bento-grid { grid-template-columns: repeat(2, 1fr); max-height: none; }
+            .bento-hero { grid-column: span 2; grid-row: span 1; }
+            .bento-wide { grid-column: span 2; }
+        }
+        @media (max-width: 600px) {
+            .bento-grid { grid-template-columns: 1fr; }
+            .bento-hero, .bento-wide { grid-column: span 1; }
+        }
+
+        /* ============================================================
+           NEW: BORDER BEAM (bento hero rotating conic outline)
+           ============================================================ */
+        @property --beam-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+        .beam-border { position: relative; }
+        .beam-border::before {
+            content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px;
+            background: conic-gradient(from var(--beam-angle), transparent 0 62%, #8B5CF6 78%, #D946EF 90%, #FF9900 96%, transparent 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude;
+            animation: beamSpin 6s linear infinite; pointer-events: none;
+        }
+        @keyframes beamSpin { to { --beam-angle: 360deg; } }
+        @media (prefers-reduced-motion: reduce) { .beam-border::before { animation: none; } }
+
+        /* ============================================================
+           NEW: SPOTLIGHT CARDS (id: spotlight) — pointer-follow glow
+           ============================================================ */
+        .spot-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.8rem, 2vw, 1.5rem);
+            width: 100%; max-width: var(--content-max);
+        }
+        .spot-card {
+            position: relative; overflow: hidden;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: clamp(12px, 1.4vw, 18px);
+            padding: clamp(1rem, 2.2vw, 1.8rem);
+            display: flex; flex-direction: column;
+            gap: clamp(0.4rem, 1vw, 0.7rem);
+            transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+        }
+        .spot-card:hover {
+            border-color: var(--card-border-hover);
+            box-shadow: 0 0 28px rgba(139,92,246,0.16);
+            transform: translateY(-3px);
+        }
+        .spot-card::before {
+            content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+            background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%), rgba(139,92,246,0.16), transparent 60%);
+            opacity: 0; transition: opacity 0.35s;
+        }
+        .spot-card:hover::before { opacity: 1; }
+        .spot-card > * { position: relative; z-index: 1; }
+        .spot-num {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 5vw, 3.6rem); font-weight: 800; line-height: 1;
+            -webkit-text-stroke: 1.5px rgba(196,181,253,0.5);
+            -webkit-text-fill-color: transparent; color: transparent;
+        }
+        .spot-icon {
+            width: clamp(30px, 3.4vw, 42px); height: clamp(30px, 3.4vw, 42px);
+            border-radius: clamp(8px, 1vw, 11px); flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(217,70,239,0.1));
+            display: flex; align-items: center; justify-content: center;
+        }
+        .spot-icon i { width: 55%; height: 55%; color: var(--accent-purple); }
+        .spot-card h3 {
+            font-family: var(--font-display); font-size: var(--h3-size);
+            font-weight: 700; line-height: 1.2;
+        }
+        .spot-card p { font-size: var(--small-size); color: var(--text-secondary); line-height: 1.45; }
+        @media (max-width: 768px) { .spot-grid { grid-template-columns: 1fr; } }
+
+        /* ============================================================
+           NEW: MARQUEE (id: ecosystem) — dual scrolling service rows
+           ============================================================ */
+        .marquee-block {
+            width: 100%; display: flex; flex-direction: column;
+            gap: clamp(0.8rem, 2vh, 1.6rem);
+        }
+        .marquee {
+            width: 100vw; margin-left: calc(50% - 50vw);
+            overflow: hidden;
+            -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+            mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+        }
+        .marquee-track {
+            display: flex; align-items: center;
+            gap: clamp(1.2rem, 3vw, 2.6rem);
+            width: max-content;
+            animation: marqueeMove 32s linear infinite;
+        }
+        .marquee-track.rev { animation-duration: 40s; animation-direction: reverse; }
+        @keyframes marqueeMove { to { transform: translateX(-50%); } }
+        .mq-item {
+            font-family: var(--font-display); font-weight: 700;
+            font-size: clamp(1.3rem, 3.2vw, 2.4rem);
+            color: rgba(255,255,255,0.22); white-space: nowrap;
+        }
+        .mq-item.hl {
+            background: var(--grad-accent);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .mq-dot {
+            width: clamp(6px, 0.9vw, 10px); height: clamp(6px, 0.9vw, 10px);
+            flex-shrink: 0; background: var(--accent-pink);
+            transform: rotate(45deg); border-radius: 1px;
+            box-shadow: 0 0 8px rgba(217,70,239,0.5);
+        }
+        @media (prefers-reduced-motion: reduce) { .marquee-track { animation: none; } }
+
+        /* ============================================================
+           NEW: TITLE WORD REVEAL + EM SHIMMER
+           ============================================================ */
+        .title-main .tw {
+            display: inline-block; opacity: 0;
+            transform: translateY(0.5em); filter: blur(8px);
+        }
+        .slide.visible .title-main .tw {
+            animation: wordRise 0.8s var(--ease-out-expo) both;
+            animation-delay: calc(var(--i) * 90ms);
+        }
+        @keyframes wordRise { to { opacity: 1; transform: none; filter: blur(0); } }
+        .title-main em {
+            background-size: 200% 100%;
+            animation: emShimmer 5s ease-in-out 1.2s infinite;
+        }
+        @keyframes emShimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .title-main .tw { opacity: 1; transform: none; filter: none; }
+        }
+
         /* === PROGRESS BAR (fixed, top) === */
         .progress-bar {
             position: fixed; top: 0; left: 0; height: 2px;
@@ -1024,7 +1246,7 @@
     </div>
     <div class="slide-content">
         <div class="title-label reveal d1">AMAZON WEB SERVICES</div>
-        <h1 class="title-main reveal d2">Building the Future with<br><em>Generative AI</em></h1>
+        <h1 class="title-main reveal d2"><span class="tw" style="--i:0">Building</span> <span class="tw" style="--i:1">the</span> <span class="tw" style="--i:2">Future</span> <span class="tw" style="--i:3">with</span><br><span class="tw" style="--i:4"><em>Generative AI</em></span></h1>
         <div class="title-accent reveal d3"></div>
         <p class="title-sub reveal d4">re:Invent 2026 Keynote — the platform, the silicon,<br>and the agents reinventing every application.</p>
     </div>
@@ -1114,28 +1336,29 @@
         <div class="metric-row">
             <div class="metric-card reveal d2">
                 <div class="metric-tag"><i data-lucide="users"></i>Customers</div>
-                <div class="metric-value">100<span class="metric-unit">K+</span></div>
+                <div class="metric-value"><span class="count" data-count="100" data-decimals="0">0</span><span class="metric-unit">K+</span></div>
                 <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>42% <span>vs 2024</span></div>
             </div>
             <div class="metric-card reveal d3">
                 <div class="metric-tag"><i data-lucide="zap"></i>Throughput</div>
-                <div class="metric-value">6<span class="metric-unit">x</span></div>
+                <div class="metric-value"><span class="count" data-count="6" data-decimals="0">0</span><span class="metric-unit">x</span></div>
                 <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>Trainium2 <span>vs prior gen</span></div>
             </div>
             <div class="metric-card reveal d4">
                 <div class="metric-tag"><i data-lucide="coins"></i>Cost / Token</div>
-                <div class="metric-value">40<span class="metric-unit">%</span></div>
+                <div class="metric-value"><span class="count" data-count="40" data-decimals="0">0</span><span class="metric-unit">%</span></div>
                 <div class="metric-delta down"><i data-lucide="arrow-down-right"></i>40% <span>vs 2024</span></div>
             </div>
             <div class="metric-card reveal d5">
                 <div class="metric-tag"><i data-lucide="map-pin"></i>Regions</div>
-                <div class="metric-value">33<span class="metric-unit">live</span></div>
+                <div class="metric-value"><span class="count" data-count="33" data-decimals="0">0</span><span class="metric-unit">live</span></div>
                 <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>+4 <span>new in 2025</span></div>
             </div>
         </div>
 
         <div class="callout-bar reveal d6">
             <i data-lucide="sparkles"></i>
+            <span class="callout-tag">Insight</span>
             <p><strong>Record year:</strong> generative AI workloads on Amazon Bedrock more than doubled across every region, with inference cost per token falling for the fourth consecutive quarter.</p>
         </div>
     </div>
@@ -1211,6 +1434,112 @@
 </section>
 
 <!-- ============================================================
+     id: bento — Bento Grid (NEW) — asymmetric platform mosaic
+     ============================================================ -->
+<section class="slide content-slide" aria-label="Platform Map">
+    <div class="floating-orb orb-purple" style="width:26vw;height:26vw;top:8%;right:7%;animation:orbFloat2 16s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-blue"   style="width:20vw;height:20vw;bottom:10%;left:5%;animation:orbFloat1 18s ease-in-out infinite;"></div>
+
+    <div class="slide-frame"></div>
+    <div class="slide-header">
+        <span class="slide-eyebrow">&mdash; re:Invent &middot; <b>PLATFORM MAP</b></span>
+        <span class="slide-index"></span>
+    </div>
+
+    <div class="slide-content">
+        <div class="section-head reveal d1">
+            <div class="section-titlebar">
+                <span class="section-num">04</span>
+                <h2 class="section-title">One Map, Every Layer</h2>
+            </div>
+            <p class="section-desc">The full generative AI stack on AWS &mdash; models, agents, silicon, and safety in one platform.</p>
+        </div>
+
+        <div class="bento-grid">
+            <div class="bento-cell bento-hero beam-border reveal d2">
+                <div class="bento-icon"><i data-lucide="layers"></i></div>
+                <h3>One Platform, Every Model</h3>
+                <p>From foundation models to custom silicon &mdash; build, tune, and ship generative AI without leaving AWS.</p>
+                <div class="bento-stat"><span class="count" data-count="200" data-decimals="0">0</span>+</div>
+            </div>
+            <div class="bento-cell reveal d3">
+                <div class="bento-icon"><i data-lucide="bot"></i></div>
+                <h3>Bedrock AgentCore</h3>
+                <p>Managed reasoning agents with memory and tool use.</p>
+            </div>
+            <div class="bento-cell reveal d4">
+                <div class="bento-icon"><i data-lucide="brain"></i></div>
+                <h3>SageMaker Unified</h3>
+                <p>One studio for data, training, and MLOps.</p>
+            </div>
+            <div class="bento-cell reveal d5">
+                <div class="bento-icon"><i data-lucide="cpu"></i></div>
+                <h3>Trainium3</h3>
+                <p>Frontier-scale training at higher perf per watt.</p>
+            </div>
+            <div class="bento-cell reveal d6">
+                <div class="bento-icon"><i data-lucide="shield-check"></i></div>
+                <h3>Guardrails</h3>
+                <p>Configurable safety and PII controls by default.</p>
+            </div>
+            <div class="bento-cell bento-wide reveal d7">
+                <div class="bento-icon"><i data-lucide="zap"></i></div>
+                <h3>Sub-second inference at global scale</h3>
+                <p>Optimized serving across 33 Regions and 600+ edge locations.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-progress"></div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- ============================================================
+     id: spotlight — Spotlight Cards (NEW) — pointer-follow glow
+     ============================================================ -->
+<section class="slide content-slide" aria-label="Why Builders Choose AWS">
+    <div class="floating-orb orb-pink"   style="width:24vw;height:24vw;top:10%;left:8%;animation:orbFloat3 17s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-purple" style="width:22vw;height:22vw;bottom:10%;right:6%;animation:orbFloat1 19s ease-in-out infinite;"></div>
+
+    <div class="slide-frame"></div>
+    <div class="slide-header">
+        <span class="slide-eyebrow">&mdash; re:Invent &middot; <b>WHY AWS</b></span>
+        <span class="slide-index"></span>
+    </div>
+
+    <div class="slide-content">
+        <div class="section-head center reveal d1">
+            <div class="section-titlebar"><h2 class="section-title">Why Builders Choose AWS</h2></div>
+            <p class="section-desc">Three reasons teams bet their generative AI roadmap on AWS.</p>
+        </div>
+
+        <div class="spot-grid">
+            <div class="spot-card reveal d2">
+                <span class="spot-num">01</span>
+                <div class="spot-icon"><i data-lucide="shield-check"></i></div>
+                <h3>Security by Design</h3>
+                <p>VPC isolation, end-to-end encryption, and fine-grained IAM protect every workload from prototype to production.</p>
+            </div>
+            <div class="spot-card reveal d3">
+                <span class="spot-num">02</span>
+                <div class="spot-icon"><i data-lucide="trending-up"></i></div>
+                <h3>Proven Scale</h3>
+                <p>100K+ customers run generative AI across 33 Regions, backed by a decade of relentless infrastructure invention.</p>
+            </div>
+            <div class="spot-card reveal d4">
+                <span class="spot-num">03</span>
+                <div class="spot-icon"><i data-lucide="zap"></i></div>
+                <h3>Fastest Time to Value</h3>
+                <p>Managed models, agents, and guardrails take you from a blank prompt to a governed app in days, not quarters.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="slide-progress"></div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- ============================================================
      SLIDE 5 — BIG NUMBER HERO (id: big-number)
      ============================================================ -->
 <section class="slide bignumber-slide content-slide" aria-label="Adoption">
@@ -1225,7 +1554,7 @@
 
     <div class="slide-content">
         <div class="section-label reveal d1">ADOPTION</div>
-        <div class="bignumber reveal d2">100K+</div>
+        <div class="bignumber reveal d2"><span class="count" data-count="100" data-decimals="0">0</span>K+</div>
         <div class="bignumber-label reveal d3">Customers Building AI on AWS</div>
         <p class="bignumber-desc reveal d4">From early-stage startups to the world's largest enterprises, generative AI on Amazon Bedrock now powers production workloads across every industry and region.</p>
     </div>
@@ -1248,10 +1577,10 @@
             <div class="section-titlebar"><span class="section-num">04</span><h2 class="section-title">Proven at Scale</h2></div>
         </div>
         <div class="stats-row reveal d2">
-            <div class="stat-item"><div class="stat-value">100K+</div><div class="stat-label">Customers</div></div>
-            <div class="stat-item"><div class="stat-value">6x</div><div class="stat-label">Performance</div></div>
-            <div class="stat-item"><div class="stat-value">4x</div><div class="stat-label">Bandwidth</div></div>
-            <div class="stat-item"><div class="stat-value">33</div><div class="stat-label">Regions</div></div>
+            <div class="stat-item"><div class="stat-value"><span class="count" data-count="100" data-decimals="0">0</span>K+</div><div class="stat-label">Customers</div></div>
+            <div class="stat-item"><div class="stat-value"><span class="count" data-count="6" data-decimals="0">0</span>x</div><div class="stat-label">Performance</div></div>
+            <div class="stat-item"><div class="stat-value"><span class="count" data-count="4" data-decimals="0">0</span>x</div><div class="stat-label">Bandwidth</div></div>
+            <div class="stat-item"><div class="stat-value"><span class="count" data-count="33" data-decimals="0">0</span></div><div class="stat-label">Regions</div></div>
         </div>
         <div class="features-grid">
             <div class="feature-card reveal d3">
@@ -1377,22 +1706,22 @@
             <div class="org-metrics">
                 <div class="metric-card reveal d2">
                     <div class="metric-tag"><i data-lucide="users"></i>Engineers</div>
-                    <div class="metric-value">12<span class="metric-unit">K+</span></div>
+                    <div class="metric-value"><span class="count" data-count="12" data-decimals="0">0</span><span class="metric-unit">K+</span></div>
                     <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>18% <span>vs 2024</span></div>
                 </div>
                 <div class="metric-card reveal d3">
                     <div class="metric-tag"><i data-lucide="boxes"></i>Teams</div>
-                    <div class="metric-value">340<span class="metric-unit">+</span></div>
+                    <div class="metric-value"><span class="count" data-count="340" data-decimals="0">0</span><span class="metric-unit">+</span></div>
                     <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>9% <span>vs 2024</span></div>
                 </div>
                 <div class="metric-card reveal d4">
                     <div class="metric-tag"><i data-lucide="git-branch"></i>Deploys / day</div>
-                    <div class="metric-value">8.4<span class="metric-unit">K</span></div>
+                    <div class="metric-value"><span class="count" data-count="8.4" data-decimals="1">0.0</span><span class="metric-unit">K</span></div>
                     <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>27% <span>vs 2024</span></div>
                 </div>
                 <div class="metric-card reveal d5">
                     <div class="metric-tag"><i data-lucide="shield-check"></i>Uptime</div>
-                    <div class="metric-value">99.99<span class="metric-unit">%</span></div>
+                    <div class="metric-value"><span class="count" data-count="99.99" data-decimals="2">0.00</span><span class="metric-unit">%</span></div>
                     <div class="metric-delta up"><i data-lucide="arrow-up-right"></i>SLA <span>met</span></div>
                 </div>
             </div>
@@ -1475,10 +1804,9 @@
         </div>
 
         <div class="reflect-grid">
-            <div class="reflect-panel warm reveal d2">
+            <div class="reflect-col warm reveal d2">
                 <div class="reflect-head">
-                    <div class="ic"><i data-lucide="alert-triangle"></i></div>
-                    <h3>Challenges</h3>
+                    <h3><i data-lucide="alert-triangle"></i>Challenges</h3>
                 </div>
                 <ul class="reflect-list">
                     <li>Balancing inference cost against tightening latency SLAs as token volume grew 8x.</li>
@@ -1486,10 +1814,9 @@
                     <li>Governance fragmented across hundreds of multi-account, multi-region estates.</li>
                 </ul>
             </div>
-            <div class="reflect-panel cool reveal d3">
+            <div class="reflect-col cool reveal d3">
                 <div class="reflect-head">
-                    <div class="ic"><i data-lucide="lightbulb"></i></div>
-                    <h3>Learnings</h3>
+                    <h3><i data-lucide="lightbulb"></i>Learnings</h3>
                 </div>
                 <ul class="reflect-list">
                     <li>Managed services on Amazon Bedrock cut time-to-first-token by 63%.</li>
@@ -1598,6 +1925,73 @@
             <div class="tl-bot tl-col3 empty"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div></div>
             <div class="tl-bot tl-col4"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year">2024</div><div class="tl-desc">Amazon Q</div></div></div>
             <div class="tl-bot tl-col5 empty"><div class="tl-stem-down"></div><div class="tl-card"><div class="tl-year">&nbsp;</div><div class="tl-desc">&nbsp;</div></div></div>
+        </div>
+    </div>
+
+    <div class="slide-progress"></div>
+    <div class="slide-footer">&copy; 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- ============================================================
+     id: ecosystem — Marquee (NEW) — dual scrolling service rows
+     ============================================================ -->
+<section class="slide content-slide" aria-label="The Ecosystem">
+    <div class="floating-orb orb-purple" style="width:26vw;height:26vw;top:8%;left:10%;animation:orbFloat2 16s ease-in-out infinite;"></div>
+    <div class="floating-orb orb-pink"   style="width:22vw;height:22vw;bottom:10%;right:8%;animation:orbFloat3 18s ease-in-out infinite;"></div>
+
+    <div class="slide-frame"></div>
+    <div class="slide-header">
+        <span class="slide-eyebrow">&mdash; re:Invent &middot; <b>ECOSYSTEM</b></span>
+        <span class="slide-index"></span>
+    </div>
+
+    <div class="slide-content">
+        <div class="section-head center reveal d1">
+            <div class="section-titlebar"><h2 class="section-title">The Ecosystem</h2></div>
+            <p class="section-desc">Hundreds of integrated services &mdash; one cloud to build, run, and scale on.</p>
+        </div>
+
+        <div class="marquee-block reveal d2">
+            <div class="marquee">
+                <div class="marquee-track">
+                    <span class="mq-item hl">Amazon Bedrock</span><span class="mq-dot"></span>
+                    <span class="mq-item">SageMaker</span><span class="mq-dot"></span>
+                    <span class="mq-item hl">Amazon Q</span><span class="mq-dot"></span>
+                    <span class="mq-item">EC2</span><span class="mq-dot"></span>
+                    <span class="mq-item">S3</span><span class="mq-dot"></span>
+                    <span class="mq-item">Lambda</span><span class="mq-dot"></span>
+                    <span class="mq-item">DynamoDB</span><span class="mq-dot"></span>
+                    <span class="mq-item">EKS</span><span class="mq-dot"></span>
+                    <span class="mq-item hl">Amazon Bedrock</span><span class="mq-dot"></span>
+                    <span class="mq-item">SageMaker</span><span class="mq-dot"></span>
+                    <span class="mq-item hl">Amazon Q</span><span class="mq-dot"></span>
+                    <span class="mq-item">EC2</span><span class="mq-dot"></span>
+                    <span class="mq-item">S3</span><span class="mq-dot"></span>
+                    <span class="mq-item">Lambda</span><span class="mq-dot"></span>
+                    <span class="mq-item">DynamoDB</span><span class="mq-dot"></span>
+                    <span class="mq-item">EKS</span><span class="mq-dot"></span>
+                </div>
+            </div>
+            <div class="marquee">
+                <div class="marquee-track rev">
+                    <span class="mq-item hl">Trainium</span><span class="mq-dot"></span>
+                    <span class="mq-item">Inferentia</span><span class="mq-dot"></span>
+                    <span class="mq-item hl">Graviton</span><span class="mq-dot"></span>
+                    <span class="mq-item">Nitro</span><span class="mq-dot"></span>
+                    <span class="mq-item">Aurora</span><span class="mq-dot"></span>
+                    <span class="mq-item">Redshift</span><span class="mq-dot"></span>
+                    <span class="mq-item">Kinesis</span><span class="mq-dot"></span>
+                    <span class="mq-item">CloudFront</span><span class="mq-dot"></span>
+                    <span class="mq-item hl">Trainium</span><span class="mq-dot"></span>
+                    <span class="mq-item">Inferentia</span><span class="mq-dot"></span>
+                    <span class="mq-item hl">Graviton</span><span class="mq-dot"></span>
+                    <span class="mq-item">Nitro</span><span class="mq-dot"></span>
+                    <span class="mq-item">Aurora</span><span class="mq-dot"></span>
+                    <span class="mq-item">Redshift</span><span class="mq-dot"></span>
+                    <span class="mq-item">Kinesis</span><span class="mq-dot"></span>
+                    <span class="mq-item">CloudFront</span><span class="mq-dot"></span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1778,12 +2172,29 @@
         entries.forEach(e => {
             if (e.isIntersecting) {
                 e.target.classList.add('visible');
+                if (!e.target.dataset.fx) { e.target.dataset.fx = '1'; runCounters(e.target); }
                 current = [...slides].indexOf(e.target);
                 updateUI();
             }
         });
     }, { threshold: 0.5 });
     slides.forEach(s => obs.observe(s));
+
+    /* --- One-shot count-up animation for .count spans --- */
+    const REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function runCounters(slide) {
+        slide.querySelectorAll('.count').forEach(el => {
+            const target = parseFloat(el.dataset.count || '0');
+            const dec = parseInt(el.dataset.decimals || '0', 10);
+            if (REDUCE) { el.textContent = target.toFixed(dec); return; }
+            const t0 = performance.now(), dur = 1300;
+            (function tick(now) {
+                const p = Math.min(1, (now - t0) / dur), e2 = 1 - Math.pow(1 - p, 3);
+                el.textContent = (target * e2).toFixed(dec);
+                if (p < 1) requestAnimationFrame(tick);
+            })(performance.now());
+        });
+    }
 
     /* --- Nav dots --- */
     slides.forEach((_, i) => {
@@ -1836,6 +2247,15 @@
 
     updateUI();
 })();
+
+/* --- Spotlight cards: pointer-follow glow position --- */
+document.querySelectorAll('.spot-card').forEach(card => {
+    card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+});
 
 // Render Lucide icons (converts <i data-lucide="name"> to inline SVGs)
 if (typeof lucide !== 'undefined') lucide.createIcons();

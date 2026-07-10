@@ -1,110 +1,120 @@
-# Diagram Reference (draw.io)
+# Diagram Reference — Native SVG/CSS Framework (+ drawio for AWS only)
 
-Integration patterns for rendering rich diagrams — flowcharts, AWS architecture, sequence/UML/ER, network topology, mind maps — inside slides. Read this file when generating slides that contain `### diagram` blocks in content.md.
+Integration patterns for rendering rich diagrams inside slides. Read this file when generating slides that contain `### diagram` blocks in content.md.
 
-Diagrams are produced by the **[drawio-skill](https://github.com/Agents365-ai/drawio-skill)**, which generates `.drawio` XML and exports a high-resolution **PNG** that gets bundled into the presentation's `assets/` folder and embedded like any other image (lightbox included).
+**The routing rule (decides everything else):**
 
-The slides skill never hand-draws diagram geometry itself — it hands the description to drawio-skill, then embeds the export. This keeps the presentation zero-dependency (the final HTML references a static `assets/*.png`, no runtime library).
+| `type:` | Renderer | Why |
+|---------|----------|-----|
+| `flowchart` (default), `sequence`, `class`, `er`, `network`, `mindmap`, `arch` | **Native inline SVG/CSS** — hand-drawn by the skill, directly in the slide | Vector, zero-dependency, theme-native colors, **animatable** (packets flowing along edges, staggered entrances, hover-highlight). PNG exports can't do any of this. |
+| `aws` / `architecture` with AWS services | **drawio skill → PNG** (legacy path, see end of file) | The official AWS service icon set is the one thing worth a raster export. |
+
+The old drawio-for-everything path produced broken arrowheads (crow's-foot ticks rendered wrong), washed-out layouts, and dead raster images that clash with an otherwise animated deck. Native SVG fixes all three and needs **no CLI install** for the common diagram types.
+
+> `arch` (non-AWS architecture) is drawn natively — either flat (routed edges between service cards) or as the isometric 3D showpiece below. Only diagrams that need *official AWS icons* go to drawio.
 
 ---
 
 ## Parsing content.md `### diagram` Blocks
 
-A diagram block looks like this:
-
 ```
 ### diagram
-type: aws
-caption: Serverless image pipeline
-Users upload images to an S3 bucket.
-The upload event triggers a Lambda function.
-Lambda calls Amazon Rekognition for labels, then writes results to DynamoDB.
-CloudFront serves the processed images back to users.
+type: sequence
+caption: POST /orders 从客户端到数据库再回来
+animate: flow
+Client -> API Gateway: POST /orders
+API Gateway -> Lambda: Invoke
+Lambda -> DynamoDB: PutItem
+DynamoDB --> Client: 201 Created
 ```
 
 **Parsing rules:**
 
-1. `type:` (optional, default `flowchart`) → selects the drawio diagram-type preset. One of:
-   `flowchart` | `aws` (or `architecture`) | `sequence` | `class` (UML) | `er` | `network` | `mindmap`
-2. `caption:` (optional) → a single line rendered under the diagram as a muted caption. Not passed to drawio.
-3. `title:` (optional) → diagram title drawn inside the diagram by drawio. If absent, use the slide heading.
-4. Every remaining non-empty line → the **description** passed to drawio-skill. Lines may be prose, or an arrow flow (`A -> B -> C`), or a bullet list of components and relationships. Concatenate them in order into one natural-language brief.
+1. `type:` (optional, default `flowchart`) → one of:
+   `flowchart` | `sequence` | `class` (UML) | `er` | `network` | `mindmap` | `arch` | `aws`/`architecture`
+2. `caption:` (optional) → one muted line under the diagram.
+3. `title:` (optional) → falls back to the slide heading.
+4. `animate:` (optional) → `flow` (default: packets/entrance choreography) | `static` (entrance only, no ambient loop) | `none`.
+5. Every remaining non-empty line → the **description**: prose, arrow flows (`A -> B: label`, `-->` for dashed/return), or bullets. The skill designs the geometry from this.
 
 **Validation (Step 4 content review):**
-- `type` (if present) must be one of the values above — otherwise warn and fall back to `flowchart`.
-- The description (lines after the directives) must be non-empty — a diagram block with only a `type:` is an empty diagram; flag it.
-- Note in the review summary that diagram blocks require the **draw.io desktop CLI** (`drawio`) to export. If unavailable, the fallback chain below applies — surface this to the user during review so they aren't surprised.
+- Unknown `type` → warn, fall back to `flowchart`.
+- Empty description → flag as an empty diagram.
+- Only if the deck contains a `type: aws` block: note that AWS diagrams need the draw.io desktop CLI (`drawio`) and flag once if missing. **Native types need nothing.**
 
 ---
 
-## Generation Workflow (per diagram block)
+## Native Diagram Framework
 
-For each `### diagram` block, while generating the presentation:
+**Working, Chrome-verified reference demos — copy their code, don't reinvent:**
 
-1. **Resolve the brief** — combine `title` (or slide heading) + the description lines into one prompt for drawio-skill. Append the theme styling instruction from "Theme Adaptation" below.
-2. **Invoke drawio-skill** — produce a `.drawio` file, then export **PNG** into the presentation's `assets/` directory:
-   - File names: `assets/diagram-1.drawio` (source) and `assets/diagram-1.png` (export). Increment the number per diagram across the whole deck.
-   - Export command (substitute the binary name resolved by drawio-skill — usually `drawio`):
-     ```bash
-     drawio -x -f png -s 2 -t -o my-presentation/assets/diagram-1.png my-presentation/assets/diagram-1.drawio
-     ```
-   - Flags: `-s 2` renders at 2x for crisp text; `-t` gives a **transparent background** so the slide background shows through. **Do NOT pass `-e`** for the slide export — beyond not needing editability in the deck, draw.io's `-e` PNG output truncates the IEND chunk and produces a corrupt file (drawio-skill issue #8). The editable `.drawio` source is kept alongside the PNG.
-   - Keep the rendered width reasonable (a medium diagram at `-s 2` stays well under any size limit). For a very large diagram, cap with `--width 2400` instead of `-s 2`.
-3. **Embed** the PNG in the slide (see "Slide Embedding" below).
-4. **Theme-match** the diagram colors to the chosen style preset before exporting (see "Theme Adaptation").
-5. Let drawio-skill run its own self-check / layout validation. Do not re-export per slide more than needed.
+| Demo | Type | Palette | Signature techniques |
+|------|------|---------|---------------------|
+| `../demos/diagrams/01-flowchart-flow/` | flowchart | re:Invent purple | node pop + edge draw-in choreography, SMIL packets chained through the graph, dashed marching-ants return edge, golden-node glow pulse |
+| `../demos/diagrams/02-sequence-api/` | sequence | Neon cyan | lifelines + growing activation bars, 7 messages fired strictly in order, **two-clock sync** (SMIL packets + CSS delays from one delay table), JS cycle loop |
+| `../demos/diagrams/03-er-schema/` | er | re:Invent purple | **geometrically correct crow's-foot markers** (the drawio failure case), entity cards with PK/FK tags, hover/click subtree highlight |
+| `../demos/diagrams/04-arch-isometric-3d/` | arch (3D) | re:Invent purple | CSS isometric plane (`rotateX(55°) rotateZ(-45°)`), extruded tiles, billboarded labels, request/response packet waves, pointer tilt |
+| `../demos/diagrams/05-mindmap-radial/` | mindmap | Neon cyan | radial bezier limbs, staggered bloom entrance, per-branch ambient drift, subtree hover highlight |
 
-> **Do not** inline a runtime draw.io library or a diagrams.net `<iframe>` into the deck for the normal path — that breaks the zero-dependency principle. The deliverable is a static PNG in `assets/`.
+All five are single-file, offline, zero-dependency, emoji-free (Lucide inline), `prefers-reduced-motion`-safe, console-clean. When generating a diagram slide, open the matching demo and adapt its patterns to the deck's palette and content.
 
----
+### Core rules (every native diagram)
 
-## Slide Embedding
+1. **Inline `<svg>` with a fixed design grid** — design at `viewBox="0 0 1400 H"` (H ≈ 640–760), hand-place coordinates generously, let CSS scale it (`width:100%; max-height:60vh`). Never compute layout at runtime.
+2. **Text via `<text>` + `<tspan>`** (never `foreignObject`). Hand-wrap CJK; keep effective font ≥14px.
+3. **Arrowheads/markers are hand-built geometry** — either `<marker>` defs (one per color: `markerUnits="userSpaceOnUse"`, explicit `fill`, since markers can't inherit CSS vars) or, when the tip must animate on arrival, a plain `<polygon>` popped in with the arrival FX. Crow's-foot: "exactly one" = two perpendicular ticks; "many" = three-prong foot opening toward the entity (see demo 03's commented defs).
+4. **Edge labels on dark pills**: small `rx=10+` rect filled with the slide bg color + edge-color border at ~40% alpha, sitting on the path midpoint. This is what kills the drawio white-box label problem.
+5. **Theme-native colors**: use the preset's `--chart-colors` + accents as **literal hex inside the SVG attrs**, matching chart slides. Node fill `rgba(accent,0.06-0.1)` + 1.5px accent stroke + soft `drop-shadow` glow on dark themes.
+6. **No emoji** — Lucide paths inlined (24×24 stroke icons). Same ban as everywhere in this skill.
 
-Embed the exported PNG using the same `.slide-image` mechanics as a normal image, so it inherits the click-to-enlarge lightbox automatically. Wrap it so it stays within the viewport.
+### Animation choreography (the whole point)
+
+Standard two-phase pattern (see demos 01/02 for full implementations):
+
+- **Phase A — entrance (~2–2.5s, replayable)**: nodes pop staggered (`scale(.85)→1` + fade, `transform-box:fill-box; transform-origin:center`), edges draw in via `pathLength="1"` + `stroke-dasharray:1; stroke-dashoffset:1→0` (length-independent), arrowheads/badges pop on arrival.
+- **Phase B — ambient loop**: glowing packets ride the edges via SMIL `<animateMotion><mpath href="#edge-path"/></animateMotion>`; dashed return edges run a marching-ants `stroke-dashoffset` loop; key nodes breathe (slow glow pulse).
+- **Two-clock sync** (when packets must line up with CSS FX): one hidden SMIL `<animate id="clock">` kicked by JS `beginElement()`; every packet begins at `clock.begin+OFFSETs`; CSS `animation-delay`s use the same offsets; document both in ONE delay-table comment. Restart cycle = remove/re-add `.play` class + `clock.beginElement()` (demo 02).
+- **In-slide activation**: inside a deck, start the choreography when the slide becomes active (hook the deck's existing slide-change handler or an IntersectionObserver) and reset it on leave, so the entrance replays each visit and packets don't run behind other slides.
+- **`prefers-reduced-motion`**: land on the fully-drawn final state, hide packets, no loops. Default no-JS state should also be the final drawn state (never blank).
+
+### Isometric 3D architecture (showpiece option)
+
+For `type: arch` when the user wants the 3D look (demo 04). Key facts:
+- Stack: `.scene{perspective}` → `.tilt` (pointer nudge wrapper) → `.iso-stage{rotateX(55deg) rotateZ(-45deg); preserve-3d}`. **Flattening gotcha applies** — no opacity/filter/overflow/mask on preserve-3d nodes; fades live on leaf children (see effects-reference.md).
+- Tiles = pad + `translateZ(--h)` top face + two extruded side faces + blurred ground shadow; labels **billboarded** with the inverse pose (`rotateZ(45deg) rotateX(-55deg)`) and anchored well *above* the top face (`translateZ(calc(var(--h) + 34px))`) so the tilted label plane doesn't sink into the block.
+- Routes live in one in-plane SVG child; packets are SMIL dots; request wave out, response wave back.
+- Budget the viewport: the projected plane leans toward the viewer, so scale the stage down (~0.8×) and pull it up (negative margin) until every tile + billboarded label fits 100vh. **Verify with a screenshot** — this is the #1 regression.
+- One diagram per slide; this one especially.
+
+### Slide embedding
+
+Native diagrams are part of the slide markup — no `<img>`, no lightbox needed (they're already full-resolution vector):
 
 ```html
 <section class="slide">
     <div class="slide-content">
-        <h2 class="reveal">Architecture Overview</h2>
+        <h2 class="reveal">一次 API 请求的完整流转</h2>
         <figure class="diagram-figure reveal">
-            <img class="slide-image diagram-image"
-                 src="assets/diagram-1.png"
-                 alt="Serverless image pipeline architecture">
-            <figcaption class="diagram-caption">Serverless image pipeline</figcaption>
+            <svg class="native-diagram" viewBox="0 0 1400 640" role="img" aria-label="...">
+                <!-- nodes / edges / packets, per the demo patterns -->
+            </svg>
+            <figcaption class="diagram-caption">POST /orders — 从客户端到数据库再回来</figcaption>
         </figure>
     </div>
     <div class="slide-footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
 </section>
 ```
 
-### CSS
-
 ```css
-/* === DIAGRAM (draw.io PNG) === */
+/* === NATIVE DIAGRAM === */
 .diagram-figure {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: flex; flex-direction: column; align-items: center;
     gap: clamp(0.4rem, 1vh, 0.8rem);
-    width: 100%;
-    max-width: min(1100px, 92vw);
-    margin: 0 auto;
+    width: 100%; max-width: min(1200px, 94vw); margin: 0 auto;
 }
-.diagram-image {
-    width: auto;
-    max-width: 100%;
-    /* Viewport fit: never exceed 60vh so heading + caption + footer still fit */
-    max-height: min(60vh, 560px);
-    object-fit: contain;
-    cursor: zoom-in;            /* lightbox affordance */
-}
-/* Optional panel behind the diagram — improves contrast for dark themes.
-   Use only when the diagram's strokes/labels are dark; skip for diagrams
-   themed with light strokes on a dark slide. */
-.diagram-image.on-panel {
-    background: var(--diagram-panel, rgba(255,255,255,0.94));
-    border-radius: clamp(8px, 1.2vw, 16px);
-    padding: clamp(12px, 2vw, 28px);
+.native-diagram {
+    width: 100%; height: auto;
+    max-height: min(60vh, 560px);   /* viewport fit — non-negotiable */
 }
 .diagram-caption {
     font-family: var(--font-body);
@@ -112,93 +122,58 @@ Embed the exported PNG using the same `.slide-image` mechanics as a normal image
     color: var(--chart-text, var(--text-secondary));
     text-align: center;
 }
-@media (max-height: 600px) {
-    .diagram-image { max-height: 52vh; }
-}
-@media (max-height: 500px) {
-    .diagram-image { max-height: 46vh; }
-}
+@media (max-height: 600px) { .native-diagram { max-height: 52vh; } }
+@media (max-height: 500px) { .native-diagram { max-height: 46vh; } }
 ```
 
-The lightbox (see html-template.md "Image Lightbox") binds to `.slide-image`, so `.diagram-image` is click-to-enlarge with no extra code. **When a deck contains any diagram, always include the lightbox** — diagrams reward zooming in.
+### Viewport fitting (NON-NEGOTIABLE)
+
+- One diagram per slide. Heading + diagram + 1-line caption + footer is the maximum.
+- Dense diagram (>~12 nodes)? **Split across two slides** (overview → detail) instead of shrinking below readability.
+- Keep the 60vh cap and height breakpoints above.
+
+### Parallel generation note
+
+With 8+ slides (batch agents): the **lead** designs each native diagram's SVG (or delegates one diagram = one agent), because batch agents writing `<section>` markup shouldn't each invent geometry conventions. Hand a batch agent the finished `<figure>` block to inline verbatim.
 
 ---
 
-## Theme Adaptation
+## AWS Architecture via drawio (the one remaining drawio path)
 
-PNG diagrams must read cleanly on the chosen slide background. draw.io shapes default to pale fills with dark strokes — fine on light themes, hard to read on dark ones. Pass explicit colors to drawio-skill so the diagram matches the preset.
+Only for `type: aws` — when official AWS service icons materially improve the diagram. Produces a PNG in `assets/`, embedded like an image (lightbox applies).
 
-**Rules:**
-1. Export the PNG with `-t` (**transparent background**), so the slide background shows through instead of a white box.
-2. Reuse the preset's `--chart-colors` palette (from STYLE_PRESETS.md) for shape fills/accents — this keeps diagrams visually consistent with charts in the same deck. Assign colors to node groups/tiers in order.
-3. Set node **stroke** and **label font color** for contrast against the slide:
-   - Dark themes → light strokes/labels: stroke `rgba(255,255,255,0.7)`, font `#ffffff` (or the accent for emphasis nodes).
-   - Light themes → dark strokes/labels: stroke `rgba(0,0,0,0.65)`, font `#1a1a1a`.
-4. Font family: pass the preset's **body font** name to drawio (e.g. `defaultFontFamily="Space Grotesk"`) so labels match the deck typography. The font is rasterized into the PNG at export time, so it renders correctly even if the viewer doesn't have that font installed.
-5. Edges/arrows: use the preset `--accent` color (resolved to a literal hex) so connectors pop.
-6. For dark themes where shape fills would still be muddy, prefer **outlined nodes** (transparent or near-transparent fill + colored stroke + light label) rather than solid pale fills. Alternatively add `.on-panel` to the `<img>` to sit the diagram on a light card.
+1. **Brief** — combine `title` + description into one prompt for drawio-skill; tell it to use the official AWS shape library (its `shapesearch.py` resolves exact shapes — don't guess shape names).
+2. **Export** — `.drawio` source + PNG into `assets/`:
+   ```bash
+   drawio -x -f png -s 2 -t -o my-presentation/assets/diagram-1.png my-presentation/assets/diagram-1.drawio
+   ```
+   `-s 2` = 2x for crisp text; `-t` = transparent background. **Never `-e`** (truncated-IEND corrupt PNG, drawio-skill issue #8). Cap very large diagrams with `--width 2400` instead of `-s 2`.
+3. **Theme-match before export** — resolve every color to literal hex (no `var()` in .drawio XML):
+   - Fills from the preset `--chart-colors`, assigned per tier/group.
+   - Dark themes → light strokes/labels (`rgba(255,255,255,0.7)` / `#ffffff`); prefer outlined nodes (near-transparent fill + colored stroke) over pale solid fills. Edge/arrow color = the preset accent.
+   - **Edge labels need `labelBackgroundColor` set to the slide bg hex** (e.g. `#0A0A0A`) or they render as white boxes on the transparent PNG.
+   - Pass the preset body font as `defaultFontFamily` (rasterized at export).
+4. **Embed** with the classic image mechanics (this is the only diagram path that still uses `<img>` + lightbox):
+   ```html
+   <img class="slide-image diagram-image" src="assets/diagram-1.png" alt="...">
+   ```
+   `.diagram-image { max-height: min(60vh, 560px); object-fit: contain; cursor: zoom-in; }` — same caps/breakpoints as native.
 
-**Per-theme quick guide** (stroke / label / edge — fills come from `--chart-colors`):
-
-| Theme group | Node stroke | Label color | Edge color | Panel? |
-|-------------|-------------|-------------|------------|--------|
-| Neon Cyber | `#00ffcc` / `#ff00aa` | `#e0e0ff` | `#00ffcc` | no (glow reads on black) |
-| re:Invent Keynote | `rgba(255,255,255,0.7)` | `#ffffff` | `#8B5CF6` | optional |
-
-Because `var()` cannot be used inside the `.drawio` XML, **resolve every color to a literal hex/rgba** when building the drawio brief — same rule as Chart.js configs.
-
-> **Tip:** Export at `-s 2` (2x) so labels stay sharp when the PNG is scaled up in the lightbox. Since PNG is rasterized, under-resolution shows as blurry text — when in doubt, render larger.
-
----
-
-## Diagram Type → drawio Preset Map
-
-| content.md `type:` | drawio diagram-type preset | Typical use |
-|--------------------|---------------------------|-------------|
-| `flowchart` (default) | Flowchart | process flows, decision trees |
-| `aws` / `architecture` | Architecture | cloud/system architecture, AWS service diagrams |
-| `sequence` | Sequence | request/response interactions, lifelines |
-| `class` | UML Class | object models, class hierarchies |
-| `er` | ERD | data models, DB schemas |
-| `network` | Architecture (network shapes) | network topology |
-| `mindmap` | Flowchart (radial) | concept maps, breakdowns |
-
-For `aws`/`network`, tell drawio-skill to use the official AWS/Cisco/network shape libraries (it resolves exact shape styles via its `shapesearch.py`). For brand/AI logos it uses `aiicons.py`. Don't guess shape names in the brief — describe the components by name and let drawio-skill pick shapes.
-
----
-
-## Viewport Fitting (NON-NEGOTIABLE)
-
-- One diagram per slide. A diagram + bullets rarely both fit — split them.
-- `.diagram-image` is capped at `max-height: min(60vh, 560px)` with height breakpoints at 600px and 500px. Keep them.
-- If a diagram is dense (>~12 nodes), it will shrink past readability inside 60vh. **Split the concept across two slides** (e.g. high-level on one, detail on the next) rather than cramming. The lightbox lets viewers zoom the full-resolution PNG when needed (export at `-s 2` so it stays sharp when enlarged).
-- Heading + diagram + optional 1-line caption + footer is the maximum. No bullet lists alongside.
-
----
-
-## Fallback Chain
-
-The normal path needs the **draw.io desktop CLI** to export PNG. Degrade gracefully:
+### Fallback chain (AWS type only)
 
 | Scenario | Behavior |
 |----------|----------|
-| drawio CLI available | Generate `.drawio` + export `assets/diagram-N.png` (`-s 2 -t`, no `-e`), embed as above. (Preferred.) |
-| drawio CLI missing, but the `.drawio` XML was generated | Embed a static placeholder card with the diagram title and a short note, and tell the user to install draw.io (`brew install --cask drawio`) and re-run to get the rendered diagram. Keep the `.drawio` source in `assets/` so nothing is lost. |
-| drawio-skill not installed at all | Fall back to the slide skill's own layout primitives — render the described flow using the chosen style's **process-flow / feature-grid layout** (boxes + arrows in HTML/CSS) instead of a real diagram. Tell the user a CSS layout was used in place of a draw.io diagram and how to enable the full feature. |
-| Diagram block empty (no description) | Skip the diagram, keep the heading, warn the user (already caught in Step 4). |
+| drawio CLI available | `.drawio` + PNG export, embed. (Preferred for `type: aws`.) |
+| CLI missing, XML generated | Keep `.drawio` in `assets/`, embed a placeholder card, tell the user to `brew install --cask drawio` and re-run. |
+| drawio-skill not installed | **Draw it natively instead**: service cards with Lucide icons + routed edges (the `arch` treatment) — no AWS official icons, but animated and self-contained. Tell the user. |
+| Empty description | Skip, warn (caught in Step 4). |
 
-Whatever the path, the final `index.html` must remain self-contained: reference only relative `assets/*.png`, never an external URL or CDN diagram service.
+Whatever the path, `index.html` stays self-contained: inline SVG or relative `assets/*.png` only — never an external URL.
 
----
-
-## Prerequisite Note
-
-The diagram feature depends on the external **drawio-skill** and the **draw.io desktop app CLI**:
+### Prerequisite (AWS type only)
 
 ```bash
-# macOS
-brew install --cask drawio
-drawio --version
+brew install --cask drawio && drawio --version
 ```
 
-If the deck contains `### diagram` blocks and the CLI is missing, mention this once during Step 4 review (not on every slide) and offer the fallbacks above. Everything else about the presentation generates normally.
+Mention once during Step 4 review if a `type: aws` block exists and the CLI is missing. Native diagram types have **no prerequisites**.

@@ -108,6 +108,113 @@ Large blurred color blobs that drift, scale, and shift colors independently. Cre
 - Use for title/divider slides; content slides use subtler floating orbs
 - Wrap in `.blob-canvas` with `overflow: hidden` to prevent layout issues
 
+## Signature Motion Patterns (used by both preview decks)
+
+These are the high-impact patterns shipped in `preview/01-neon-cyber.html` and
+`preview/02-reinvent-keynote.html`. Copy them verbatim; every one has a
+`prefers-reduced-motion` fallback that lands on the final state.
+
+### Border Beam (rotating conic border highlight)
+
+Marks ONE hero card per deck (e.g. the bento hero). Needs `@property` for the
+animatable angle; degrades to a static border where unsupported.
+
+```css
+@property --beam-angle { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+.beam-border { position:relative; }
+.beam-border::before { content:''; position:absolute; inset:-1px; border-radius:inherit; padding:1.5px;
+  background:conic-gradient(from var(--beam-angle), transparent 0 62%, var(--accent-1) 78%, var(--accent-2) 92%, transparent 100%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  animation:beamSpin 5s linear infinite; pointer-events:none; }
+@keyframes beamSpin { to { --beam-angle:360deg; } }
+@media (prefers-reduced-motion:reduce){ .beam-border::before { animation:none; } }
+```
+
+### Count-Up Numbers
+
+Wrap the numeric part only: `<span class="count" data-count="92" data-suffix="%">0</span>`.
+Trigger once per slide from the IntersectionObserver that adds `.visible`
+(guard with `slide.dataset.fx`). Ease-out cubic over ~1.3s; reduced-motion sets
+the final value instantly.
+
+```js
+function runCounters(slide) {
+    slide.querySelectorAll('.count').forEach(el => {
+        const target = parseFloat(el.dataset.count || '0');
+        const dec = parseInt(el.dataset.decimals || '0', 10);
+        const suffix = el.dataset.suffix || '';
+        if (REDUCE) { el.textContent = target.toFixed(dec) + suffix; return; }
+        const t0 = performance.now(), dur = 1300;
+        (function tick(now) {
+            const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+            el.textContent = (target * e).toFixed(dec) + suffix;
+            if (p < 1) requestAnimationFrame(tick);
+        })(performance.now());
+    });
+}
+```
+
+### Spotlight Cards (cursor-tracking radial glow)
+
+```css
+.spot-card { position:relative; overflow:hidden; }
+.spot-card::before { content:''; position:absolute; inset:0; opacity:0; transition:opacity .35s;
+  background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%), var(--spot-color), transparent 60%);
+  pointer-events:none; }
+.spot-card:hover::before { opacity:1; }
+```
+```js
+card.addEventListener('pointermove', e => {
+    const r = card.getBoundingClientRect();
+    card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+    card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+});
+```
+
+### Kinetic Title (per-char / per-word rise)
+
+Wrap chars (Neon) or words (re:Invent) in spans with an index custom property:
+`<span class="tw" style="--i:2">the</span>`. Gate on `.slide.visible` so it
+replays correctly with the slide engine. NEVER split a gradient-clipped `<em>`
+across spans — wrap the whole `<em>` in one span.
+
+```css
+.title-main .tw { display:inline-block; opacity:0; transform:translateY(.5em); filter:blur(8px); }
+.slide.visible .title-main .tw { animation:wordRise .8s var(--ease-out-expo) both;
+  animation-delay:calc(var(--i) * 90ms); }
+@keyframes wordRise { to { opacity:1; transform:none; filter:blur(0); } }
+@media (prefers-reduced-motion:reduce){ .title-main .tw { opacity:1; transform:none; filter:none; } }
+```
+
+### Marquee (infinite scrolling keyword strip)
+
+Duplicate the item sequence TWICE inside the track, then translate -50%.
+Full-bleed with soft mask edges; second row reversed at a different speed.
+
+```css
+.marquee { width:100vw; margin-left:calc(50% - 50vw); overflow:hidden;
+  -webkit-mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);
+          mask:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent); }
+.marquee-track { display:flex; align-items:center; gap:clamp(1.2rem,3vw,2.6rem);
+  width:max-content; animation:marqueeMove 32s linear infinite; }
+.marquee-track.rev { animation-direction:reverse; animation-duration:40s; }
+@keyframes marqueeMove { to { transform:translateX(-50%); } }
+@media (prefers-reduced-motion:reduce){ .marquee-track { animation:none; } }
+```
+
+### Text Scramble / Decode
+
+For short monospace labels only (HUD strips, terminal chrome). Decode
+left→right over ~900ms from a charset like `!<>-_\/[]{}—=+*^?#0123456789`.
+Reduced-motion: set final text immediately.
+
+### Terminal Typing
+
+`.term-line[data-type]` elements typed sequentially (~28ms/char) with a block
+cursor on the active line, triggered on first slide visibility. Reduced-motion:
+render all lines instantly.
+
 ## Interactive Effects
 
 ```javascript

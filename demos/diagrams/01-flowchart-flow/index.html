@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Native SVG Diagram — Animated Flowchart (Golden Master)</title>
+
+<!--
+  ============================================================================
+  NATIVE ANIMATED SVG FLOWCHART  —  "Golden Master / Characterization Test"
+  ============================================================================
+  Self-contained, 100% OFFLINE. Zero network requests: no CDN, no web fonts,
+  no external images. Double-click to open via file:// — no build step, no ESM.
+
+  WHY THIS EXISTS
+  ---------------------------------------------------------------------------
+  This replaces ugly rasterized drawio PNG exports with a hand-written,
+  vector, animatable SVG diagram. It reads crisply at any zoom, restyles with
+  CSS variables, and animates natively (CSS + SMIL). It also doubles as a
+  COPY-PASTE REFERENCE, so everything below is commented heavily.
+
+  SVG DIAGRAM CRASH COURSE (this file is a skill reference)
+  ---------------------------------------------------------------------------
+  * ONE responsive coordinate system. The <svg> declares
+        viewBox="0 0 1400 700"
+    and is sized width:100%. All node/edge coordinates are hand-computed on
+    that fixed 1400x700 "design grid" — so the whole thing scales fluidly and
+    stays pixel-aligned. Design once in user units, render at any size.
+
+  * NODES are <g> groups: a rounded <rect> card + a nested <svg> Lucide icon +
+    <text>/<tspan> label. Multi-line text uses <tspan dy="..."> (NEVER
+    <foreignObject> — that drags in HTML layout and hurts portability).
+
+  * ICONS are inline Lucide SVG paths (ISC license), hand-inlined so we stay
+    offline. Each icon is a nested <svg viewBox="0 0 24 24"> with stroke-based
+    paths. Emoji-as-icons reads as "AI slop" and is banned by this skill.
+
+  * EDGES are <path> cubic beziers with SVG <marker> arrowheads. Markers use
+    markerUnits="userSpaceOnUse" (constant size in grid units, crisp, not
+    scaled by stroke-width) and orient="auto-start-reverse". ONE marker def
+    per color (blue / purple / green / pink) — edges pick the matching one.
+
+  * EDGE LABELS are pills: a dark <rect rx="10"> (fill = page bg) with the
+    edge color at ~40% alpha as its border, plus centered <text>. Placed by
+    hand at each path's visual midpoint.
+
+  ANIMATION — two phases
+  ---------------------------------------------------------------------------
+  PHASE A (entrance, ~2.4s, runs on load and on Replay):
+    - Nodes POP in (scale .85 -> 1 + fade), staggered by per-node
+      `--d` animation-delay following flow order. transform-box:fill-box makes
+      the SVG transform-origin the node's own bounding box, so it scales about
+      its center.
+    - Edges DRAW in via the stroke-dasharray/dashoffset trick (offset LEN->0),
+      each delayed to start as its source node lands. The whole edge (line +
+      its marker) fades in together, so the arrowhead appears with the stroke.
+    All entrance animation is gated behind the `.animate` class on the <svg>,
+    so Replay = remove class -> force reflow -> re-add class (restart CSS) plus
+    svg.setCurrentTime(0) (restart SMIL).
+
+  PHASE B (ambient loop, forever after entrance):
+    - Glowing PACKETS travel the graph via SMIL <animateMotion> + <mpath>
+      referencing the very same edge <path> ids, chained with begin="prev.end"
+      so a packet flows node->node->node. Each packet loops via a begin list
+      "startTime; lastMotion.end+gap".
+    - The dashed FEEDBACK edge (6->3) runs a continuous marching-ants loop
+      (small stroke-dasharray + animated stroke-dashoffset).
+    - The GOLDEN node breathes via a soft blurred duplicate rect pulsing opacity.
+
+  ACCESSIBILITY / ROBUSTNESS
+  ---------------------------------------------------------------------------
+  * prefers-reduced-motion: reduce -> every animation off, everything jumps to
+    its end state, and the SMIL packets are `display:none` (hidden entirely).
+  * Page is exactly 100vh, dark, no scrollbars. Console stays clean.
+  ============================================================================
+-->
+
+<style>
+  /* ---------------------------------------------------------------- *
+   *  re:Invent Keynote palette + tokens                              *
+   * ---------------------------------------------------------------- */
+  :root {
+    --bg:      #0A0A0A;   /* base near-black page                     */
+    --purple:  #8B5CF6;   /* primary neon purple                     */
+    --pink:    #D946EF;   /* neon pink / magenta (mismatch, feedback) */
+    --blue:    #38BDF8;   /* blue accent (source data)               */
+    --orange:  #FF9900;   /* "golden" — used sparingly, one node only */
+    --green:   #34D399;   /* success / match                         */
+    --ink:     #FFFFFF;   /* primary text                            */
+    --muted:   rgba(255,255,255,0.6); /* secondary text              */
+    --card-fill:   rgba(139,92,246,0.08);
+    --card-stroke: rgba(139,92,246,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    /* Graceful system-font stack, NO @font-face / no web fonts (offline). */
+    font-family: 'Urbanist', 'Albert Sans', 'Avenir Next',
+                 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+
+    /* Exactly one viewport, no scrollbars ever. */
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------------------------------------------------------------- *
+   *  Ambient purple orb glows in the page background (atmosphere).   *
+   *  Pure CSS blurred radial divs, behind everything, non-interactive.*
+   * ---------------------------------------------------------------- */
+  .orbs { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .orb  { position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.55; }
+  .orb.o1 { width: 560px; height: 560px; top: -160px; left: -120px;
+            background: radial-gradient(circle, var(--purple), transparent 70%); }
+  .orb.o2 { width: 520px; height: 520px; bottom: -200px; right: -140px;
+            background: radial-gradient(circle, var(--pink), transparent 70%); opacity: 0.42; }
+  .orb.o3 { width: 420px; height: 420px; top: 46%; left: 52%;
+            background: radial-gradient(circle, var(--blue), transparent 70%); opacity: 0.28; }
+
+  /* ---------------------------------------------------------------- *
+   *  Header — eyebrow + heading + sub                                *
+   * ---------------------------------------------------------------- */
+  header { position: relative; z-index: 2; padding: 26px 40px 6px; flex: 0 0 auto; }
+  .eyebrow {
+    display: inline-block;
+    font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--blue);
+    border: 1px solid rgba(56,189,248,0.4);
+    padding: 5px 13px; border-radius: 999px;
+  }
+  h1 {
+    margin: 14px 0 0; font-size: 34px; font-weight: 800; letter-spacing: 0.5px;
+    background: linear-gradient(90deg, var(--purple), var(--pink), var(--blue));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub { margin: 8px 0 0; color: var(--muted); font-size: 15px; letter-spacing: 0.3px; }
+
+  /* ---------------------------------------------------------------- *
+   *  Stage — centers the SVG, capped at ~66vh so header/footer fit.  *
+   * ---------------------------------------------------------------- */
+  main { position: relative; z-index: 2; flex: 1 1 auto;
+         display: flex; align-items: center; justify-content: center;
+         min-height: 0; padding: 0 32px; }
+  svg.diagram { width: 100%; max-width: 1400px; max-height: 66vh; height: auto; display: block; }
+
+  /* ---------------------------------------------------------------- *
+   *  Footer — replay button (right) + caption (left)                 *
+   * ---------------------------------------------------------------- */
+  footer { position: relative; z-index: 2; flex: 0 0 auto;
+           display: flex; align-items: center; justify-content: space-between;
+           padding: 6px 40px 24px; }
+  .caption { color: var(--muted); font-size: 12.5px; letter-spacing: 0.5px; }
+  .replay {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: inherit; font-size: 14px; color: var(--ink);
+    background: var(--card-fill);
+    border: 1px solid var(--card-stroke);
+    padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+  }
+  .replay:hover  { background: rgba(139,92,246,0.16); border-color: var(--purple); }
+  .replay:active { transform: scale(0.96); }
+  .replay svg { width: 16px; height: 16px; stroke: currentColor; fill: none;
+                stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ================================================================ *
+   *  SVG PRIMITIVES                                                  *
+   * ================================================================ */
+
+  /* Node card + text defaults. */
+  .card      { fill: var(--card-fill); stroke: var(--card-stroke); stroke-width: 1.5; }
+  .node-title { fill: var(--ink); font-size: 15px; font-weight: 600; }
+  .node-sub   { fill: var(--muted); font-size: 13px; }
+  .icon path, .icon circle, .icon rect, .icon ellipse, .icon line, .icon polyline {
+    fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  /* Per-accent node coloring — recolor card border + icon stroke together. */
+  .n-blue   .card { stroke: var(--blue);   }   .n-blue   .icon * { stroke: var(--blue);   }
+  .n-orange .card { stroke: var(--orange); fill: rgba(255,153,0,0.10); }
+  .n-orange .icon * { stroke: var(--orange); }
+  .n-purple .card { stroke: var(--purple); }   .n-purple .icon * { stroke: var(--purple); }
+  .n-green  .card { stroke: var(--green);  }   .n-green  .icon * { stroke: var(--green);  }
+  .n-pink   .card { stroke: var(--pink);   }   .n-pink   .icon * { stroke: var(--pink);   }
+  .diamond  .card { fill: var(--card-fill); stroke: var(--purple); stroke-width: 2; }
+  .diamond  .icon * { stroke: var(--purple); }
+
+  /* The golden badge tag on the golden-master node. */
+  .tag-rect { fill: var(--orange); }
+  .tag-text { fill: #1A1206; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+
+  /* Edges. Base state = fully drawn (so reduced-motion + Replay end-state work). */
+  .edge-path {
+    fill: none; stroke-width: 2.4; stroke-linecap: round;
+    stroke-dasharray: 1600; stroke-dashoffset: 0;   /* dash spans whole path */
+  }
+  .e-blue   { stroke: var(--blue);   marker-end: url(#arrowBlue);   }
+  .e-purple { stroke: var(--purple); marker-end: url(#arrowPurple); }
+  .e-green  { stroke: var(--green);  marker-end: url(#arrowGreen);  }
+  .e-pink   { stroke: var(--pink);   marker-end: url(#arrowPink);   }
+
+  /* Dashed feedback edge (6->3): marching ants run ALWAYS (ambient). */
+  .edge-dashed {
+    fill: none; stroke: var(--pink); stroke-width: 2.2; stroke-linecap: round;
+    stroke-dasharray: 9 9; marker-end: url(#arrowPink);
+    animation: ants 0.7s linear infinite;
+  }
+  @keyframes ants { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -36; } }
+
+  /* Edge-label pills. */
+  .label-rect { fill: var(--bg); stroke-width: 1.2; }
+  .label-text { font-size: 12px; font-weight: 600; text-anchor: middle; }
+  .lbl-blue  .label-rect { stroke: rgba(56,189,248,0.4);  } .lbl-blue  .label-text { fill: var(--blue);  }
+  .lbl-green .label-rect { stroke: rgba(52,211,153,0.4);  } .lbl-green .label-text { fill: var(--green); }
+  .lbl-pink  .label-rect { stroke: rgba(217,70,239,0.4);  } .lbl-pink  .label-text { fill: var(--pink);  }
+
+  /* Golden glow: soft blurred duplicate rect behind the golden node. */
+  .glow-golden { fill: var(--orange); filter: url(#goldBlur);
+                 animation: glowPulse 3.4s ease-in-out infinite; }
+  @keyframes glowPulse { 0%,100% { opacity: 0.16; } 50% { opacity: 0.5; } }
+
+  /* Ambient traveling packets. */
+  .packet { opacity: 0; }              /* hidden until its SMIL fade-in fires */
+  .packet .halo { opacity: 0.28; }
+
+  /* ================================================================ *
+   *  PHASE A — entrance choreography (gated behind .animate)         *
+   * ================================================================ */
+  .animate .node {
+    transform-box: fill-box; transform-origin: center;
+    animation: nodePop 0.55s cubic-bezier(.2,.75,.3,1.25) both;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes nodePop {
+    0%   { opacity: 0; transform: scale(0.85); }
+    60%  { opacity: 1; }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .animate .edge-path {
+    animation: drawEdge 0.7s ease both;
+    animation-delay: var(--d, 0s);
+  }
+  @keyframes drawEdge {
+    0%   { stroke-dashoffset: 1600; opacity: 0; }
+    18%  { opacity: 1; }
+    100% { stroke-dashoffset: 0;    opacity: 1; }
+  }
+  /* Dashed feedback edge fades in LAST while ants keep marching. */
+  .animate .edge-dashed {
+    animation: ants 0.7s linear infinite, fadeInLate 0.6s ease 1.9s both;
+  }
+  @keyframes fadeInLate { from { opacity: 0; } to { opacity: 1; } }
+  /* Labels + golden glow appear with a gentle late fade. */
+  .animate .label { animation: fadeInLate 0.5s ease both; animation-delay: var(--d, 0s); }
+
+  /* ================================================================ *
+   *  REDUCED MOTION — everything off, jump to end state, packets gone*
+   * ================================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none !important; }
+    .node, .edge-path, .edge-dashed, .label, .glow-golden {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+      stroke-dashoffset: 0 !important;
+    }
+    .glow-golden { opacity: 0.32 !important; }
+    .packet { display: none !important; }   /* SMIL packets hidden entirely */
+  }
+
+  /* Short-viewport safety so the layout never spawns a scrollbar. */
+  @media (max-height: 620px) {
+    h1 { font-size: 27px; } header { padding-top: 16px; }
+    svg.diagram { max-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- Ambient background orbs (atmosphere; behind everything) -->
+  <div class="orbs" aria-hidden="true">
+    <div class="orb o1"></div>
+    <div class="orb o2"></div>
+    <div class="orb o3"></div>
+  </div>
+
+  <header>
+    <span class="eyebrow">NATIVE SVG DIAGRAM — FLOWCHART</span>
+    <h1>用“工资单”锁住旧系统行为</h1>
+    <p class="sub">Golden Master / 特征测试:先建基线,再动手</p>
+  </header>
+
+  <main>
+    <!--
+      The diagram. viewBox is the fixed 1400x700 design grid; width:100% makes
+      it responsive. `class="diagram animate"` — the `animate` class arms the
+      Phase-A entrance; Replay strips + re-adds it. NOTE: no xmlns needed for
+      inline SVG in HTML5, and we use plain href (+ xlink:href for old engines)
+      on <mpath> so the file contains ZERO http(s) URLs.
+    -->
+    <svg class="diagram animate" id="diagram" viewBox="0 0 1400 700"
+         role="img" aria-label="流程图:用旧系统已发放的真实工资单作为黄金样本,逐人对比新系统重算结果,一致则替换,不一致则修复后重测">
+
+      <!-- ============================ DEFS ============================ -->
+      <defs>
+        <!-- ONE arrowhead marker per edge color. markerUnits=userSpaceOnUse
+             keeps them a constant crisp size (not scaled by stroke-width);
+             orient=auto-start-reverse aligns them to the path direction. -->
+        <marker id="arrowBlue"   markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13"
+                refX="9" refY="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#38BDF8"/></marker>
+        <marker id="arrowPurple" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13"
+                refX="9" refY="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#8B5CF6"/></marker>
+        <marker id="arrowGreen"  markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13"
+                refX="9" refY="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#34D399"/></marker>
+        <marker id="arrowPink"   markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13"
+                refX="9" refY="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill="#D946EF"/></marker>
+
+        <!-- Soft blur for the golden node's breathing glow. -->
+        <filter id="goldBlur" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="7"/></filter>
+        <!-- Soft halo blur for the traveling packets. -->
+        <filter id="pktBlur" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3.2"/></filter>
+      </defs>
+
+      <!-- ===================== EDGES (behind nodes) ==================== -->
+      <!-- Each edge is a cubic bezier hand-plotted on the grid. The id is
+           reused by the SMIL packets' <mpath>. `--d` staggers the draw-in. -->
+      <g class="edges">
+        <path id="e1" class="edge-path e-blue"   style="--d:0.30s" d="M290,340 C335,340 335,175 380,175"/>
+        <path id="e2" class="edge-path e-blue"   style="--d:0.45s" d="M290,360 C335,360 335,525 380,525"/>
+        <path id="e3" class="edge-path e-purple" style="--d:0.70s" d="M610,182 C700,182 705,292 776,312"/>
+        <path id="e4" class="edge-path e-purple" style="--d:0.85s" d="M610,518 C700,518 705,408 776,388"/>
+        <path id="e5" class="edge-path e-green"  style="--d:1.20s" d="M885,312 C1000,262 1045,180 1115,180"/>
+        <path id="e6" class="edge-path e-pink"   style="--d:1.35s" d="M885,388 C1000,440 1045,520 1115,520"/>
+        <!-- 6->3 feedback: dashed, marching-ants, curves along the bottom. -->
+        <path class="edge-dashed" d="M1200,563 C1180,665 640,680 520,568"/>
+      </g>
+
+      <!-- Golden-node breathing glow: a soft blurred duplicate rect BEHIND
+           the golden card, pulsing opacity (Phase-B ambient). -->
+      <rect class="glow-golden" x="372" y="119" width="246" height="112" rx="22"/>
+
+      <!-- ============================ NODES =========================== -->
+      <g class="nodes">
+
+        <!-- (1) Source data — blue -->
+        <g class="node n-blue" style="--d:0s">
+          <rect class="card" x="60" y="307" width="230" height="86" rx="16"/>
+          <svg class="icon" x="80" y="338" width="24" height="24" viewBox="0 0 24 24"><!-- lucide: database -->
+            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+          <!-- Multi-line via <tspan dy>: same x resets each line to the left. -->
+          <text class="node-title" x="116" y="346">上月全员真实<tspan x="116" dy="21">考勤 + 薪资数据</tspan></text>
+        </g>
+
+        <!-- (2) GOLDEN MASTER — orange, with 黄金样本 tag -->
+        <g class="node n-orange" style="--d:0.25s">
+          <rect class="card" x="380" y="127" width="230" height="96" rx="16"/>
+          <svg class="icon" x="483" y="137" width="24" height="24" viewBox="0 0 24 24"><!-- lucide: award -->
+            <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+          <text class="node-title" x="495" y="181" text-anchor="middle" style="font-size:14px">旧系统已发放的真实工资单</text>
+          <rect class="tag-rect" x="459" y="196" width="72" height="19" rx="9"/>
+          <text class="tag-text" x="495" y="209" text-anchor="middle">黄金样本</text>
+        </g>
+
+        <!-- (3) New system recompute — purple -->
+        <g class="node n-purple" style="--d:0.40s">
+          <rect class="card" x="380" y="482" width="230" height="86" rx="16"/>
+          <svg class="icon" x="400" y="513" width="24" height="24" viewBox="0 0 24 24"><!-- lucide: cpu -->
+            <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>
+            <path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>
+          <text class="node-title" x="440" y="520">新工资系统<tspan x="440" dy="21">重新计算</tspan></text>
+        </g>
+
+        <!-- (4) DECISION diamond —逐人对比 -->
+        <g class="node diamond" style="--d:0.70s">
+          <polygon class="card" points="830,275 940,350 830,425 720,350"/>
+          <svg class="icon" x="818" y="304" width="24" height="24" viewBox="0 0 24 24"><!-- lucide: git-compare -->
+            <circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/>
+            <path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M11 18H8a2 2 0 0 1-2-2V9"/></svg>
+          <text class="node-title" x="830" y="350" text-anchor="middle">逐人对比<tspan x="830" dy="21">新旧工资单</tspan></text>
+        </g>
+
+        <!-- (5) Match — green (check-circle icon stands in for the tick) -->
+        <g class="node n-green" style="--d:1.15s">
+          <rect class="card" x="1115" y="137" width="230" height="86" rx="16"/>
+          <svg class="icon" x="1133" y="168" width="24" height="24" viewBox="0 0 24 24"><!-- lucide: check-circle -->
+            <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+          <text class="node-title" x="1176" y="185" style="font-size:14px">完全一致 → 放心替换</text>
+        </g>
+
+        <!-- (6) Mismatch — pink -->
+        <g class="node n-pink" style="--d:1.30s">
+          <rect class="card" x="1115" y="477" width="230" height="86" rx="16"/>
+          <svg class="icon" x="1133" y="508" width="24" height="24" viewBox="0 0 24 24"><!-- lucide: alert-triangle -->
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+            <path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <text class="node-title" x="1176" y="514" style="font-size:13px">金额对不上:新系统 bug<tspan class="node-sub" x="1176" dy="22" style="font-size:13px">或挖出隐藏规则</tspan></text>
+        </g>
+      </g>
+
+      <!-- ======================== EDGE LABELS ========================= -->
+      <!-- Dark pills (fill = page bg) with the edge color as a 40%-alpha
+           border, centered at each path's visual midpoint. -->
+      <g class="labels">
+        <g class="label lbl-blue"  style="--d:0.55s">
+          <rect class="label-rect" x="309" y="246" width="52"  height="22" rx="10"/>
+          <text class="label-text" x="335"  y="261">已算出</text></g>
+        <g class="label lbl-blue"  style="--d:0.70s">
+          <rect class="label-rect" x="295" y="431" width="80"  height="22" rx="10"/>
+          <text class="label-text" x="335"  y="446">同一批数据</text></g>
+        <g class="label lbl-green" style="--d:1.45s">
+          <rect class="label-rect" x="993" y="214" width="44"  height="22" rx="10"/>
+          <text class="label-text" x="1015" y="229">一致</text></g>
+        <g class="label lbl-pink"  style="--d:1.60s">
+          <rect class="label-rect" x="987" y="462" width="56"  height="22" rx="10"/>
+          <text class="label-text" x="1015" y="477">不一致</text></g>
+        <g class="label lbl-pink"  style="--d:2.00s">
+          <rect class="label-rect" x="841" y="635" width="112" height="22" rx="10"/>
+          <text class="label-text" x="897"  y="650">补上规则后重测</text></g>
+      </g>
+
+      <!-- ===================== AMBIENT PACKETS (Phase B) ==============
+        Two glowing packets stream through the graph, driven by SMIL
+        <animateMotion> whose <mpath> reuses the edge <path> ids. Segments
+        are chained via begin="prevSeg.end"; the whole run restarts on
+        "startTime; lastSeg.end+gap", so it loops forever. Base opacity="0"
+        is an ATTRIBUTE (not CSS) so the SMIL opacity fade can override it
+        (CSS opacity would beat animated presentation attributes).
+        Packet A: 1 -> 2 -> 4 -> 5   (e1, e3, e5)
+        Packet B: 1 -> 3 -> 4 -> 6   (e2, e4, e6)
+      -->
+      <g class="packets" aria-hidden="true">
+        <!-- Packet A (blue) -->
+        <g class="packet" opacity="0">
+          <circle class="halo" r="10"  fill="#38BDF8" fill-opacity="0.5" filter="url(#pktBlur)"/>
+          <circle class="core" r="4.5" fill="#CFEFFF"/>
+          <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.07;0.5;0.93;1"
+                   dur="3.9s" begin="2.6s; mA3.end+0.9s" fill="freeze"/>
+          <animateMotion id="mA1" dur="1.3s" begin="2.6s; mA3.end+0.9s" fill="freeze">
+            <mpath href="#e1" xlink:href="#e1"/></animateMotion>
+          <animateMotion id="mA2" dur="1.3s" begin="mA1.end" fill="freeze">
+            <mpath href="#e3" xlink:href="#e3"/></animateMotion>
+          <animateMotion id="mA3" dur="1.3s" begin="mA2.end" fill="freeze">
+            <mpath href="#e5" xlink:href="#e5"/></animateMotion>
+        </g>
+        <!-- Packet B (pink) -->
+        <g class="packet" opacity="0">
+          <circle class="halo" r="10"  fill="#D946EF" fill-opacity="0.5" filter="url(#pktBlur)"/>
+          <circle class="core" r="4.5" fill="#FBD5FF"/>
+          <animate attributeName="opacity" values="0;1;1;1;0" keyTimes="0;0.07;0.5;0.93;1"
+                   dur="3.9s" begin="3.3s; mB3.end+0.9s" fill="freeze"/>
+          <animateMotion id="mB1" dur="1.3s" begin="3.3s; mB3.end+0.9s" fill="freeze">
+            <mpath href="#e2" xlink:href="#e2"/></animateMotion>
+          <animateMotion id="mB2" dur="1.3s" begin="mB1.end" fill="freeze">
+            <mpath href="#e4" xlink:href="#e4"/></animateMotion>
+          <animateMotion id="mB3" dur="1.3s" begin="mB2.end" fill="freeze">
+            <mpath href="#e6" xlink:href="#e6"/></animateMotion>
+        </g>
+      </g>
+
+    </svg>
+  </main>
+
+  <footer>
+    <span class="caption">原生 SVG · 零依赖 · 矢量 · 可动画 — 对比 drawio PNG 导出</span>
+    <button class="replay" id="replay" type="button" aria-label="重播入场动画">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><!-- lucide: rotate-ccw -->
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      Replay
+    </button>
+  </footer>
+
+  <!--
+    TINY vanilla JS — ONLY job is Replay: restart both animation systems.
+    * CSS entrance: remove `.animate`, force a reflow (read offsetWidth), then
+      re-add it on the next frame -> the keyframes run again from 0.
+    * SMIL packets: svg.setCurrentTime(0) rewinds the document timeline so the
+      chained animateMotion begin-list fires fresh.
+    No dependency; the diagram already animates on first load via the inline
+    `animate` class, so the page works even if this script is stripped.
+  -->
+  <script>
+    (function () {
+      var svg = document.getElementById('diagram');
+      var btn = document.getElementById('replay');
+      if (!svg || !btn) return;
+      btn.addEventListener('click', function () {
+        svg.classList.remove('animate');
+        // Force reflow so removing + re-adding the class restarts CSS anims.
+        void svg.getBoundingClientRect().width;
+        requestAnimationFrame(function () {
+          svg.classList.add('animate');
+          // Rewind SMIL packet timeline (guarded: not all engines expose it).
+          if (typeof svg.setCurrentTime === 'function') {
+            try { svg.setCurrentTime(0); } catch (e) {}
+          }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
