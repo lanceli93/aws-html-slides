@@ -971,10 +971,12 @@
     document.querySelectorAll('.slide.visible').forEach(function (s) { window.runFX(s); });
 })();
 
-/* === Constellation network background (hand-written, zero-dep, offline) ===
-   Drifting cyan/magenta/blue dots linked by faint lines, brightening toward the
-   cursor (grab) + click-to-add. DPR-capped, ~45fps throttle, pauses when hidden,
-   respects prefers-reduced-motion. Replaces the old simple particle field. */
+/* === Quiet starfield background (hand-written, zero-dep, offline) ===
+   Sparse, crisp cyan stars (occasional magenta) that drift very slowly and
+   twinkle. NO link lines, NO additive-glow halos — those made the old
+   constellation read as busy/washed-out against the grid + scanline + nebula
+   layers. Cursor proximity gives a subtle brighten (no lines, no click-to-add).
+   DPR-capped, ~45fps throttle, pauses when hidden, respects reduced-motion. */
 (function () {
     "use strict";
     var canvas = document.getElementById('particles');
@@ -985,27 +987,29 @@
         window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     var DPR = Math.min(window.devicePixelRatio || 1, 1.5);
-    var LINK_DIST = 150, LINK_DIST2 = LINK_DIST * LINK_DIST;
-    var GRAB_DIST = 200, GRAB_DIST2 = GRAB_DIST * GRAB_DIST;
-    var BASE_AREA = 1920 * 1080, MAX_DOTS = 90, FPS = 45, FRAME_MS = 1000 / FPS;
-    var COLORS = [[0, 255, 204], [255, 0, 170], [0, 170, 255]];
+    var GLOW_DIST = 160, GLOW_DIST2 = GLOW_DIST * GLOW_DIST;
+    var BASE_AREA = 1920 * 1080, MAX_DOTS = 38, FPS = 45, FRAME_MS = 1000 / FPS;
+    var CYAN = [0, 255, 204], MAGENTA = [255, 0, 170];
 
     var W = 0, H = 0, dots = [], mouse = { x: -9999, y: -9999, active: false };
     var rafId = 0, running = false, last = 0;
 
-    function makeDot(x, y) {
-        var c = COLORS[(Math.random() * COLORS.length) | 0];
-        var speed = reduceMotion ? 0 : 0.3;
+    function makeDot() {
+        // mostly cyan, ~1-in-6 magenta for a restrained accent
+        var c = (Math.random() < 0.16) ? MAGENTA : CYAN;
+        var speed = reduceMotion ? 0 : 0.09;
         return {
-            x: x != null ? x : Math.random() * W, y: y != null ? y : Math.random() * H,
+            x: Math.random() * W, y: Math.random() * H,
             vx: (Math.random() - 0.5) * speed, vy: (Math.random() - 0.5) * speed,
-            r: 1.3 + Math.random() * 1.8, a: 0.45 + Math.random() * 0.5, col: c
+            r: 0.7 + Math.random() * 1.1,          // small, crisp
+            a: 0.35 + Math.random() * 0.45, col: c,
+            tw: Math.random() * Math.PI * 2,        // twinkle phase
+            tws: 0.008 + Math.random() * 0.015      // twinkle speed
         };
     }
     function seed() {
         var target = Math.round(MAX_DOTS * Math.min(1, (W * H) / BASE_AREA));
-        target = Math.max(32, target);
-        if (reduceMotion) target = Math.min(target, 60);
+        target = Math.max(18, target);
         dots = [];
         for (var i = 0; i < target; i++) dots.push(makeDot());
     }
@@ -1018,43 +1022,33 @@
     function draw() {
         ctx.clearRect(0, 0, W, H);
         for (var i = 0; i < dots.length; i++) {
-            var d = dots[i]; d.x += d.vx; d.y += d.vy;
-            if (d.x < 0 || d.x > W) d.vx *= -1;
-            if (d.y < 0 || d.y > H) d.vy *= -1;
-        }
-        for (var a = 0; a < dots.length; a++) {
-            var p = dots[a];
-            for (var b = a + 1; b < dots.length; b++) {
-                var q = dots[b], dx = p.x - q.x, dy = p.y - q.y, dist2 = dx * dx + dy * dy;
-                if (dist2 < LINK_DIST2) {
-                    var t = 1 - Math.sqrt(dist2) / LINK_DIST;
-                    ctx.globalAlpha = t * 0.4; ctx.strokeStyle = 'rgba(0,255,204,1)';
-                    ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+            var d = dots[i];
+            if (!reduceMotion) {
+                d.x += d.vx; d.y += d.vy; d.tw += d.tws;
+                // wrap around the edges (softer than bouncing for a starfield)
+                if (d.x < -10) d.x = W + 10; else if (d.x > W + 10) d.x = -10;
+                if (d.y < -10) d.y = H + 10; else if (d.y > H + 10) d.y = -10;
+            }
+            var c = d.col;
+            var tw = reduceMotion ? 1 : (0.55 + 0.45 * Math.sin(d.tw));
+            var alpha = d.a * tw;
+            if (mouse.active && !reduceMotion) {
+                var mx = d.x - mouse.x, my = d.y - mouse.y, md2 = mx * mx + my * my;
+                if (md2 < GLOW_DIST2) {
+                    alpha = Math.min(1, alpha + (1 - Math.sqrt(md2) / GLOW_DIST) * 0.5);
                 }
             }
-        }
-        if (mouse.active && !reduceMotion) {
-            for (var k = 0; k < dots.length; k++) {
-                var dd = dots[k], mx = dd.x - mouse.x, my = dd.y - mouse.y, md2 = mx * mx + my * my;
-                if (md2 < GRAB_DIST2) {
-                    var mt = 1 - Math.sqrt(md2) / GRAB_DIST;
-                    ctx.globalAlpha = mt * 0.65; ctx.strokeStyle = 'rgba(255,0,170,1)';
-                    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(dd.x, dd.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
-                }
-            }
-        }
-        ctx.globalCompositeOperation = 'lighter';
-        for (var n = 0; n < dots.length; n++) {
-            var e = dots[n], c = e.col;
-            var grd = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 4);
-            grd.addColorStop(0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + e.a + ')');
+            // faint, TIGHT halo (r*3, source-over — no additive stacking to white)
+            var hr = d.r * 3;
+            var grd = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, hr);
+            grd.addColorStop(0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (alpha * 0.5) + ')');
             grd.addColorStop(1, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)');
-            ctx.globalAlpha = 1; ctx.fillStyle = grd;
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 4, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = 'rgba(255,255,255,' + (e.a * 0.85) + ')';
-            ctx.beginPath(); ctx.arc(e.x, e.y, e.r * 0.6, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = grd;
+            ctx.beginPath(); ctx.arc(d.x, d.y, hr, 0, Math.PI * 2); ctx.fill();
+            // crisp core
+            ctx.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
+            ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     }
     function loop(now) {
         if (!running) return;
@@ -1068,13 +1062,8 @@
     document.addEventListener('visibilitychange', function () { if (document.hidden) stop(); else if (!reduceMotion) start(); });
     window.addEventListener('mousemove', function (e) { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
     window.addEventListener('mouseout', function () { mouse.active = false; });
-    window.addEventListener('click', function (e) {
-        for (var i = 0; i < 3 && dots.length < MAX_DOTS + 12; i++) {
-            dots.push(makeDot(e.clientX + (Math.random() - 0.5) * 20, e.clientY + (Math.random() - 0.5) * 20));
-        }
-    });
     try { resize(); seed(); if (reduceMotion) draw(); else start(); }
-    catch (err) { console.error('constellation init failed:', err); canvas.style.display = 'none'; }
+    catch (err) { console.error('starfield init failed:', err); canvas.style.display = 'none'; }
 })();
 
 /* === WebGL nebula on the TITLE slide (hand-written WebGL1 shader, offline) ===

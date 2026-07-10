@@ -210,11 +210,14 @@ window.runFX = function (slide) {
   consumed by its `::before` radial-gradient spotlight; cards additionally carrying `.tilt` get a
   `perspective(700px) rotateX() rotateY()` transform proportional to cursor position, cleared on `pointerleave`.
   Skipped under `prefers-reduced-motion`.
-- **`#particles` constellation canvas** — `position:fixed; inset:0; z-index:0` behind ALL slides, running
-  continuously for the whole deck (not gated per-slide). Hand-written 2D-canvas dot field: drifting cyan/magenta/
-  blue dots linked by faint lines when close, brightening toward the cursor, click-to-add. DPR-capped at 1.5,
-  ~45fps throttle, pauses on `document.hidden`. Reduced motion: zero velocity + fewer dots + one static draw, no
-  RAF loop.
+- **`#particles` starfield canvas** — `position:fixed; inset:0; z-index:0` behind ALL slides, running
+  continuously for the whole deck (not gated per-slide). Hand-written 2D-canvas star field kept deliberately
+  quiet so it doesn't fight the grid + scanline + nebula layers: ~38 sparse, small, crisp stars (mostly cyan,
+  ~1-in-6 magenta), very slow drift with edge-wrap, gentle sine twinkle, and a tight `source-over` halo (r×3 —
+  **no additive `lighter` blending, no link lines, no click-to-add**; those were the old constellation's
+  "too busy / washed-out" tells). Cursor proximity (≤160px) gives a subtle brighten only. DPR-capped at 1.5,
+  ~45fps throttle, pauses on `document.hidden`. Reduced motion: zero velocity + no twinkle + one static draw,
+  no RAF loop.
 - **`#nebula` WebGL canvas — title slide ONLY.** Hand-written WebGL1 fragment shader (MIT `snoise`-based domain-
   warped fBm) rendering a cyan/magenta soft cloud mass behind the title copy. Needs explicit `width:100%;
   height:100%` in CSS (a canvas is a replaced element — `inset:0` alone won't size its backing store). An
