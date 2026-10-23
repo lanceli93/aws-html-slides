@@ -1,0 +1,285 @@
+/* ===========================================================
+   PULSE FLAVOR KIT — CSS   (paste verbatim AFTER stage-engine.css [+ inline-editor.css])
+   Flavor 3 of the re:Invent theme: "living infrastructure". One persistent
+   dotted 3D globe + backdrop that re-docks per slide; animated beams carry
+   light pulses between nodes; live counters / tickers / sparklines.
+   Prefix: p-  ·  --d counts in SECONDS (style="--d:.4")  ·  layout unit --u
+   =========================================================== */
+
+/* === 1. TOKENS (brand + flavor) === */
+:root {
+    --bg: #0A0A0A; --bg-title: #0B0015; --p-ink: #07040d;
+    --purple: #8B5CF6; --pink: #D946EF; --blue: #3B82F6; --orange: #FF9900;
+    --up: #34D399; --down: #F472B6; --warn: #FBBF24;
+    --t1: #FFFFFF; --t2: rgba(255,255,255,.55); --t3: rgba(255,255,255,.38); --hair: rgba(255,255,255,.09);
+    --accent: #8B5CF6;
+    --grad-accent: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6);
+    --grad-warm: linear-gradient(100deg, #a78bfa 0%, #e879f9 45%, #f472b6 70%, #ff9900 100%);
+    --font-display: 'Urbanist', 'Noto Sans SC', sans-serif;
+    --font-body: 'Albert Sans', 'Noto Sans SC', sans-serif;
+    --fd: var(--font-display); --fb: var(--font-body);
+    --u: min(1vw, 1.7778vh);                /* 1u = 1/100 of the 16:9 .p-box */
+    --ease: cubic-bezier(.16, 1, .3, 1); --ease-io: cubic-bezier(.65, 0, .35, 1);
+    --micro: max(9px, calc(var(--u) * .74));
+    /* engine timing → Pulse convention: --d is seconds */
+    --rv-step: 1s; --rv-base: 120ms; --rv-dur: 1s; --split-step: 70ms;
+    --p-delay: calc(var(--rv-base) + var(--d, 0) * var(--rv-step));
+    --stage-thumb-bg: radial-gradient(70% 80% at 66% 52%, rgba(91,52,170,.55), rgba(14,7,30,.0) 60%),
+                      radial-gradient(120% 90% at 70% 40%, #12082a 0%, #0a0614 45%, #060309 100%);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--p-ink); color: var(--t1); font-family: var(--fb); -webkit-font-smoothing: antialiased; }
+svg { overflow: visible; }
+
+/* === 2. PERSISTENT BACKDROP (.stage-bg → hidden in print) === */
+.p-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background: radial-gradient(120% 90% at 70% 40%, #12082a 0%, #0a0614 45%, #060309 100%); }
+.p-bg .neb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; will-change: transform; }
+.p-bg .n1 { width: 55vw; height: 55vw; left: -12vw; top: -18vw; background: radial-gradient(circle, rgba(139,92,246,.45), transparent 65%); animation: p-drift1 26s ease-in-out infinite; }
+.p-bg .n2 { width: 45vw; height: 45vw; right: -10vw; bottom: -16vw; background: radial-gradient(circle, rgba(217,70,239,.32), transparent 65%); animation: p-drift2 32s ease-in-out infinite; }
+.p-bg .n3 { width: 30vw; height: 30vw; right: 18vw; top: -10vw; background: radial-gradient(circle, rgba(255,153,0,.13), transparent 65%); animation: p-drift1 38s ease-in-out infinite reverse; }
+@keyframes p-drift1 { 50% { transform: translate(6vw, 4vh) scale(1.08); } }
+@keyframes p-drift2 { 50% { transform: translate(-5vw, -6vh) scale(.94); } }
+.p-bg .grid { position: absolute; inset: -2px; opacity: .5;
+    background-image: linear-gradient(rgba(139,92,246,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,.07) 1px, transparent 1px);
+    background-size: calc(var(--u) * 4) calc(var(--u) * 4);
+    -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 20%, transparent 80%);
+            mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 20%, transparent 80%); }
+.p-bg .scan { position: absolute; left: 0; right: 0; height: 22vh; top: -22vh;
+    background: linear-gradient(180deg, transparent 0%, rgba(167,139,250,.025) 55%, rgba(232,121,249,.06) 88%, transparent 100%);
+    animation: p-scan 9s linear infinite; }
+@keyframes p-scan { to { transform: translateY(144vh); } }
+.p-bg .vig { position: absolute; inset: 0; background: radial-gradient(ellipse 90% 85% at 50% 50%, transparent 55%, rgba(0,0,0,.65) 100%); }
+.p-globe { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
+.stage-reduced .p-bg * { animation: none !important; }
+
+/* === 3. STAGE BOX + CHROME === */
+.p-box { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 100); height: calc(var(--u) * 56.25); transform: translate(-50%, -50%); }
+.p-anchor { position: absolute; pointer-events: none; }      /* globe dock target: [data-globe-anchor] */
+.p-hdr { position: absolute; top: calc(var(--u) * 2.6); left: calc(var(--u) * 4); right: calc(var(--u) * 4); z-index: 6;
+    display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+    font-size: var(--micro); letter-spacing: .2em; text-transform: uppercase; color: var(--t3); font-weight: 500;
+    text-shadow: 0 1px 8px rgba(0,0,0,.9); }
+.p-hdr b { color: rgba(255,255,255,.75); font-weight: 600; }
+.p-hdr .slide-index { font-family: var(--fd); font-weight: 700; letter-spacing: .14em; font-variant-numeric: tabular-nums; }
+.p-live { display: inline-flex; align-items: center; gap: .7em; }
+.p-live::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: p-blink 2s ease-in-out infinite; }
+.p-live.ok::before { background: var(--up); box-shadow: 0 0 8px var(--up); animation-duration: 1.4s; }
+@keyframes p-blink { 50% { opacity: .25; } }
+.p-ftr { position: absolute; bottom: calc(var(--u) * 2.2); left: calc(var(--u) * 4); z-index: 6; font-size: max(8px, calc(var(--u) * .62)); color: rgba(255,255,255,.3); letter-spacing: .04em; }
+.p-note { position: absolute; bottom: calc(var(--u) * 2.2); left: calc(var(--u) * 34); z-index: 6; font-size: max(8px, calc(var(--u) * .66)); color: rgba(255,255,255,.32); }
+.p-progress { position: fixed; right: calc(var(--u) * 4); bottom: calc(var(--u) * 2); z-index: 900; display: flex; align-items: center; gap: calc(var(--u) * 1);
+    font-family: var(--fd); font-weight: 700; font-size: var(--micro); letter-spacing: .14em; color: var(--t3); font-variant-numeric: tabular-nums; }
+.p-progress .nav-dots { position: static; transform: none; flex-direction: row; gap: 4px; }
+.p-progress .nav-dots button { display: block; width: calc(var(--u) * 2.2); height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); position: relative; overflow: hidden; transform: none; }
+.p-progress .nav-dots button::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #a78bfa, #e879f9, #ff9900); transform: scaleX(0); transform-origin: left; transition: transform .6s var(--ease); }
+.p-progress .nav-dots button.done::after { transform: scaleX(1); opacity: .45; }
+.p-progress .nav-dots button.on { transform: none; background: rgba(255,255,255,.12); }
+.p-progress .nav-dots button.on::after { transform: scaleX(1); opacity: 1; }
+@media screen and (max-height: 600px) { .p-progress .nav-dots { display: flex; } }
+
+/* === 4. TYPE === */
+.p-eyebrow { font-size: calc(var(--u) * .9); letter-spacing: .32em; text-transform: uppercase; color: var(--t2); font-weight: 600; display: flex; align-items: center; gap: .9em; }
+.p-eyebrow::before { content: ""; width: calc(var(--u) * 2.4); height: 1px; background: linear-gradient(90deg, var(--pink), transparent); }
+.p-eyebrow.c { justify-content: center; }
+.p-eyebrow.c::after { content: ""; width: calc(var(--u) * 2.4); height: 1px; background: linear-gradient(270deg, var(--pink), transparent); }
+.p-h2 { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 3.4); line-height: 1.05; letter-spacing: -.02em; margin-top: calc(var(--u) * .9); }
+:lang(zh) .p-h2, .p-h2:lang(zh) { letter-spacing: 0; line-height: 1.25; font-weight: 900; }
+.grad { background: var(--grad-accent); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.grad-warm { background: var(--grad-warm); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.p-shimmer { animation: p-shim 6s ease-in-out infinite; }
+@keyframes p-shim { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
+.p-glow { filter: drop-shadow(0 0 calc(var(--u) * 2.4) rgba(217,70,239,.38)); }
+
+/* === 5. REVEAL EXTRAS (engine rv* cover rise/blur/scale/left; these add Pulse moves) ===
+   All keyed on :is(.is-active,.is-leaving) so they replay per entry; .is-final jumps them to the end. */
+.p-wipe { clip-path: inset(-60% 100% -60% -20%); }          /* gradient text + glow: wide insets so the drop-shadow never shows a box */
+:is(.is-active, .is-leaving) .p-wipe { animation: p-wipe 1.3s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-wipe { to { clip-path: inset(-60% -20% -60% -20%); } }
+.slide.is-final .p-wipe { clip-path: none; }
+.p-fade { opacity: 0; }
+:is(.is-active, .is-leaving) .p-fade { animation: p-fade 1s ease both; animation-delay: var(--p-delay); }
+@keyframes p-fade { to { opacity: 1; } }
+.p-pop { opacity: 0; }
+:is(.is-active, .is-leaving) .p-pop { animation: p-pop .8s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: var(--p-delay); }
+@keyframes p-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.p-draw { stroke-dasharray: 1 1; stroke-dashoffset: 1; }       /* SVG path with pathLength="1" */
+:is(.is-active, .is-leaving) .p-draw { animation: p-draw 1.6s var(--ease-io) both; animation-delay: var(--p-delay); }
+@keyframes p-draw { to { stroke-dashoffset: 0; } }
+.p-grow { transform-box: fill-box; transform-origin: left center; transform: scaleX(0); }  /* bars (also SVG rect) */
+:is(.is-active, .is-leaving) .p-grow { animation: p-grow 1.4s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-grow { to { transform: none; } }
+/* final state WITHOUT .is-active (print marks every slide .is-final but only the current one is active) */
+.slide.is-final :is(.p-fade, .p-pop) { opacity: 1; }
+.slide.is-final .p-draw { stroke-dashoffset: 0; }
+.slide.is-final .p-grow { transform: none; }
+
+/* === 6. SURFACES & LABELS === */
+.p-panel { position: relative; border-radius: calc(var(--u) * 1.1); background: linear-gradient(165deg, rgba(30,15,58,.72), rgba(10,5,22,.8));
+    border: 1px solid rgba(167,139,250,.16); backdrop-filter: blur(6px); }
+.p-panel.clear { background: linear-gradient(180deg, rgba(20,10,40,.12), rgba(10,5,22,.55) 70%); backdrop-filter: none; }   /* lets the globe show through */
+.p-pill { display: inline-flex; align-items: center; gap: .8em; padding: .55em 1.1em; border-radius: 99px; border: 1px solid rgba(232,121,249,.28);
+    background: rgba(139,92,246,.10); backdrop-filter: blur(8px); font-size: calc(var(--u) * .92); letter-spacing: .26em; text-transform: uppercase; font-weight: 600; color: rgba(255,255,255,.85); }
+.p-pill :is(i, svg) { width: 1.2em; height: 1.2em; color: var(--orange); }
+.p-tag { display: inline-flex; align-items: center; padding: .28em .7em; border-radius: 99px; font-size: max(9px, calc(var(--u) * .8)); font-weight: 500;
+    color: rgba(255,255,255,.72); border: 1px solid rgba(167,139,250,.24); background: rgba(139,92,246,.08); white-space: nowrap; }
+.p-badge { display: inline-flex; align-items: center; gap: .5em; padding: .35em .9em; border-radius: 99px; font-size: calc(var(--u) * .95); font-weight: 600;
+    color: #ffb547; background: rgba(255,153,0,.10); border: 1px solid rgba(255,153,0,.32); }
+.p-badge::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: #ff9900; box-shadow: 0 0 8px #ff9900; }
+.p-tick { display: inline-flex; flex-direction: column; gap: .3em; padding: calc(var(--u) * .75) calc(var(--u) * 1.35); border-radius: calc(var(--u) * .8);
+    border: 1px solid rgba(167,139,250,.2); background: rgba(20,10,40,.58); }
+.p-tick .k { font-size: var(--micro); letter-spacing: .16em; text-transform: uppercase; color: var(--t3); font-weight: 600; display: flex; align-items: center; gap: .6em; }
+.p-tick .k.live::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: var(--up); box-shadow: 0 0 8px var(--up); animation: p-blink 1.4s infinite; }
+.p-tick .v { font-family: var(--fd); font-size: calc(var(--u) * 1.6); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.p-tick .v small { font-size: .6em; color: var(--t2); font-weight: 600; margin-left: .3em; }
+.p-scrim { position: absolute; inset: 0; pointer-events: none; }
+.p-scrim.left  { background: linear-gradient(90deg, rgba(6,3,12,.92) 0%, rgba(6,3,12,.76) 30%, rgba(6,3,12,.25) 55%, rgba(6,3,12,0) 70%); }
+.p-scrim.right { background: linear-gradient(270deg, rgba(6,3,12,.9) 0%, rgba(6,3,12,.72) 34%, rgba(6,3,12,0) 62%); }
+.p-scrim.top   { background: linear-gradient(180deg, rgba(6,3,12,.85) 0%, rgba(6,3,12,.55) 45%, rgba(6,3,12,0) 62%); }
+.p-scrim.hdr   { inset: 0 0 auto 0; height: calc(var(--u) * 11); background: linear-gradient(180deg, rgba(6,3,12,.92), rgba(6,3,12,.7) 45%, rgba(6,3,12,0));
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 72%); mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 72%); }   /* feathered on both axes — no hard edge */
+.p-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; pointer-events: none; }
+
+/* === 7. BEAMS — <svg class="p-beams" data-links="…"> (kit.js builds the paths) === */
+svg.p-beams { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.p-beam-base { fill: none; stroke: rgba(196,181,253,.24); stroke-width: 1.2; }
+.p-beams.bright .p-beam-base { stroke-opacity: .62; stroke-width: 1.6; }   /* gradient stroke set by kit.js — resting lines read in a still frame */
+.p-beam-glow { fill: none; stroke-width: 3; stroke-linecap: round; }
+.p-beam-core { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; }
+.slide.is-final :is(.p-beam-glow, .p-beam-core) { opacity: 0; }
+
+/* === 8. GRAPH NODES, PORTS, HUB, SPINNING RING === */
+.p-node { position: absolute; z-index: 3; padding: calc(var(--u) * 1.5) calc(var(--u) * 1.7); border-radius: calc(var(--u) * 1.2);
+    background: linear-gradient(160deg, rgba(32,16,62,.78), rgba(12,6,26,.82)); border: 1px solid rgba(167,139,250,.16);
+    backdrop-filter: blur(6px); transition: border-color .6s, box-shadow .6s; }
+.p-node.on { border-color: rgba(232,121,249,.5); box-shadow: 0 0 0 1px rgba(232,121,249,.12), 0 0 calc(var(--u) * 3) rgba(217,70,239,.22); }
+.p-node .nt { display: flex; align-items: center; gap: .6em; font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.48); white-space: nowrap; }
+.p-node .nt :is(i, svg) { width: 1.05em; height: 1.05em; color: #e879f9; flex: none; }
+.p-node .nd { margin-top: .45em; font-size: calc(var(--u) * 1.02); line-height: 1.45; color: var(--t2); }
+.p-port { position: absolute; width: calc(var(--u) * .75); height: calc(var(--u) * .75); border-radius: 50%; background: #0b0616; border: 1.5px solid rgba(232,121,249,.65); transition: all .4s; z-index: 2; }
+.p-port.r { right: calc(var(--u) * -.375); top: 50%; margin-top: calc(var(--u) * -.375); }
+.p-port.l { left: calc(var(--u) * -.375); top: 50%; margin-top: calc(var(--u) * -.375); }
+.p-port.t { top: calc(var(--u) * -.375); left: 50%; margin-left: calc(var(--u) * -.375); }
+.p-port.b { bottom: calc(var(--u) * -.375); left: 50%; margin-left: calc(var(--u) * -.375); }
+.on > .p-port, .p-port.on { background: #fff; box-shadow: 0 0 12px #e879f9; }
+.p-ring { position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
+    background: conic-gradient(from var(--p-a, 0deg), rgba(167,139,250,.1), #e879f9 18%, #ff9900 26%, rgba(167,139,250,.1) 40%, rgba(167,139,250,.1) 60%, #a78bfa 80%, rgba(167,139,250,.1));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: p-spin 7s linear infinite; }
+@property --p-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes p-spin { to { --p-a: 360deg; } }
+.p-hub { position: absolute; z-index: 3; border-radius: 50%; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.p-hub .glass { position: absolute; inset: 3px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, rgba(91,52,170,.55), rgba(14,7,30,.92) 70%);
+    box-shadow: 0 0 calc(var(--u) * 6) rgba(139,92,246,.35), inset 0 0 calc(var(--u) * 3) rgba(217,70,239,.18); }
+.p-hub .orbit { position: absolute; inset: calc(var(--u) * -2.2); border-radius: 50%; border: 1px dashed rgba(196,181,253,.18); animation: p-rot 40s linear infinite; }
+@keyframes p-rot { to { transform: rotate(360deg); } }
+.p-hub > :not(.p-ring, .glass, .orbit) { position: relative; }
+
+/* === 9. PIPELINE STEPS (kit.js Pulse.packet drives .on / .hit) === */
+.p-step { position: absolute; z-index: 3; width: calc(var(--u) * 18); margin-left: calc(var(--u) * -9); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.p-step .dot { position: relative; width: calc(var(--u) * 7); height: calc(var(--u) * 7); border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 35%, rgba(50,26,96,.9), rgba(12,6,26,.95)); border: 1px solid rgba(167,139,250,.22); transition: all .5s var(--ease); }
+.p-step .dot :is(i, svg) { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); color: rgba(196,181,253,.45); transition: color .5s; }
+.p-step .dot::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid rgba(232,121,249,0); transition: all .5s; }
+.p-step .dot::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid #e879f9; opacity: 0; }
+.p-step.on .dot { border-color: rgba(232,121,249,.75); box-shadow: 0 0 calc(var(--u) * 2.6) rgba(217,70,239,.45), inset 0 0 calc(var(--u) * 1.4) rgba(217,70,239,.3); }
+.p-step.on .dot :is(i, svg) { color: #fff; }
+.p-step.on .dot::before { border-color: rgba(232,121,249,.35); }
+.p-step.hit .dot::after { animation: p-hit .9s ease-out; }
+@keyframes p-hit { from { opacity: 1; transform: scale(.9); } to { opacity: 0; transform: scale(1.9); } }
+.p-step.globe .dot { background: transparent; border-color: rgba(255,153,0,.35); }
+.p-step.globe.on .dot { border-color: rgba(255,153,0,.85); box-shadow: 0 0 calc(var(--u) * 3) rgba(255,153,0,.4); }
+.p-step .n { margin-top: calc(var(--u) * 1.8); font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * .95); letter-spacing: .2em; color: var(--t3); transition: color .5s; }
+.p-step .t { margin-top: .35em; font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.7); color: rgba(255,255,255,.4); transition: color .5s; }
+.p-step .d { margin-top: .5em; font-size: calc(var(--u) * 1.02); line-height: 1.45; color: rgba(255,255,255,.3); transition: color .5s; max-width: calc(var(--u) * 15); }
+.p-step.on .n { color: #ff9900; } .p-step.on .t { color: #fff; } .p-step.on .d { color: var(--t2); }
+
+/* === 10. STAT ROW (number · label · viz) and SPEC ROW === */
+.p-stat { display: grid; grid-template-columns: calc(var(--u) * 17) 1fr calc(var(--u) * 17); align-items: center; gap: calc(var(--u) * 1.6);
+    height: calc(var(--u) * 8.6); border-top: 1px solid var(--hair); position: relative; }
+.p-stat:last-child { border-bottom: 1px solid var(--hair); }
+.p-stat::before { content: ""; position: absolute; left: 0; top: -1px; height: 1px; width: 0; background: linear-gradient(90deg, #e879f9, transparent); }
+:is(.is-active, .is-leaving) .p-stat::before { animation: p-line 1.4s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-line { to { width: 100%; } }
+.slide.is-final .p-stat::before { width: 100%; }
+.p-stat .num { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 4.6); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.p-stat .lbl b { display: block; font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.5); }
+.p-stat .lbl span { display: inline-flex; align-items: center; gap: .35em; margin-top: .35em; font-size: calc(var(--u) * 1); color: var(--t2); }
+.p-stat .lbl span :is(i, svg) { width: 1.1em; height: 1.1em; }
+.p-stat .up { color: var(--up); } .p-stat .dn { color: var(--down); }
+.p-stat .viz { height: calc(var(--u) * 6); } .p-stat .viz svg { width: 100%; height: 100%; }
+.p-spec { display: flex; align-items: baseline; gap: calc(var(--u) * 1.4); padding-bottom: calc(var(--u) * 1.1); border-bottom: 1px solid var(--hair); }
+.p-spec .v { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 3); line-height: 1; min-width: calc(var(--u) * 5.6); letter-spacing: -.02em; }
+.p-spec .l { font-size: calc(var(--u) * 1.4); color: rgba(255,255,255,.8); }
+.p-spec .v.live { display: inline-flex; align-items: center; gap: .3em; font-size: calc(var(--u) * 1.5); align-self: center; color: var(--up); }
+.p-spec .v.live::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: var(--up); box-shadow: 0 0 10px var(--up); animation: p-blink 1.4s infinite; }
+
+/* === 11. PRODUCT REVEAL — ignition flash, shock rings, 3D chip (Pulse.chip / Pulse.ignite) === */
+.p-flash { position: absolute; left: 0; top: 0; width: 200vmax; height: 200vmax; margin: -100vmax 0 0 -100vmax; border-radius: 50%; z-index: 2; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(244,114,182,.55) 6%, rgba(139,92,246,.18) 18%, transparent 40%); }
+.p-flash.go { animation: p-flash 1.6s ease-out both; }
+@keyframes p-flash { 0% { opacity: 0; transform: scale(.05); } 12% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+.p-shock { position: absolute; left: 0; top: 0; width: calc(var(--u) * 10); height: calc(var(--u) * 10); margin: calc(var(--u) * -5) 0 0 calc(var(--u) * -5); border-radius: 50%;
+    border: 2px solid rgba(255,190,240,.9); z-index: 2; opacity: 0; pointer-events: none; }
+.p-shock.go { animation: p-shock 1.4s cubic-bezier(.1, .7, .3, 1) both; }
+.p-shock.b.go { animation-delay: .18s; border-color: rgba(255,153,0,.7); }
+@keyframes p-shock { 0% { opacity: 1; transform: scale(.1); } 100% { opacity: 0; transform: scale(9); } }
+.p-chip { position: absolute; perspective: calc(var(--u) * 120); z-index: 3; }
+.p-chip .in { position: absolute; inset: 0; opacity: 0; transform: scale(.55); }
+:is(.is-active, .is-leaving) .p-chip .in { animation: p-chipin 1.4s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-chipin { to { opacity: 1; transform: none; } }
+.slide.is-final .p-chip .in { opacity: 1; transform: none; }
+.p-chip .c3 { position: absolute; inset: 11%; transform-style: preserve-3d; transform: rotateX(54deg) rotateZ(-38deg); animation: p-sway 9s ease-in-out infinite; }
+@keyframes p-sway { 50% { transform: rotateX(50deg) rotateZ(-30deg); } }
+.slide.is-final .p-chip .c3 { transform: rotateX(54deg) rotateZ(-38deg); }
+.p-chip .lay { position: absolute; inset: 0; border-radius: 5%; background: #1a0d2e; border: 1px solid rgba(167,139,250,.25); }
+.p-chip .shadow { position: absolute; inset: -25%; border-radius: 50%; transform: translateZ(calc(var(--u) * -6)); background: radial-gradient(circle, rgba(217,70,239,.45), rgba(255,153,0,.12) 40%, transparent 68%); filter: blur(calc(var(--u) * 2)); }
+.p-chip svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: translateZ(calc(var(--u) * 1.4)); }
+.p-chip .lid { position: absolute; left: 37%; top: 37%; width: 26%; height: 26%; border-radius: 4%; transform: translateZ(calc(var(--u) * 2.8));
+    background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(232,121,249,.12) 40%, rgba(255,153,0,.18)); border: 1px solid rgba(255,220,250,.55);
+    box-shadow: 0 0 calc(var(--u) * 4) rgba(232,121,249,.75), inset 0 0 calc(var(--u) * 2) rgba(255,153,0,.35); display: grid; place-items: center; }
+.p-chip .lid span { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 1.25); letter-spacing: .12em; color: rgba(255,255,255,.92); }
+.p-trace { fill: none; stroke: rgba(232,121,249,.55); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.p-tpulse { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: .06 1.4; stroke-dashoffset: .06; opacity: 0; }
+:is(.is-active, .is-leaving) .p-tpulse { animation: p-tp 2.6s linear infinite; animation-delay: var(--p-delay); }
+@keyframes p-tp { 0% { stroke-dashoffset: .06; opacity: 1; } 100% { stroke-dashoffset: -1; opacity: 1; } }
+.slide.is-final .p-tpulse { opacity: 0; }
+
+/* === 12. LIVE WIDGETS — alert feed rows, bouncing bars === */
+.p-feed { position: relative; overflow: hidden; }
+.p-alert { position: absolute; left: 0; right: 0; top: 0; height: calc(var(--u) * 4.1); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: calc(var(--u) * .9);
+    padding: 0 calc(var(--u) * .9); border-radius: calc(var(--u) * .6); background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.05);
+    transition: transform .6s var(--ease), opacity .6s; }
+.p-alert .sv { width: calc(var(--u) * .7); height: calc(var(--u) * .7); border-radius: 50%; }
+.p-alert.hi .sv { background: #f472b6; box-shadow: 0 0 10px #f472b6; } .p-alert.wa .sv { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; } .p-alert.inf .sv { background: #a78bfa; box-shadow: 0 0 10px #a78bfa; }
+.p-alert .tx { min-width: 0; }
+.p-alert .tx b { display: block; font-weight: 500; font-size: calc(var(--u) * .98); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-alert .tx span { display: block; font-size: calc(var(--u) * .8); color: var(--t3); margin-top: .15em; font-family: ui-monospace, Menlo, monospace; }
+.p-alert .st { font-size: calc(var(--u) * .82); padding: .25em .6em; border-radius: 99px; white-space: nowrap; }
+.p-alert.hi .st { color: #f9a8d4; background: rgba(244,114,182,.14); } .p-alert.wa .st { color: #fcd34d; background: rgba(251,191,36,.12); } .p-alert.inf .st { color: #c4b5fd; background: rgba(139,92,246,.15); }
+.p-alert.new { animation: p-alin .7s var(--ease); }
+@keyframes p-alin { from { opacity: 0; filter: brightness(2.2); } to { opacity: 1; } }
+.p-bars { display: flex; align-items: flex-end; gap: 5%; }
+.p-bars i { flex: 1; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #e879f9, #8b5cf6); height: 40%; animation: p-bar 1.6s ease-in-out infinite alternate; }
+.p-bars i:nth-child(2) { animation-delay: -.4s; animation-duration: 1.3s; } .p-bars i:nth-child(3) { animation-delay: -.9s; animation-duration: 1.9s; }
+.p-bars i:nth-child(4) { animation-delay: -.2s; animation-duration: 1.1s; background: linear-gradient(180deg, #ffb547, #e879f9); } .p-bars i:nth-child(5) { animation-delay: -1.1s; }
+@keyframes p-bar { from { height: 25%; } to { height: 95%; } }
+.slide.is-final .p-bars i { animation: none !important; } .slide.is-final .p-bars i:nth-child(1) { height: 82%; } .slide.is-final .p-bars i:nth-child(2) { height: 55%; }
+.slide.is-final .p-bars i:nth-child(3) { height: 70%; } .slide.is-final .p-bars i:nth-child(4) { height: 40%; } .slide.is-final .p-bars i:nth-child(5) { height: 92%; }
+
+/* === 13. PRINT — pages are exactly 1600×900: pin the unit instead of trusting vw/vh in Chrome's PDF pass === */
+@media print {
+    :root { --u: 16px; --micro: 11.84px; }
+    .p-box { left: 0 !important; top: 0 !important; transform: none !important; }
+    .p-progress { display: none !important; }
+    /* Chrome's PDF output paints an additive-glow <canvas> as an opaque WHITE image → effect canvases stay screen-only */
+    .p-fx { display: none !important; }
+    /* …and it can't rasterise preserve-3d → print the chip as the equivalent 2D isometric (rotateX 54° ≈ scaleY(cos 54°)) */
+    .p-chip { perspective: none !important; }
+    .p-chip .c3 { transform-style: flat !important; transform: scale(1, .59) rotate(-38deg) !important; animation: none !important; }
+    .p-chip .c3 > * { transform: none !important; }
+    .p-chip .lay:not(:last-of-type) { display: none !important; }
+    /* mask-composite isn't honoured in PDF → the conic ring would print as a solid blob */
+    .p-ring { -webkit-mask: none !important; mask: none !important; background: none !important; padding: 0 !important; border: 1.5px solid rgba(232,121,249,.55); }
+}

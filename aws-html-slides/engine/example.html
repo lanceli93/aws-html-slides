@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stage Engine — Example Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@500;700;800&family=Albert+Sans:wght@400;500&display=swap" rel="stylesheet">
+<!-- Test bed links the engine files; generated decks INLINE them verbatim instead. -->
+<link rel="stylesheet" href="stage-engine.css">
+<link rel="stylesheet" href="inline-editor.css">
+<style>
+/* ===== trivial theme + motif (everything below is "flavor", not engine) ===== */
+:root {
+    --bg: #0A0A0A; --accent: #8B5CF6;
+    --grad-accent: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6);
+    --font-display: 'Urbanist', sans-serif; --font-body: 'Albert Sans', sans-serif;
+    --u: min(1vw, 1.7778vh);                      /* 1u = 1% of a 16:9 box fitted in the viewport */
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: #fff; font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* persistent motif layer: two glows that re-compose per slide (Stage.onChange) */
+.motif { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.motif i { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(80px); opacity: .5;
+    left: calc(var(--x, 50) * 1%); top: calc(var(--y, 50) * 1%); transform: translate(-50%, -50%) scale(var(--s, 1));
+    transition: left 1.4s cubic-bezier(.65,0,.35,1), top 1.4s cubic-bezier(.65,0,.35,1), transform 1.4s cubic-bezier(.65,0,.35,1); }
+.motif .g1 { background: radial-gradient(circle, rgba(139,92,246,.7), transparent 65%); }
+.motif .g2 { background: radial-gradient(circle, rgba(217,70,239,.45), transparent 65%); }
+.stage-reduced .motif i { transition: none; }
+
+.slide { z-index: 1; isolation: isolate; display: flex; align-items: center; justify-content: center; }
+.frame { width: calc(var(--u) * 88); }
+.eyebrow { font: 600 max(11px, calc(var(--u) * 1)) var(--font-body); letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.55); margin-bottom: calc(var(--u) * 2); }
+h1 { font: 800 calc(var(--u) * 7.4)/1.02 var(--font-display); letter-spacing: -.03em; }
+.s-cover h1 { max-width: calc(var(--u) * 62); }
+h2 { font: 700 calc(var(--u) * 4.2)/1.05 var(--font-display); letter-spacing: -.02em; margin-bottom: calc(var(--u) * 3); }
+.lead { margin-top: calc(var(--u) * 2.4); font-size: calc(var(--u) * 1.6); line-height: 1.5; color: rgba(255,255,255,.6); max-width: calc(var(--u) * 52); }
+.grad { background: var(--grad-accent); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.foot { position: absolute; left: calc(var(--u) * 6); bottom: calc(var(--u) * 2.4); font-size: max(9px, calc(var(--u) * .7)); color: rgba(255,255,255,.38); }
+.slide-index { position: absolute; right: calc(var(--u) * 6); top: calc(var(--u) * 3); font: 600 max(10px, calc(var(--u) * .9)) var(--font-display); letter-spacing: .2em; color: rgba(255,255,255,.38); }
+
+/* cover orb — hook-driven (ctx.raf), final state = steady glow */
+.orb { position: absolute; right: calc(var(--u) * 7); top: 50%; width: calc(var(--u) * 22); z-index: -1; aspect-ratio: 1; border-radius: 50%;
+    transform: translateY(-50%) scale(var(--pulse, 1));
+    background: radial-gradient(circle at 35% 30%, #f5d0fe, #c084fc 30%, #6d28d9 65%, #1e0b4b);
+    box-shadow: 0 0 calc(var(--u) * 8) rgba(192,132,252,.45); }
+
+/* metrics */
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u) * 2); }
+.card { border: 1px solid rgba(255,255,255,.1); border-radius: calc(var(--u) * 1.4); padding: calc(var(--u) * 2.4);
+    background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.015)); }
+.card .v { font: 800 calc(var(--u) * 4.6)/1 var(--font-display); }
+.card .v small { font-size: .5em; color: #e879f9; margin-left: .1em; }
+.card p { margin-top: calc(var(--u) * 1); font-size: calc(var(--u) * 1.15); color: rgba(255,255,255,.55); }
+.note { margin-top: calc(var(--u) * 3); font-size: calc(var(--u) * 1.3); color: rgba(255,255,255,.35); transition: color .6s; }
+.note.is-lit { color: #fbbf24; }
+.slide.is-final .note { color: #fbbf24; }        /* final state of a hook-driven element */
+
+/* image slide */
+.two { display: grid; grid-template-columns: 1fr 1.2fr; gap: calc(var(--u) * 5); align-items: center; }
+.shot { width: 100%; border-radius: calc(var(--u) * 1.2); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+
+/* custom-transition slide: bars */
+.bars { display: flex; align-items: flex-end; gap: calc(var(--u) * 1.6); height: calc(var(--u) * 26); }
+.bars b { flex: 1; border-radius: calc(var(--u) * .6) calc(var(--u) * .6) 0 0; background: linear-gradient(180deg, #e879f9, #6d28d9);
+    height: calc(var(--h) * 1%); transform-origin: bottom; transform: scaleY(0);
+    transition: transform 1.1s cubic-bezier(.16,1,.3,1) calc(var(--rv-base) + var(--d, 0) * var(--rv-step)); }
+.is-active .bars b, .is-leaving .bars b { transform: none; }
+.slide.is-final .bars b { transform: none !important; }
+
+/* CJK line: split per ideograph, wraps like normal text */
+.cjk { max-width: calc(var(--u) * 46); margin: calc(var(--u) * -1.6) 0 calc(var(--u) * 3); font-size: calc(var(--u) * 1.45); line-height: 1.6; color: rgba(255,255,255,.6); --split-step: 18ms; }
+
+/* closing */
+.s-close { text-align: center; }
+.s-close h1 { font-size: calc(var(--u) * 9); }
+
+@media screen and (max-aspect-ratio: 4/3) { .grid4 { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="motif stage-bg" aria-hidden="true"><i class="g1"></i><i class="g2"></i></div>
+<div class="progress-bar"></div>
+<nav class="nav-dots" aria-label="Slides"></nav>
+<div class="page-number"></div>
+
+<!-- 1 · COVER : split words (gradient run kept whole), hook with ctx.wait + ctx.raf -->
+<section class="slide s-cover" data-scene="cover" data-label="Opening"
+         data-thumb="radial-gradient(60% 70% at 30% 40%, rgba(139,92,246,.55), transparent 70%), #0A0A0A">
+    <span class="slide-index"></span>
+    <div class="frame">
+        <p class="eyebrow rv">Stage Engine · Test Bed</p>
+        <h1 data-split="words" style="--d:1">One engine, <span class="grad">every flavor</span></h1>
+        <p class="lead rv-blur" style="--d:6">Stacked slides, per-slide hooks, cinematic transitions, overview, lightbox and print — in one inline script.</p>
+    </div>
+    <div class="orb rv-scale" style="--d:3"></div>
+    <div class="foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+<script>
+(window.STAGE_HOOKS = window.STAGE_HOOKS || []).push(['cover', {
+    async enter(slide, ctx) {
+        window.__log && __log.push('enter:cover');
+        const orb = slide.querySelector('.orb');
+        if (ctx.reduced) return;
+        await ctx.wait(500);                               // never resolves if the user already left
+        ctx.raf((now, dt, t) => { orb.style.setProperty('--pulse', (1 + Math.sin(t / 600) * .03).toFixed(4)); });
+    },
+    leave(slide) { window.__log && __log.push('leave:cover'); },
+    final(slide) { slide.querySelector('.orb').style.setProperty('--pulse', 1); }
+}]);
+</script>
+
+<!-- 2 · METRICS : count-up + async choreography guarded by ctx.alive() -->
+<section class="slide s-metrics" data-scene="metrics" data-label="Key Metrics">
+    <span class="slide-index"></span>
+    <div class="frame">
+        <p class="eyebrow rv">By the numbers</p>
+        <h2 class="rv" style="--d:1">Key Metrics</h2>
+        <div class="grid4">
+            <div class="card rv-scale" style="--d:2"><div class="v"><span class="count" data-count="100">100</span><small>K+</small></div><p>Customers</p></div>
+            <div class="card rv-scale" style="--d:3"><div class="v"><span class="count" data-count="6" data-delay=".1">6</span><small>x</small></div><p>Throughput</p></div>
+            <div class="card rv-scale" style="--d:4"><div class="v"><span class="count" data-count="40" data-delay=".2">40</span><small>%</small></div><p>Lower cost / token</p></div>
+            <div class="card rv-scale" style="--d:5"><div class="v"><span class="count" data-count="2.5" data-decimals="1" data-delay=".3">2.5</span><small>s</small></div><p>Median deploy</p></div>
+        </div>
+        <p class="note rv" style="--d:7">Record year: generative AI workloads more than doubled.</p>
+    </div>
+    <div class="foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+<script>
+(window.STAGE_HOOKS = window.STAGE_HOOKS || []).push(['metrics', {
+    async enter(slide, ctx) {
+        const note = slide.querySelector('.note');
+        note.classList.remove('is-lit');
+        await ctx.wait(1400);
+        note.classList.add('is-lit');                      // only reached if still on this slide
+        window.__log && __log.push('lit:metrics');
+    },
+    final(slide) { slide.querySelector('.note').classList.add('is-lit'); }
+}]);
+</script>
+
+<!-- 3 · IMAGE : lightbox (img[data-zoom]), rv-mask on gradient text -->
+<section class="slide s-image" data-scene="image" data-label="Screenshot">
+    <span class="slide-index"></span>
+    <div class="frame two">
+        <div>
+            <p class="eyebrow rv">Lightbox</p>
+            <h2 class="rv-mask" style="--d:1"><span class="grad">Click to zoom</span></h2>
+            <p class="lead rv" style="--d:3">Any slide image opens in the lightbox. Esc closes it before anything else.</p>
+        </div>
+        <img class="shot rv-blur" style="--d:2" data-zoom alt="Architecture sketch"
+             src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%238B5CF6'/%3E%3Cstop offset='1' stop-color='%23D946EF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='450' fill='%23120a22'/%3E%3Crect x='60' y='70' width='200' height='120' rx='14' fill='none' stroke='url(%23g)' stroke-width='3'/%3E%3Crect x='300' y='170' width='200' height='120' rx='14' fill='none' stroke='url(%23g)' stroke-width='3'/%3E%3Crect x='540' y='270' width='200' height='120' rx='14' fill='none' stroke='url(%23g)' stroke-width='3'/%3E%3Cpath d='M260 130 C300 130 280 230 300 230 M500 230 C540 230 520 330 540 330' stroke='%23e879f9' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+    </div>
+    <div class="foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- 4 · CUSTOM TRANSITION : data-transition="wipe" handled by Stage.setTransition -->
+<section class="slide s-bars" data-scene="bars" data-label="Growth" data-transition="wipe">
+    <span class="slide-index"></span>
+    <div class="frame">
+        <p class="eyebrow rv">Custom transition</p>
+        <h2 class="rv" style="--d:1">A wipe, then the bars rise</h2>
+        <p class="cjk" lang="zh" data-split="chars" style="--d:2">用 AWS 构建：一份开放的数据、一套统一的治理，让每一个决策都建立在「最新、可信」的数据之上。</p>
+        <div class="bars">
+            <b style="--h:28;--d:2"></b><b style="--h:44;--d:3"></b><b style="--h:52;--d:4"></b><b style="--h:71;--d:5"></b><b style="--h:100;--d:6"></b>
+        </div>
+    </div>
+    <div class="foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<!-- 5 · CLOSING : split chars -->
+<section class="slide s-close" data-scene="closing" data-label="Closing">
+    <span class="slide-index"></span>
+    <div class="frame">
+        <p class="eyebrow rv">Thank you</p>
+        <h1 data-split="chars" style="--d:1">Now go build.</h1>
+        <p class="lead rv-blur" style="--d:8; margin-inline: auto">Press <b>O</b> or <b>Esc</b> for the overview · <b>E</b> to edit.</p>
+    </div>
+    <div class="foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+</section>
+
+<script>window.__log = [];</script>
+<script src="stage-engine.js"></script>
+<script src="inline-editor.js"></script>
+<script>
+/* ===== flavor glue: motif + custom transition ===== */
+const MOTIF = {                       // per-scene composition of the persistent layer
+    cover:   [[28, 40, 1.1], [80, 70, .9]],
+    metrics: [[50, 10, .8], [20, 90, .7]],
+    image:   [[85, 30, 1], [10, 60, .8]],
+    bars:    [[40, 95, 1.2], [90, 10, .7]],
+    closing: [[50, 50, 1.3], [50, 60, .6]]
+};
+const glows = document.querySelectorAll('.motif i');
+Stage.onChange((to, from, dir, slide) => {
+    (MOTIF[slide.dataset.scene] || MOTIF.cover).forEach(([x, y, s], k) => {
+        glows[k].style.setProperty('--x', x); glows[k].style.setProperty('--y', y); glows[k].style.setProperty('--s', s);
+    });
+});
+
+// Custom transition: clip-path wipe INTO slides marked data-transition="wipe", default dissolve otherwise.
+Stage.setTransition((from, to, t) => {
+    if (to.dataset.transition !== 'wipe') return Stage.dissolve(from, to, t);
+    const back = t.dir === 'back';
+    const a = to.animate([{ clipPath: back ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }],
+                         { duration: t.duration, easing: 'cubic-bezier(.65,0,.35,1)' });
+    const b = from.animate([{ opacity: 1 }, { opacity: .25 }], { duration: t.duration, fill: 'forwards' });
+    t.cleanup(() => { a.cancel(); b.cancel(); });     // runs on finish AND when a fast keypress interrupts
+    t.wait(t.duration * .35).then(t.enter);            // start the incoming choreography mid-wipe
+    return a.finished.catch(() => {});
+});
+</script>
+</body>
+</html>

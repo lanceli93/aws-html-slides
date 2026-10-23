@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse · re:Invent Keynote — Building the Future with Generative AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600&family=Urbanist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+/* === STAGE ENGINE CSS (engine/stage-engine.css) === */
+/* ===========================================================
+   STAGE ENGINE — BASE CSS  (paste verbatim into <style>, BEFORE theme CSS)
+   Replaces viewport-base.css (scroll-snap). Slides are stacked fixed
+   layers; JS (stage-engine.js) toggles state classes:
+     .slide.is-active    current slide (reveals play)
+     .slide.is-entering  incoming during a transition (visible, pre-reveal)
+     .slide.is-leaving   outgoing during a transition
+     .slide.is-final     everything rendered in its finished state
+     body[data-dir=fwd|back]   direction of the last navigation
+     body.stage-busy     a transition is running
+   Free mode: <body data-stage="free"> → engine does NOT position/hide
+   slides (e.g. a CSS-3D world that places slides itself).
+   =========================================================== */
+:root {
+    --stage-dur: 700ms;                         /* default transition length */
+    --stage-ease: cubic-bezier(.16, 1, .3, 1);
+    --rv-base: 180ms;                           /* reveal start offset (lets the dissolve begin) */
+    --rv-step: 90ms;                            /* one unit of style="--d:N" */
+    --rv-dur: 900ms;
+    --split-step: 45ms;                         /* per word / char of [data-split] */
+    --stage-accent: var(--accent, #8B5CF6);
+    --stage-thumb-bg: radial-gradient(80% 70% at 70% 40%, rgba(139,92,246,.35), transparent 70%),
+                      radial-gradient(60% 60% at 20% 80%, rgba(217,70,239,.22), transparent 70%), #0A0A0A;
+}
+
+/* === 1. VIEWPORT LOCK === */
+html, body { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+
+/* === 2. STACKED SLIDES (default mode) === */
+:where(body:not([data-stage="free"])) .slide {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh; height: 100dvh;
+    overflow: hidden;
+    visibility: hidden; pointer-events: none;
+}
+:where(body:not([data-stage="free"])) .slide:is(.is-active, .is-entering, .is-leaving) { visibility: visible; }
+:where(body:not([data-stage="free"])) .slide.is-active { pointer-events: auto; z-index: 2; }
+:where(body:not([data-stage="free"])) .slide.is-leaving { z-index: 1; }
+
+/* === 3. DEFAULT TRANSITION — cross-dissolve with depth (direction-aware) === */
+.slide.stage-out { animation: stage-out var(--stage-dur) var(--stage-ease) both; }
+.slide.stage-in  { animation: stage-in  var(--stage-dur) var(--stage-ease) both; }
+body[data-dir="back"] .slide.stage-out { animation-name: stage-out-back; }
+body[data-dir="back"] .slide.stage-in  { animation-name: stage-in-back; }
+@keyframes stage-out      { to { opacity: 0; filter: blur(12px); transform: scale(.94); } }
+@keyframes stage-out-back { to { opacity: 0; filter: blur(12px); transform: scale(1.06); } }
+@keyframes stage-in       { from { opacity: 0; transform: scale(1.04); } }
+@keyframes stage-in-back  { from { opacity: 0; transform: scale(.96); } }
+
+/* === 4. REVEAL PRIMITIVES — replay on every entry ===
+   <h2 class="rv" style="--d:2">  delay = --rv-base + d × --rv-step
+   Variants: rv (rise+fade) · rv-blur (focus in) · rv-mask (clip wipe, safe
+   for gradient text) · rv-scale (pop) · rv-left (slide from left) */
+.rv, .rv-blur, .rv-mask, .rv-scale, .rv-left {
+    --rv-delay: calc(var(--rv-base) + var(--d, 0) * var(--rv-step));
+    transition: opacity var(--rv-dur) var(--stage-ease) var(--rv-delay),
+                transform calc(var(--rv-dur) * 1.25) var(--stage-ease) var(--rv-delay),
+                filter var(--rv-dur) var(--stage-ease) var(--rv-delay),
+                clip-path calc(var(--rv-dur) * 1.4) var(--stage-ease) var(--rv-delay);
+}
+.rv       { opacity: 0; transform: translateY(clamp(14px, 2.6vh, 30px)); }
+.rv-left  { opacity: 0; transform: translateX(clamp(-40px, -3vw, -16px)); }
+.rv-blur  { opacity: 0; filter: blur(10px); transform: scale(1.04); }
+.rv-scale { opacity: 0; transform: scale(.86); }
+.rv-mask  { clip-path: inset(-15% 100% -25% 0); }
+:is(.is-active, .is-leaving) :is(.rv, .rv-left, .rv-blur, .rv-scale) { opacity: 1; transform: none; filter: none; }
+:is(.is-active, .is-leaving) .rv-mask { clip-path: inset(-15% -4% -25% -2%); }
+
+/* split text: Stage.fx.split / [data-split="words|chars"] → .sp pieces with --i */
+.sp { display: inline-block; white-space: pre; opacity: 0; transform: translateY(.45em); filter: blur(6px);
+      transition: opacity .8s var(--stage-ease), transform 1s var(--stage-ease), filter .8s var(--stage-ease);
+      transition-delay: calc(var(--rv-base) + var(--d, 0) * var(--rv-step) + var(--i, 0) * var(--split-step)); }
+.sp-unit { white-space: normal; }               /* gradient run kept whole */
+.sp-w { display: inline-block; white-space: nowrap; }   /* word wrapper in chars mode */
+:is(.is-active, .is-leaving) .sp { opacity: 1; transform: none; filter: none; }
+
+/* reset frame (engine-internal): snap reveals back to their start state */
+.stage-reset, .stage-reset *, .stage-reset *::before, .stage-reset *::after { transition: none !important; animation: none !important; }
+
+/* === 5. FINAL STATE — reduced motion, overview thumbnails, print, editor ===
+   Every component MUST look finished under .is-final. Keyframe animations
+   jump to their last frame; override per component if that frame is wrong. */
+.slide.is-final, .slide.is-final *, .slide.is-final *::before, .slide.is-final *::after {
+    transition-duration: 0s !important; transition-delay: 0s !important;
+    animation-duration: 1ms !important; animation-delay: 0s !important;
+    animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+}
+.slide.is-final :is(.rv, .rv-left, .rv-blur, .rv-scale, .sp) { opacity: 1 !important; transform: none !important; filter: none !important; }
+.slide.is-final .rv-mask { clip-path: none !important; }
+.slide.is-final.stage-out, .slide.is-final.stage-in { animation: none !important; }
+
+/* === 6. CHROME — progress bar, page number, nav dots === */
+.progress-bar {
+    position: fixed; top: 0; left: 0; z-index: 900; height: 3px; width: 100%;
+    background: var(--grad-accent, var(--stage-accent));
+    transform-origin: left; transform: scaleX(var(--stage-progress, 0));
+    transition: transform .6s var(--stage-ease); pointer-events: none;
+}
+.page-number {
+    position: fixed; bottom: clamp(8px, 1.2vh, 16px); right: clamp(12px, 2vw, 24px); z-index: 900;
+    font-size: clamp(.6rem, .9vw, .75rem); letter-spacing: .05em; font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,.38); pointer-events: none;
+}
+.nav-dots {
+    position: fixed; right: clamp(10px, 1.6vw, 22px); top: 50%; transform: translateY(-50%); z-index: 900;
+    display: flex; flex-direction: column; gap: clamp(6px, 1.1vh, 10px);
+}
+.nav-dots button {
+    all: unset; cursor: pointer; width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,.22); transition: transform .3s, background .3s;
+}
+.nav-dots button.on { background: var(--stage-accent); transform: scale(1.5); }
+.nav-dots button:focus-visible { outline: 1px solid var(--stage-accent); outline-offset: 3px; }
+@media (max-height: 600px) { .page-number, .nav-dots { display: none; } }
+
+/* === 7. OVERVIEW (Esc / O) — built by JS === */
+.stage-ov {
+    position: fixed; inset: 0; z-index: 9998; overflow-y: auto;
+    background: rgba(8, 6, 14, .94); backdrop-filter: blur(14px);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
+}
+.stage-ov.active { opacity: 1; pointer-events: auto; }
+.stage-ov-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(200px, 20vw, 300px), 1fr));
+    gap: clamp(14px, 2.2vw, 30px); padding: clamp(48px, 7vh, 80px) clamp(24px, 5vw, 72px);
+    max-width: 1700px; margin: 0 auto;
+}
+.stage-ov-card {
+    all: unset; box-sizing: border-box; position: relative; aspect-ratio: 16 / 9; cursor: pointer; overflow: hidden;
+    border: 2px solid rgba(255,255,255,.12); border-radius: 10px; background: var(--stage-thumb-bg);
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.stage-ov-card:hover, .stage-ov-card:focus-visible {
+    border-color: var(--stage-accent); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,.5);
+}
+.stage-ov-card.current { border-color: var(--stage-accent); box-shadow: 0 0 0 3px rgba(139,92,246,.4); }
+.stage-ov-thumb { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.stage-ov-thumb > .slide {
+    position: absolute !important; inset: auto !important; left: 0; top: 0; margin: 0 !important;
+    visibility: visible !important; opacity: 1 !important; filter: none !important;
+    transform-origin: 0 0; overflow: hidden; pointer-events: none;
+}
+.stage-ov-num {
+    position: absolute; bottom: 8px; right: 10px; z-index: 2; padding: 2px 8px; border-radius: 4px;
+    font: 500 .75rem/1.4 var(--font-body, system-ui, sans-serif); font-variant-numeric: tabular-nums;
+    color: #fff; background: rgba(0,0,0,.65);
+}
+.stage-ov-num em { font-style: normal; color: rgba(255,255,255,.6); margin-left: .5em; }
+.stage-ov-hint {
+    position: fixed; top: clamp(12px, 2vh, 20px); right: clamp(16px, 2vw, 24px);
+    font: .8rem var(--font-body, system-ui, sans-serif); color: rgba(255,255,255,.55);
+}
+.stage-ov-hint kbd { background: rgba(255,255,255,.12); padding: 2px 6px; border-radius: 3px; font: .75rem monospace; }
+
+/* === 8. LIGHTBOX — img[data-zoom] or any .slide img outside [data-no-zoom] === */
+.slide img:not([data-no-zoom] img, [data-no-zoom]) { cursor: zoom-in; }
+.stage-lb {
+    position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.92); backdrop-filter: blur(8px); cursor: zoom-out;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.stage-lb.active { opacity: 1; pointer-events: auto; }
+.stage-lb img {
+    max-width: 92vw; max-height: 88vh; object-fit: contain; border-radius: 8px;
+    transform: scale(.92); transition: transform .3s var(--stage-ease);
+}
+.stage-lb.active img { transform: none; }
+.stage-lb-close {
+    all: unset; position: absolute; top: clamp(12px, 2vh, 24px); right: clamp(12px, 2vw, 24px);
+    font-size: clamp(1.4rem, 2.2vw, 2rem); line-height: 1; color: rgba(255,255,255,.6); cursor: pointer;
+}
+.stage-lb-close:hover { color: var(--stage-accent); }
+.stage-lb-hint {
+    position: absolute; bottom: clamp(12px, 2vh, 24px); left: 50%; transform: translateX(-50%);
+    font-size: clamp(.65rem, 1vw, .85rem); color: rgba(255,255,255,.35);
+}
+
+/* === 9. REDUCED MOTION (JS also marks every slide .is-final) === */
+@media (prefers-reduced-motion: reduce) {
+    .slide.stage-in, .slide.stage-out { animation: none !important; }
+    .slide :is(.rv, .rv-left, .rv-blur, .rv-scale, .sp) { opacity: 1; transform: none; filter: none; transition: none; }
+    .slide .rv-mask { clip-path: none; transition: none; }
+}
+
+/* === 10. PRINT — "Print → Save as PDF" exports the deck, one 16:9 page per slide === */
+@page { size: 1600px 900px; margin: 0; }
+@media print {
+    html, body { width: 1600px !important; height: auto !important; overflow: visible !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .stage-root { position: static !important; transform: none !important; overflow: visible !important;
+                  perspective: none !important; width: auto !important; height: auto !important; }
+    body .slide {
+        position: relative !important; inset: auto !important; left: 0 !important; top: 0 !important;
+        width: 1600px !important; height: 900px !important; margin: 0 !important;
+        visibility: visible !important; opacity: 1 !important; filter: none !important; transform: none !important;
+        overflow: hidden !important; break-after: page; break-inside: avoid; page-break-after: always;
+        animation: none !important;
+        background-color: var(--bg, #0A0A0A);
+    }
+    body .slide[data-thumb] { background: var(--stage-thumb) !important; }
+    body .slide:last-of-type { break-after: auto; page-break-after: auto; }
+    .slide, .slide *, .slide *::before, .slide *::after {
+        transition-duration: 0s !important; transition-delay: 0s !important;
+        animation-duration: 1ms !important; animation-delay: 0s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+    }
+    .slide :is(.rv, .rv-left, .rv-blur, .rv-scale, .sp) { opacity: 1 !important; transform: none !important; filter: none !important; }
+    .slide .rv-mask { clip-path: none !important; }
+    .stage-bg, .stage-ov, .stage-lb, .progress-bar, .page-number, .nav-dots,
+    .edit-hotzone, .edit-toggle, .edit-save-file, .edit-toast, .edit-bar { display: none !important; }
+}
+
+/* === INLINE EDITOR CSS === */
+/* ===========================================================
+   INLINE EDITOR — CSS  (opt-in only; paste after stage-engine.css)
+   Visibility of the toggle is controlled by JS classes only —
+   do NOT use a CSS `~` sibling hover chain (pointer-events:none breaks it).
+   =========================================================== */
+.edit-hotzone {
+    position: fixed; top: 0; left: 0; width: 80px; height: 80px;
+    z-index: 10000; cursor: pointer;
+}
+.edit-toggle, .edit-save-file, .edit-bar button {
+    font: 500 .8rem/1 var(--font-body, system-ui, sans-serif);
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: none; border-radius: 6px; padding: 7px 11px;
+}
+.edit-toggle svg, .edit-save-file svg, .edit-bar svg { width: 16px; height: 16px; flex: none; }
+.edit-toggle {
+    position: fixed; top: clamp(12px, 2vh, 20px); left: clamp(12px, 1.6vw, 20px); z-index: 10001;
+    background: rgba(20, 14, 34, .85); color: #fff; border: 1px solid rgba(255,255,255,.18);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { background: var(--stage-accent, #8B5CF6); border-color: transparent; }
+.edit-save-file {
+    position: fixed; top: clamp(12px, 2vh, 20px); left: clamp(96px, 9vw, 112px); z-index: 10001;
+    background: var(--stage-accent, #8B5CF6); color: #fff;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+body.editing-active .edit-save-file { opacity: 1; pointer-events: auto; }
+
+/* slide navigation while editing (keys belong to the text cursor) */
+.edit-bar {
+    position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); z-index: 10001;
+    display: flex; gap: 6px; padding: 6px; border-radius: 10px;
+    background: rgba(12, 8, 22, .88); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(10px);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+body.editing-active .edit-bar { opacity: 1; pointer-events: auto; }
+.edit-bar button { background: rgba(255,255,255,.08); color: #fff; }
+.edit-bar button:hover { background: rgba(255,255,255,.16); }
+.edit-bar .edit-pos { align-self: center; padding: 0 8px; font: .8rem var(--font-body, system-ui, sans-serif);
+    color: rgba(255,255,255,.6); font-variant-numeric: tabular-nums; }
+
+/* editable affordance */
+body.editing-active [contenteditable="true"] { outline: 1px dashed rgba(167,139,250,.45); outline-offset: 4px; border-radius: 2px; cursor: text; }
+body.editing-active [contenteditable="true"]:hover { outline-color: rgba(232,121,249,.8); }
+body.editing-active [contenteditable="true"]:focus { outline: 2px solid var(--stage-accent, #8B5CF6); background: rgba(139,92,246,.06); }
+
+.edit-toast {
+    position: fixed; bottom: clamp(70px, 10vh, 96px); left: 50%; z-index: 10002;
+    transform: translateX(-50%) translateY(20px); padding: 10px 20px; border-radius: 6px;
+    background: rgba(0,0,0,.85); color: #fff; font: .85rem var(--font-body, system-ui, sans-serif);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .3s ease;
+}
+.edit-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.edit-toast.error { background: rgba(220, 38, 38, .92); }
+@media print { .edit-hotzone, .edit-toggle, .edit-save-file, .edit-bar, .edit-toast { display: none !important; } }
+
+/* === FLAVOR KIT CSS (flavors/pulse/kit.css) === */
+/* ===========================================================
+   PULSE FLAVOR KIT — CSS   (paste verbatim AFTER stage-engine.css [+ inline-editor.css])
+   Flavor 3 of the re:Invent theme: "living infrastructure". One persistent
+   dotted 3D globe + backdrop that re-docks per slide; animated beams carry
+   light pulses between nodes; live counters / tickers / sparklines.
+   Prefix: p-  ·  --d counts in SECONDS (style="--d:.4")  ·  layout unit --u
+   =========================================================== */
+
+/* === 1. TOKENS (brand + flavor) === */
+:root {
+    --bg: #0A0A0A; --bg-title: #0B0015; --p-ink: #07040d;
+    --purple: #8B5CF6; --pink: #D946EF; --blue: #3B82F6; --orange: #FF9900;
+    --up: #34D399; --down: #F472B6; --warn: #FBBF24;
+    --t1: #FFFFFF; --t2: rgba(255,255,255,.55); --t3: rgba(255,255,255,.38); --hair: rgba(255,255,255,.09);
+    --accent: #8B5CF6;
+    --grad-accent: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6);
+    --grad-warm: linear-gradient(100deg, #a78bfa 0%, #e879f9 45%, #f472b6 70%, #ff9900 100%);
+    --font-display: 'Urbanist', 'Noto Sans SC', sans-serif;
+    --font-body: 'Albert Sans', 'Noto Sans SC', sans-serif;
+    --fd: var(--font-display); --fb: var(--font-body);
+    --u: min(1vw, 1.7778vh);                /* 1u = 1/100 of the 16:9 .p-box */
+    --ease: cubic-bezier(.16, 1, .3, 1); --ease-io: cubic-bezier(.65, 0, .35, 1);
+    --micro: max(9px, calc(var(--u) * .74));
+    /* engine timing → Pulse convention: --d is seconds */
+    --rv-step: 1s; --rv-base: 120ms; --rv-dur: 1s; --split-step: 70ms;
+    --p-delay: calc(var(--rv-base) + var(--d, 0) * var(--rv-step));
+    --stage-thumb-bg: radial-gradient(70% 80% at 66% 52%, rgba(91,52,170,.55), rgba(14,7,30,.0) 60%),
+                      radial-gradient(120% 90% at 70% 40%, #12082a 0%, #0a0614 45%, #060309 100%);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--p-ink); color: var(--t1); font-family: var(--fb); -webkit-font-smoothing: antialiased; }
+svg { overflow: visible; }
+
+/* === 2. PERSISTENT BACKDROP (.stage-bg → hidden in print) === */
+.p-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+    background: radial-gradient(120% 90% at 70% 40%, #12082a 0%, #0a0614 45%, #060309 100%); }
+.p-bg .neb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; will-change: transform; }
+.p-bg .n1 { width: 55vw; height: 55vw; left: -12vw; top: -18vw; background: radial-gradient(circle, rgba(139,92,246,.45), transparent 65%); animation: p-drift1 26s ease-in-out infinite; }
+.p-bg .n2 { width: 45vw; height: 45vw; right: -10vw; bottom: -16vw; background: radial-gradient(circle, rgba(217,70,239,.32), transparent 65%); animation: p-drift2 32s ease-in-out infinite; }
+.p-bg .n3 { width: 30vw; height: 30vw; right: 18vw; top: -10vw; background: radial-gradient(circle, rgba(255,153,0,.13), transparent 65%); animation: p-drift1 38s ease-in-out infinite reverse; }
+@keyframes p-drift1 { 50% { transform: translate(6vw, 4vh) scale(1.08); } }
+@keyframes p-drift2 { 50% { transform: translate(-5vw, -6vh) scale(.94); } }
+.p-bg .grid { position: absolute; inset: -2px; opacity: .5;
+    background-image: linear-gradient(rgba(139,92,246,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,.07) 1px, transparent 1px);
+    background-size: calc(var(--u) * 4) calc(var(--u) * 4);
+    -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 20%, transparent 80%);
+            mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 20%, transparent 80%); }
+.p-bg .scan { position: absolute; left: 0; right: 0; height: 22vh; top: -22vh;
+    background: linear-gradient(180deg, transparent 0%, rgba(167,139,250,.025) 55%, rgba(232,121,249,.06) 88%, transparent 100%);
+    animation: p-scan 9s linear infinite; }
+@keyframes p-scan { to { transform: translateY(144vh); } }
+.p-bg .vig { position: absolute; inset: 0; background: radial-gradient(ellipse 90% 85% at 50% 50%, transparent 55%, rgba(0,0,0,.65) 100%); }
+.p-globe { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
+.stage-reduced .p-bg * { animation: none !important; }
+
+/* === 3. STAGE BOX + CHROME === */
+.p-box { position: absolute; left: 50%; top: 50%; width: calc(var(--u) * 100); height: calc(var(--u) * 56.25); transform: translate(-50%, -50%); }
+.p-anchor { position: absolute; pointer-events: none; }      /* globe dock target: [data-globe-anchor] */
+.p-hdr { position: absolute; top: calc(var(--u) * 2.6); left: calc(var(--u) * 4); right: calc(var(--u) * 4); z-index: 6;
+    display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+    font-size: var(--micro); letter-spacing: .2em; text-transform: uppercase; color: var(--t3); font-weight: 500;
+    text-shadow: 0 1px 8px rgba(0,0,0,.9); }
+.p-hdr b { color: rgba(255,255,255,.75); font-weight: 600; }
+.p-hdr .slide-index { font-family: var(--fd); font-weight: 700; letter-spacing: .14em; font-variant-numeric: tabular-nums; }
+.p-live { display: inline-flex; align-items: center; gap: .7em; }
+.p-live::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: p-blink 2s ease-in-out infinite; }
+.p-live.ok::before { background: var(--up); box-shadow: 0 0 8px var(--up); animation-duration: 1.4s; }
+@keyframes p-blink { 50% { opacity: .25; } }
+.p-ftr { position: absolute; bottom: calc(var(--u) * 2.2); left: calc(var(--u) * 4); z-index: 6; font-size: max(8px, calc(var(--u) * .62)); color: rgba(255,255,255,.3); letter-spacing: .04em; }
+.p-note { position: absolute; bottom: calc(var(--u) * 2.2); left: calc(var(--u) * 34); z-index: 6; font-size: max(8px, calc(var(--u) * .66)); color: rgba(255,255,255,.32); }
+.p-progress { position: fixed; right: calc(var(--u) * 4); bottom: calc(var(--u) * 2); z-index: 900; display: flex; align-items: center; gap: calc(var(--u) * 1);
+    font-family: var(--fd); font-weight: 700; font-size: var(--micro); letter-spacing: .14em; color: var(--t3); font-variant-numeric: tabular-nums; }
+.p-progress .nav-dots { position: static; transform: none; flex-direction: row; gap: 4px; }
+.p-progress .nav-dots button { display: block; width: calc(var(--u) * 2.2); height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); position: relative; overflow: hidden; transform: none; }
+.p-progress .nav-dots button::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #a78bfa, #e879f9, #ff9900); transform: scaleX(0); transform-origin: left; transition: transform .6s var(--ease); }
+.p-progress .nav-dots button.done::after { transform: scaleX(1); opacity: .45; }
+.p-progress .nav-dots button.on { transform: none; background: rgba(255,255,255,.12); }
+.p-progress .nav-dots button.on::after { transform: scaleX(1); opacity: 1; }
+@media screen and (max-height: 600px) { .p-progress .nav-dots { display: flex; } }
+
+/* === 4. TYPE === */
+.p-eyebrow { font-size: calc(var(--u) * .9); letter-spacing: .32em; text-transform: uppercase; color: var(--t2); font-weight: 600; display: flex; align-items: center; gap: .9em; }
+.p-eyebrow::before { content: ""; width: calc(var(--u) * 2.4); height: 1px; background: linear-gradient(90deg, var(--pink), transparent); }
+.p-eyebrow.c { justify-content: center; }
+.p-eyebrow.c::after { content: ""; width: calc(var(--u) * 2.4); height: 1px; background: linear-gradient(270deg, var(--pink), transparent); }
+.p-h2 { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 3.4); line-height: 1.05; letter-spacing: -.02em; margin-top: calc(var(--u) * .9); }
+:lang(zh) .p-h2, .p-h2:lang(zh) { letter-spacing: 0; line-height: 1.25; font-weight: 900; }
+.grad { background: var(--grad-accent); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.grad-warm { background: var(--grad-warm); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.p-shimmer { animation: p-shim 6s ease-in-out infinite; }
+@keyframes p-shim { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
+.p-glow { filter: drop-shadow(0 0 calc(var(--u) * 2.4) rgba(217,70,239,.38)); }
+
+/* === 5. REVEAL EXTRAS (engine rv* cover rise/blur/scale/left; these add Pulse moves) ===
+   All keyed on :is(.is-active,.is-leaving) so they replay per entry; .is-final jumps them to the end. */
+.p-wipe { clip-path: inset(-60% 100% -60% -20%); }          /* gradient text + glow: wide insets so the drop-shadow never shows a box */
+:is(.is-active, .is-leaving) .p-wipe { animation: p-wipe 1.3s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-wipe { to { clip-path: inset(-60% -20% -60% -20%); } }
+.slide.is-final .p-wipe { clip-path: none; }
+.p-fade { opacity: 0; }
+:is(.is-active, .is-leaving) .p-fade { animation: p-fade 1s ease both; animation-delay: var(--p-delay); }
+@keyframes p-fade { to { opacity: 1; } }
+.p-pop { opacity: 0; }
+:is(.is-active, .is-leaving) .p-pop { animation: p-pop .8s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: var(--p-delay); }
+@keyframes p-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.p-draw { stroke-dasharray: 1 1; stroke-dashoffset: 1; }       /* SVG path with pathLength="1" */
+:is(.is-active, .is-leaving) .p-draw { animation: p-draw 1.6s var(--ease-io) both; animation-delay: var(--p-delay); }
+@keyframes p-draw { to { stroke-dashoffset: 0; } }
+.p-grow { transform-box: fill-box; transform-origin: left center; transform: scaleX(0); }  /* bars (also SVG rect) */
+:is(.is-active, .is-leaving) .p-grow { animation: p-grow 1.4s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-grow { to { transform: none; } }
+/* final state WITHOUT .is-active (print marks every slide .is-final but only the current one is active) */
+.slide.is-final :is(.p-fade, .p-pop) { opacity: 1; }
+.slide.is-final .p-draw { stroke-dashoffset: 0; }
+.slide.is-final .p-grow { transform: none; }
+
+/* === 6. SURFACES & LABELS === */
+.p-panel { position: relative; border-radius: calc(var(--u) * 1.1); background: linear-gradient(165deg, rgba(30,15,58,.72), rgba(10,5,22,.8));
+    border: 1px solid rgba(167,139,250,.16); backdrop-filter: blur(6px); }
+.p-panel.clear { background: linear-gradient(180deg, rgba(20,10,40,.12), rgba(10,5,22,.55) 70%); backdrop-filter: none; }   /* lets the globe show through */
+.p-pill { display: inline-flex; align-items: center; gap: .8em; padding: .55em 1.1em; border-radius: 99px; border: 1px solid rgba(232,121,249,.28);
+    background: rgba(139,92,246,.10); backdrop-filter: blur(8px); font-size: calc(var(--u) * .92); letter-spacing: .26em; text-transform: uppercase; font-weight: 600; color: rgba(255,255,255,.85); }
+.p-pill :is(i, svg) { width: 1.2em; height: 1.2em; color: var(--orange); }
+.p-tag { display: inline-flex; align-items: center; padding: .28em .7em; border-radius: 99px; font-size: max(9px, calc(var(--u) * .8)); font-weight: 500;
+    color: rgba(255,255,255,.72); border: 1px solid rgba(167,139,250,.24); background: rgba(139,92,246,.08); white-space: nowrap; }
+.p-badge { display: inline-flex; align-items: center; gap: .5em; padding: .35em .9em; border-radius: 99px; font-size: calc(var(--u) * .95); font-weight: 600;
+    color: #ffb547; background: rgba(255,153,0,.10); border: 1px solid rgba(255,153,0,.32); }
+.p-badge::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: #ff9900; box-shadow: 0 0 8px #ff9900; }
+.p-tick { display: inline-flex; flex-direction: column; gap: .3em; padding: calc(var(--u) * .75) calc(var(--u) * 1.35); border-radius: calc(var(--u) * .8);
+    border: 1px solid rgba(167,139,250,.2); background: rgba(20,10,40,.58); }
+.p-tick .k { font-size: var(--micro); letter-spacing: .16em; text-transform: uppercase; color: var(--t3); font-weight: 600; display: flex; align-items: center; gap: .6em; }
+.p-tick .k.live::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: var(--up); box-shadow: 0 0 8px var(--up); animation: p-blink 1.4s infinite; }
+.p-tick .v { font-family: var(--fd); font-size: calc(var(--u) * 1.6); font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.p-tick .v small { font-size: .6em; color: var(--t2); font-weight: 600; margin-left: .3em; }
+.p-scrim { position: absolute; inset: 0; pointer-events: none; }
+.p-scrim.left  { background: linear-gradient(90deg, rgba(6,3,12,.92) 0%, rgba(6,3,12,.76) 30%, rgba(6,3,12,.25) 55%, rgba(6,3,12,0) 70%); }
+.p-scrim.right { background: linear-gradient(270deg, rgba(6,3,12,.9) 0%, rgba(6,3,12,.72) 34%, rgba(6,3,12,0) 62%); }
+.p-scrim.top   { background: linear-gradient(180deg, rgba(6,3,12,.85) 0%, rgba(6,3,12,.55) 45%, rgba(6,3,12,0) 62%); }
+.p-scrim.hdr   { inset: 0 0 auto 0; height: calc(var(--u) * 11); background: linear-gradient(180deg, rgba(6,3,12,.92), rgba(6,3,12,.7) 45%, rgba(6,3,12,0));
+    -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 72%); mask-image: linear-gradient(90deg, #000 0%, #000 40%, transparent 72%); }   /* feathered on both axes — no hard edge */
+.p-fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; pointer-events: none; }
+
+/* === 7. BEAMS — <svg class="p-beams" data-links="…"> (kit.js builds the paths) === */
+svg.p-beams { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.p-beam-base { fill: none; stroke: rgba(196,181,253,.24); stroke-width: 1.2; }
+.p-beams.bright .p-beam-base { stroke-opacity: .62; stroke-width: 1.6; }   /* gradient stroke set by kit.js — resting lines read in a still frame */
+.p-beam-glow { fill: none; stroke-width: 3; stroke-linecap: round; }
+.p-beam-core { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linecap: round; }
+.slide.is-final :is(.p-beam-glow, .p-beam-core) { opacity: 0; }
+
+/* === 8. GRAPH NODES, PORTS, HUB, SPINNING RING === */
+.p-node { position: absolute; z-index: 3; padding: calc(var(--u) * 1.5) calc(var(--u) * 1.7); border-radius: calc(var(--u) * 1.2);
+    background: linear-gradient(160deg, rgba(32,16,62,.78), rgba(12,6,26,.82)); border: 1px solid rgba(167,139,250,.16);
+    backdrop-filter: blur(6px); transition: border-color .6s, box-shadow .6s; }
+.p-node.on { border-color: rgba(232,121,249,.5); box-shadow: 0 0 0 1px rgba(232,121,249,.12), 0 0 calc(var(--u) * 3) rgba(217,70,239,.22); }
+.p-node .nt { display: flex; align-items: center; gap: .6em; font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.48); white-space: nowrap; }
+.p-node .nt :is(i, svg) { width: 1.05em; height: 1.05em; color: #e879f9; flex: none; }
+.p-node .nd { margin-top: .45em; font-size: calc(var(--u) * 1.02); line-height: 1.45; color: var(--t2); }
+.p-port { position: absolute; width: calc(var(--u) * .75); height: calc(var(--u) * .75); border-radius: 50%; background: #0b0616; border: 1.5px solid rgba(232,121,249,.65); transition: all .4s; z-index: 2; }
+.p-port.r { right: calc(var(--u) * -.375); top: 50%; margin-top: calc(var(--u) * -.375); }
+.p-port.l { left: calc(var(--u) * -.375); top: 50%; margin-top: calc(var(--u) * -.375); }
+.p-port.t { top: calc(var(--u) * -.375); left: 50%; margin-left: calc(var(--u) * -.375); }
+.p-port.b { bottom: calc(var(--u) * -.375); left: 50%; margin-left: calc(var(--u) * -.375); }
+.on > .p-port, .p-port.on { background: #fff; box-shadow: 0 0 12px #e879f9; }
+.p-ring { position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none;
+    background: conic-gradient(from var(--p-a, 0deg), rgba(167,139,250,.1), #e879f9 18%, #ff9900 26%, rgba(167,139,250,.1) 40%, rgba(167,139,250,.1) 60%, #a78bfa 80%, rgba(167,139,250,.1));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    animation: p-spin 7s linear infinite; }
+@property --p-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes p-spin { to { --p-a: 360deg; } }
+.p-hub { position: absolute; z-index: 3; border-radius: 50%; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.p-hub .glass { position: absolute; inset: 3px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, rgba(91,52,170,.55), rgba(14,7,30,.92) 70%);
+    box-shadow: 0 0 calc(var(--u) * 6) rgba(139,92,246,.35), inset 0 0 calc(var(--u) * 3) rgba(217,70,239,.18); }
+.p-hub .orbit { position: absolute; inset: calc(var(--u) * -2.2); border-radius: 50%; border: 1px dashed rgba(196,181,253,.18); animation: p-rot 40s linear infinite; }
+@keyframes p-rot { to { transform: rotate(360deg); } }
+.p-hub > :not(.p-ring, .glass, .orbit) { position: relative; }
+
+/* === 9. PIPELINE STEPS (kit.js Pulse.packet drives .on / .hit) === */
+.p-step { position: absolute; z-index: 3; width: calc(var(--u) * 18); margin-left: calc(var(--u) * -9); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.p-step .dot { position: relative; width: calc(var(--u) * 7); height: calc(var(--u) * 7); border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 35%, rgba(50,26,96,.9), rgba(12,6,26,.95)); border: 1px solid rgba(167,139,250,.22); transition: all .5s var(--ease); }
+.p-step .dot :is(i, svg) { width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); color: rgba(196,181,253,.45); transition: color .5s; }
+.p-step .dot::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid rgba(232,121,249,0); transition: all .5s; }
+.p-step .dot::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid #e879f9; opacity: 0; }
+.p-step.on .dot { border-color: rgba(232,121,249,.75); box-shadow: 0 0 calc(var(--u) * 2.6) rgba(217,70,239,.45), inset 0 0 calc(var(--u) * 1.4) rgba(217,70,239,.3); }
+.p-step.on .dot :is(i, svg) { color: #fff; }
+.p-step.on .dot::before { border-color: rgba(232,121,249,.35); }
+.p-step.hit .dot::after { animation: p-hit .9s ease-out; }
+@keyframes p-hit { from { opacity: 1; transform: scale(.9); } to { opacity: 0; transform: scale(1.9); } }
+.p-step.globe .dot { background: transparent; border-color: rgba(255,153,0,.35); }
+.p-step.globe.on .dot { border-color: rgba(255,153,0,.85); box-shadow: 0 0 calc(var(--u) * 3) rgba(255,153,0,.4); }
+.p-step .n { margin-top: calc(var(--u) * 1.8); font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * .95); letter-spacing: .2em; color: var(--t3); transition: color .5s; }
+.p-step .t { margin-top: .35em; font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.7); color: rgba(255,255,255,.4); transition: color .5s; }
+.p-step .d { margin-top: .5em; font-size: calc(var(--u) * 1.02); line-height: 1.45; color: rgba(255,255,255,.3); transition: color .5s; max-width: calc(var(--u) * 15); }
+.p-step.on .n { color: #ff9900; } .p-step.on .t { color: #fff; } .p-step.on .d { color: var(--t2); }
+
+/* === 10. STAT ROW (number · label · viz) and SPEC ROW === */
+.p-stat { display: grid; grid-template-columns: calc(var(--u) * 17) 1fr calc(var(--u) * 17); align-items: center; gap: calc(var(--u) * 1.6);
+    height: calc(var(--u) * 8.6); border-top: 1px solid var(--hair); position: relative; }
+.p-stat:last-child { border-bottom: 1px solid var(--hair); }
+.p-stat::before { content: ""; position: absolute; left: 0; top: -1px; height: 1px; width: 0; background: linear-gradient(90deg, #e879f9, transparent); }
+:is(.is-active, .is-leaving) .p-stat::before { animation: p-line 1.4s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-line { to { width: 100%; } }
+.slide.is-final .p-stat::before { width: 100%; }
+.p-stat .num { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 4.6); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.p-stat .lbl b { display: block; font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.5); }
+.p-stat .lbl span { display: inline-flex; align-items: center; gap: .35em; margin-top: .35em; font-size: calc(var(--u) * 1); color: var(--t2); }
+.p-stat .lbl span :is(i, svg) { width: 1.1em; height: 1.1em; }
+.p-stat .up { color: var(--up); } .p-stat .dn { color: var(--down); }
+.p-stat .viz { height: calc(var(--u) * 6); } .p-stat .viz svg { width: 100%; height: 100%; }
+.p-spec { display: flex; align-items: baseline; gap: calc(var(--u) * 1.4); padding-bottom: calc(var(--u) * 1.1); border-bottom: 1px solid var(--hair); }
+.p-spec .v { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 3); line-height: 1; min-width: calc(var(--u) * 5.6); letter-spacing: -.02em; }
+.p-spec .l { font-size: calc(var(--u) * 1.4); color: rgba(255,255,255,.8); }
+.p-spec .v.live { display: inline-flex; align-items: center; gap: .3em; font-size: calc(var(--u) * 1.5); align-self: center; color: var(--up); }
+.p-spec .v.live::before { content: ""; width: .6em; height: .6em; border-radius: 50%; background: var(--up); box-shadow: 0 0 10px var(--up); animation: p-blink 1.4s infinite; }
+
+/* === 11. PRODUCT REVEAL — ignition flash, shock rings, 3D chip (Pulse.chip / Pulse.ignite) === */
+.p-flash { position: absolute; left: 0; top: 0; width: 200vmax; height: 200vmax; margin: -100vmax 0 0 -100vmax; border-radius: 50%; z-index: 2; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(244,114,182,.55) 6%, rgba(139,92,246,.18) 18%, transparent 40%); }
+.p-flash.go { animation: p-flash 1.6s ease-out both; }
+@keyframes p-flash { 0% { opacity: 0; transform: scale(.05); } 12% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+.p-shock { position: absolute; left: 0; top: 0; width: calc(var(--u) * 10); height: calc(var(--u) * 10); margin: calc(var(--u) * -5) 0 0 calc(var(--u) * -5); border-radius: 50%;
+    border: 2px solid rgba(255,190,240,.9); z-index: 2; opacity: 0; pointer-events: none; }
+.p-shock.go { animation: p-shock 1.4s cubic-bezier(.1, .7, .3, 1) both; }
+.p-shock.b.go { animation-delay: .18s; border-color: rgba(255,153,0,.7); }
+@keyframes p-shock { 0% { opacity: 1; transform: scale(.1); } 100% { opacity: 0; transform: scale(9); } }
+.p-chip { position: absolute; perspective: calc(var(--u) * 120); z-index: 3; }
+.p-chip .in { position: absolute; inset: 0; opacity: 0; transform: scale(.55); }
+:is(.is-active, .is-leaving) .p-chip .in { animation: p-chipin 1.4s var(--ease) both; animation-delay: var(--p-delay); }
+@keyframes p-chipin { to { opacity: 1; transform: none; } }
+.slide.is-final .p-chip .in { opacity: 1; transform: none; }
+.p-chip .c3 { position: absolute; inset: 11%; transform-style: preserve-3d; transform: rotateX(54deg) rotateZ(-38deg); animation: p-sway 9s ease-in-out infinite; }
+@keyframes p-sway { 50% { transform: rotateX(50deg) rotateZ(-30deg); } }
+.slide.is-final .p-chip .c3 { transform: rotateX(54deg) rotateZ(-38deg); }
+.p-chip .lay { position: absolute; inset: 0; border-radius: 5%; background: #1a0d2e; border: 1px solid rgba(167,139,250,.25); }
+.p-chip .shadow { position: absolute; inset: -25%; border-radius: 50%; transform: translateZ(calc(var(--u) * -6)); background: radial-gradient(circle, rgba(217,70,239,.45), rgba(255,153,0,.12) 40%, transparent 68%); filter: blur(calc(var(--u) * 2)); }
+.p-chip svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: translateZ(calc(var(--u) * 1.4)); }
+.p-chip .lid { position: absolute; left: 37%; top: 37%; width: 26%; height: 26%; border-radius: 4%; transform: translateZ(calc(var(--u) * 2.8));
+    background: linear-gradient(135deg, rgba(255,255,255,.22), rgba(232,121,249,.12) 40%, rgba(255,153,0,.18)); border: 1px solid rgba(255,220,250,.55);
+    box-shadow: 0 0 calc(var(--u) * 4) rgba(232,121,249,.75), inset 0 0 calc(var(--u) * 2) rgba(255,153,0,.35); display: grid; place-items: center; }
+.p-chip .lid span { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 1.25); letter-spacing: .12em; color: rgba(255,255,255,.92); }
+.p-trace { fill: none; stroke: rgba(232,121,249,.55); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.p-tpulse { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: .06 1.4; stroke-dashoffset: .06; opacity: 0; }
+:is(.is-active, .is-leaving) .p-tpulse { animation: p-tp 2.6s linear infinite; animation-delay: var(--p-delay); }
+@keyframes p-tp { 0% { stroke-dashoffset: .06; opacity: 1; } 100% { stroke-dashoffset: -1; opacity: 1; } }
+.slide.is-final .p-tpulse { opacity: 0; }
+
+/* === 12. LIVE WIDGETS — alert feed rows, bouncing bars === */
+.p-feed { position: relative; overflow: hidden; }
+.p-alert { position: absolute; left: 0; right: 0; top: 0; height: calc(var(--u) * 4.1); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: calc(var(--u) * .9);
+    padding: 0 calc(var(--u) * .9); border-radius: calc(var(--u) * .6); background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.05);
+    transition: transform .6s var(--ease), opacity .6s; }
+.p-alert .sv { width: calc(var(--u) * .7); height: calc(var(--u) * .7); border-radius: 50%; }
+.p-alert.hi .sv { background: #f472b6; box-shadow: 0 0 10px #f472b6; } .p-alert.wa .sv { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; } .p-alert.inf .sv { background: #a78bfa; box-shadow: 0 0 10px #a78bfa; }
+.p-alert .tx { min-width: 0; }
+.p-alert .tx b { display: block; font-weight: 500; font-size: calc(var(--u) * .98); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-alert .tx span { display: block; font-size: calc(var(--u) * .8); color: var(--t3); margin-top: .15em; font-family: ui-monospace, Menlo, monospace; }
+.p-alert .st { font-size: calc(var(--u) * .82); padding: .25em .6em; border-radius: 99px; white-space: nowrap; }
+.p-alert.hi .st { color: #f9a8d4; background: rgba(244,114,182,.14); } .p-alert.wa .st { color: #fcd34d; background: rgba(251,191,36,.12); } .p-alert.inf .st { color: #c4b5fd; background: rgba(139,92,246,.15); }
+.p-alert.new { animation: p-alin .7s var(--ease); }
+@keyframes p-alin { from { opacity: 0; filter: brightness(2.2); } to { opacity: 1; } }
+.p-bars { display: flex; align-items: flex-end; gap: 5%; }
+.p-bars i { flex: 1; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #e879f9, #8b5cf6); height: 40%; animation: p-bar 1.6s ease-in-out infinite alternate; }
+.p-bars i:nth-child(2) { animation-delay: -.4s; animation-duration: 1.3s; } .p-bars i:nth-child(3) { animation-delay: -.9s; animation-duration: 1.9s; }
+.p-bars i:nth-child(4) { animation-delay: -.2s; animation-duration: 1.1s; background: linear-gradient(180deg, #ffb547, #e879f9); } .p-bars i:nth-child(5) { animation-delay: -1.1s; }
+@keyframes p-bar { from { height: 25%; } to { height: 95%; } }
+.slide.is-final .p-bars i { animation: none !important; } .slide.is-final .p-bars i:nth-child(1) { height: 82%; } .slide.is-final .p-bars i:nth-child(2) { height: 55%; }
+.slide.is-final .p-bars i:nth-child(3) { height: 70%; } .slide.is-final .p-bars i:nth-child(4) { height: 40%; } .slide.is-final .p-bars i:nth-child(5) { height: 92%; }
+
+/* === 13. PRINT — pages are exactly 1600×900: pin the unit instead of trusting vw/vh in Chrome's PDF pass === */
+@media print {
+    :root { --u: 16px; --micro: 11.84px; }
+    .p-box { left: 0 !important; top: 0 !important; transform: none !important; }
+    .p-progress { display: none !important; }
+    /* Chrome's PDF output paints an additive-glow <canvas> as an opaque WHITE image → effect canvases stay screen-only */
+    .p-fx { display: none !important; }
+    /* …and it can't rasterise preserve-3d → print the chip as the equivalent 2D isometric (rotateX 54° ≈ scaleY(cos 54°)) */
+    .p-chip { perspective: none !important; }
+    .p-chip .c3 { transform-style: flat !important; transform: scale(1, .59) rotate(-38deg) !important; animation: none !important; }
+    .p-chip .c3 > * { transform: none !important; }
+    .p-chip .lay:not(:last-of-type) { display: none !important; }
+    /* mask-composite isn't honoured in PDF → the conic ring would print as a solid blob */
+    .p-ring { -webkit-mask: none !important; mask: none !important; background: none !important; padding: 0 !important; border: 1.5px solid rgba(232,121,249,.55); }
+}
+
+/* === DECK CSS === */
+/* Deck: "Building the Future with Generative AI" — one-off layout only; components come from the kit.
+   All positions in --u inside .p-box (100u × 56.25u). --d counts seconds. */
+.s-announce { background: radial-gradient(ellipse 80% 70% at 30% 50%, rgba(11,0,21,.6), rgba(5,0,10,.92)); }
+
+/* 1 · cover */
+/* vertical centring via a full-height flex column, NOT top:50% + translateY(-50%) — Chrome's PDF pass fragments
+   abspos boxes by their pre-transform position and pushes the overflowing part to the page bottom */
+.cover-text { position: absolute; left: calc(var(--u) * 6); top: 0; bottom: calc(var(--u) * 1); width: calc(var(--u) * 60); z-index: 3; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+.cover-title { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 5.6); line-height: 1.02; letter-spacing: -.03em; margin-top: calc(var(--u) * 2.2); }
+.cover-title .l1 { --split-step: 100ms; }
+.cover-title .l2 { display: block; font-size: 1.22em; font-weight: 900; padding-bottom: .06em; }
+.cover-sub { margin-top: calc(var(--u) * 2); font-size: calc(var(--u) * 1.45); line-height: 1.5; color: var(--t2); max-width: calc(var(--u) * 42); }
+.cover-legend { position: absolute; right: calc(var(--u) * 5); bottom: calc(var(--u) * 5.6); display: flex; gap: calc(var(--u) * 2.4); z-index: 3;
+    font-size: var(--micro); letter-spacing: .16em; text-transform: uppercase; color: var(--t3); }
+.cover-legend > span { display: inline-flex; align-items: center; gap: .7em; }
+.cover-legend .d { width: .7em; height: .7em; border-radius: 50%; background: #f0abfc; box-shadow: 0 0 8px #e879f9; }
+.cover-legend .ln { width: 2.2em; height: 2px; background: linear-gradient(90deg, transparent, #e879f9, #ff9900); }
+.cover-legend b { color: #fff; font-weight: 600; }
+
+/* 2 · agenda — items lit by their beam (kit adds .on to .ag-node) */
+.ag-head { position: absolute; left: calc(var(--u) * 50); top: calc(var(--u) * 7.2); }
+.ag-list { position: absolute; left: calc(var(--u) * 50); top: calc(var(--u) * 16.5); width: calc(var(--u) * 46); }
+.ag-item { position: relative; height: calc(var(--u) * 8.6); display: flex; align-items: center; gap: calc(var(--u) * 2); margin-left: var(--x, 0); }
+.ag-node { position: relative; flex: none; width: calc(var(--u) * 1.3); height: calc(var(--u) * 1.3); border-radius: 50%; border: 1.5px solid rgba(167,139,250,.45); background: #0b0616; transition: all .5s var(--ease); }
+.ag-node::after { content: ""; position: absolute; inset: -70%; border-radius: 50%; border: 1px solid rgba(232,121,249,0); }
+.ag-num { font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 1.15); letter-spacing: .12em; color: var(--t3); width: calc(var(--u) * 2.8); transition: color .5s; }
+.ag-title { font-family: var(--fd); font-weight: 700; font-size: calc(var(--u) * 3); letter-spacing: -.02em; color: rgba(255,255,255,.28);
+    transition: color .6s var(--ease), transform .7s var(--ease), text-shadow .6s; transform: translateX(calc(var(--u) * -1)); }
+.ag-node.on { background: #fff; border-color: #f0abfc; box-shadow: 0 0 0 4px rgba(217,70,239,.18), 0 0 18px #e879f9; }
+.ag-node.on::after { border-color: rgba(232,121,249,.35); animation: k-ring 2.4s ease-out infinite; }
+@keyframes k-ring { from { transform: scale(.4); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
+.ag-item:has(.ag-node.on) .ag-num { color: #ff9900; }
+.ag-item:has(.ag-node.on) .ag-title { color: #fff; transform: none; text-shadow: 0 0 30px rgba(217,70,239,.35); }
+
+/* 3 · metrics */
+.m-head { position: absolute; left: calc(var(--u) * 6); top: calc(var(--u) * 6.6); }
+.m-rows { position: absolute; left: calc(var(--u) * 6); top: calc(var(--u) * 15.2); width: calc(var(--u) * 54); }
+.m-reg { position: absolute; left: calc(var(--u) * 62); top: calc(var(--u) * 36.4); width: calc(var(--u) * 32); text-align: center; }
+.m-reg .big { font-family: var(--fd); font-weight: 900; font-size: calc(var(--u) * 5.2); line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.m-reg .big small { font-size: .42em; font-weight: 700; letter-spacing: 0; margin-left: .25em; color: #fff; }
+.m-reg .p-badge { margin-top: calc(var(--u) * .8); }
+.m-band { position: absolute; left: calc(var(--u) * 6); right: calc(var(--u) * 6); top: calc(var(--u) * 46); display: flex; align-items: center; gap: calc(var(--u) * 3); }
+.insight { font-size: calc(var(--u) * 1.32); line-height: 1.45; color: var(--t2); }
+.insight b { color: #fff; font-weight: 600; }
+
+/* 4 · platform map */
+.hub { left: calc(var(--u) * 39); top: calc(var(--u) * 14.4); width: calc(var(--u) * 22); }
+.hub .k { font-size: calc(var(--u) * .85); letter-spacing: .3em; text-transform: uppercase; color: var(--t2); }
+.hub .t { font-family: var(--fd); font-weight: 800; font-size: calc(var(--u) * 1.85); line-height: 1.1; margin-top: calc(var(--u) * .6); }
+.hub .n { font-family: var(--fd); font-weight: 900; font-size: calc(var(--u) * 5.4); line-height: 1; margin-top: calc(var(--u) * .8); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.hub .m { font-size: calc(var(--u) * 1.05); color: var(--t2); margin-top: calc(var(--u) * .2); letter-spacing: .08em; }
+.s-platform .p-node { width: calc(var(--u) * 24.5); }
+.n-tl { left: calc(var(--u) * 4); top: calc(var(--u) * 9.4); } .n-bl { left: calc(var(--u) * 4); top: calc(var(--u) * 30); }
+.n-tr { left: calc(var(--u) * 71.5); top: calc(var(--u) * 9.4); } .n-br { left: calc(var(--u) * 71.5); top: calc(var(--u) * 30); }
+.p-band { position: absolute; left: 0; right: 0; top: calc(var(--u) * 45.6); display: flex; justify-content: center; z-index: 3; }
+.p-band > div { display: inline-flex; align-items: center; gap: .8em; padding: .7em 1.4em; border-radius: 99px; font-size: calc(var(--u) * 1.12); color: var(--t2);
+    border: 1px solid rgba(255,153,0,.25); background: rgba(30,14,8,.5); }
+.p-band b { color: #fff; font-weight: 600; } .p-band :is(i, svg) { width: 1.25em; height: 1.25em; color: var(--orange); }
+
+/* 5 · pipeline */
+.pp-head { position: absolute; left: calc(var(--u) * 6); top: calc(var(--u) * 6.6); }
+.s-pipe .p-step { top: calc(var(--u) * 23.5); }
+.pp-read { position: absolute; left: 0; right: 0; top: calc(var(--u) * 45.4); display: flex; justify-content: center; z-index: 3; }
+.pp-read > div { display: inline-flex; gap: 1.6em; align-items: center; padding: .65em 1.4em; border-radius: calc(var(--u) * .7); border: 1px solid rgba(167,139,250,.18);
+    background: rgba(16,8,32,.6); font-size: calc(var(--u) * 1); color: var(--t3); }
+.pp-read b { color: #fff; font-weight: 600; } .pp-read .ok { color: var(--up); }
+
+/* 6 · announcing */
+.chip-wrap { left: calc(var(--u) * 7); top: calc(var(--u) * 5.5); width: calc(var(--u) * 46); height: calc(var(--u) * 46); }
+.ann-text { position: absolute; left: calc(var(--u) * 56); top: 0; bottom: 0; width: calc(var(--u) * 40); z-index: 3; display: flex; flex-direction: column; justify-content: center; }
+.ann-k { font-size: calc(var(--u) * 1.15); letter-spacing: .55em; text-transform: uppercase; font-weight: 600; color: #ffb547; display: flex; align-items: center; gap: 1em; }
+.ann-k::after { content: ""; flex: 1; max-width: calc(var(--u) * 8); height: 1px; background: linear-gradient(90deg, #ff9900, transparent); }
+.ann-aws { margin-top: calc(var(--u) * 1.6); font-family: var(--fd); font-weight: 600; font-size: calc(var(--u) * 2.4); color: rgba(255,255,255,.75); letter-spacing: .02em; }
+.ann-name { font-family: var(--fd); font-weight: 900; font-size: calc(var(--u) * 7.4); line-height: .95; letter-spacing: -.035em; padding-bottom: .08em; }
+.specs { margin-top: calc(var(--u) * 2.6); }          /* block flow: a flex column + gap mis-fragments in Chrome's PDF pass */
+.specs > * + * { margin-top: calc(var(--u) * 1.1); }
+
+/* 7 · closing */
+.cl-quote { position: absolute; left: calc(var(--u) * 12); right: calc(var(--u) * 12); top: calc(var(--u) * 7); text-align: center; z-index: 3; }
+.cl-quote > :is(i, svg) { display: block; margin: 0 auto; width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); color: #e879f9; opacity: .8; }
+.cl-quote p { margin-top: calc(var(--u) * 1); font-family: var(--fd); font-weight: 600; font-size: calc(var(--u) * 2.7); line-height: 1.25; letter-spacing: -.01em; --split-step: 80ms; }
+.cl-quote .who { margin-top: calc(var(--u) * 1.3); font-size: calc(var(--u) * 1.1); letter-spacing: .14em; text-transform: uppercase; color: var(--t2); }
+.cl-quote .who b { color: #fff; font-weight: 600; }
+.cl-go { position: absolute; left: 0; right: 0; top: calc(var(--u) * 23.6); text-align: center; z-index: 3; }
+.cl-go h1 { display: inline-block; font-family: var(--fd); font-weight: 900; font-size: calc(var(--u) * 8.2); line-height: 1; letter-spacing: -.04em; padding: 0 .05em .08em; }
+
+</style>
+</head>
+<body>
+<div class="p-progress"><span class="slide-index"></span><nav class="nav-dots" aria-label="Slides"></nav></div>
+
+<!-- 1 · COVER — globe hero right, regions power on, ambient arcs -->
+<section class="slide s-cover" data-scene="cover" data-label="Cover" data-globe="hero-right" data-globe-opts="power:1.9"
+  data-thumb="radial-gradient(40% 70% at 66% 52%, rgba(91,52,170,.6), rgba(14,7,30,0) 70%), #07040d">
+  <div class="p-scrim left"></div>
+  <div class="p-box">
+    <div class="cover-text">
+      <div class="p-pill rv" style="--d:.15"><i data-lucide="radio-tower"></i>AWS re:Invent 2026</div>
+      <h1 class="cover-title"><span class="l1" data-split="words" style="--d:.35">Building the Future with</span>
+        <span class="l2 p-wipe p-glow" style="--d:.9"><span class="grad-warm p-shimmer">Generative AI</span></span></h1>
+      <p class="cover-sub rv" style="--d:1.35">The platform, the silicon, and the agents reinventing every application.</p>
+    </div>
+    <div class="cover-legend p-fade" style="--d:1.8">
+      <span><i class="d"></i>Regions</span><span><i class="ln"></i>Backbone traffic</span><span>Requests/s <b class="mono" id="cvTick">41,600,000</b></span>
+    </div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+<script>(window.STAGE_HOOKS = window.STAGE_HOOKS || []).push(['cover', {
+  enter(slide, ctx) {
+    if (ctx.reduced) return;
+    const tk = Pulse.ticker(slide.querySelector('#cvTick'), t => 41.6e6 + Math.sin(t * 1.7) * 6.2e5 + Math.random() * 1.8e5);
+    Pulse.loop(ctx, t => tk.tick(t));
+  },
+  final(slide) { slide.querySelector('#cvTick').textContent = '41,600,000'; }
+}]);</script>
+
+<!-- 2 · AGENDA — beams launch from the globe's limb; each item lights when its pulse lands -->
+<section class="slide s-agenda" data-scene="agenda" data-label="Agenda" data-globe="edge-left"
+  data-thumb="radial-gradient(45% 80% at 8% 50%, rgba(91,52,170,.6), rgba(14,7,30,0) 70%), #07040d">
+  <div class="p-scrim hdr"></div>
+  <div class="p-box">
+    <div class="p-hdr"><span class="p-live">AWS re:Invent 2026 · <b>Agenda</b></span><span class="slide-index"></span></div>
+    <svg class="p-beams" data-links="globe > .ag-node@l | dur=.8 every=4.4 at=1.1 stag=.18 light"></svg>
+    <div class="ag-head"><div class="p-eyebrow rv" style="--d:.1">Today's route</div><h2 class="p-h2 rv" style="--d:.2">Agenda</h2></div>
+    <div class="ag-list">
+      <div class="ag-item" style="--x:calc(var(--u)*0)"><span class="ag-node"></span><span class="ag-num">01</span><span class="ag-title edit">Platform Innovation</span></div>
+      <div class="ag-item" style="--x:calc(var(--u)*3.2)"><span class="ag-node"></span><span class="ag-num">02</span><span class="ag-title edit">Custom Silicon</span></div>
+      <div class="ag-item" style="--x:calc(var(--u)*3.2)"><span class="ag-node"></span><span class="ag-num">03</span><span class="ag-title edit">Agentic AI</span></div>
+      <div class="ag-item" style="--x:calc(var(--u)*0)"><span class="ag-node"></span><span class="ag-num">04</span><span class="ag-title edit">What's Next</span></div>
+    </div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+
+<!-- 3 · KEY METRICS — count-ups; "33 Regions" lights the globe dot by dot; live tokens/sec -->
+<section class="slide s-metrics" data-scene="metrics" data-label="Key Metrics" data-globe="side-right" data-globe-opts="lit:0"
+  data-thumb="radial-gradient(22% 40% at 78% 37%, rgba(91,52,170,.6), rgba(14,7,30,0) 70%), #07040d">
+  <div class="p-box">
+    <div class="p-hdr"><span class="p-live">AWS re:Invent 2026 · <b>Key Metrics</b></span><span class="slide-index"></span></div>
+    <div class="m-head"><div class="p-eyebrow rv" style="--d:.1">2025 in numbers</div><h2 class="p-h2 rv" style="--d:.2">Key Metrics</h2></div>
+    <div class="m-rows">
+      <div class="p-stat rv" style="--d:.35">
+        <div class="num grad"><span class="count" data-count="100" data-delay=".4">100</span>K+</div>
+        <div class="lbl"><b>Customers</b><span class="up"><i data-lucide="trending-up"></i>↑42% vs 2024</span></div>
+        <div class="viz"><svg viewBox="0 0 170 60" preserveAspectRatio="none">
+          <defs><linearGradient id="kga1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e879f9" stop-opacity=".35"/><stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient>
+          <linearGradient id="kgl1" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs>
+          <path class="p-fade" style="--d:1.1" fill="url(#kga1)" d="M0 52 C18 50 26 46 40 44 S62 40 76 34 S100 30 112 24 S140 14 170 6 L170 60 L0 60Z"/>
+          <path class="p-draw" style="--d:.55" pathLength="1" fill="none" stroke="url(#kgl1)" stroke-width="1.8" d="M0 52 C18 50 26 46 40 44 S62 40 76 34 S100 30 112 24 S140 14 170 6"/>
+        </svg></div>
+      </div>
+      <div class="p-stat rv" style="--d:.5">
+        <div class="num grad"><span class="count" data-count="6" data-delay=".6">6</span>x</div>
+        <div class="lbl"><b>Throughput</b><span>Trainium3 vs prior gen</span></div>
+        <div class="viz"><svg viewBox="0 0 170 60" preserveAspectRatio="none">
+          <defs><linearGradient id="kgb" x1="0" x2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset=".7" stop-color="#e879f9"/><stop offset="1" stop-color="#ff9900"/></linearGradient></defs>
+          <rect class="p-grow" style="--d:.8" x="0" y="12" width="28" height="12" rx="3" fill="rgba(255,255,255,.18)"/>
+          <rect class="p-grow" style="--d:1" x="0" y="34" width="170" height="12" rx="3" fill="url(#kgb)"/>
+        </svg></div>
+      </div>
+      <div class="p-stat rv" style="--d:.65">
+        <div class="num grad"><span class="count" data-count="40" data-delay=".8">40</span>%</div>
+        <div class="lbl"><b>Lower cost / token</b><span class="dn"><i data-lucide="trending-down"></i>↓ vs 2024</span></div>
+        <div class="viz"><svg viewBox="0 0 170 60" preserveAspectRatio="none">
+          <defs><linearGradient id="kga3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f472b6" stop-opacity=".28"/><stop offset="1" stop-color="#f472b6" stop-opacity="0"/></linearGradient></defs>
+          <path class="p-fade" style="--d:1.4" fill="url(#kga3)" d="M0 8 C20 9 30 14 46 16 S70 22 84 28 S110 32 124 38 S150 44 170 48 L170 60 L0 60Z"/>
+          <path class="p-draw" style="--d:.95" pathLength="1" fill="none" stroke="#f472b6" stroke-width="1.8" d="M0 8 C20 9 30 14 46 16 S70 22 84 28 S110 32 124 38 S150 44 170 48"/>
+        </svg></div>
+      </div>
+    </div>
+    <div class="m-reg">
+      <div class="big rv" style="--d:.4"><span class="grad"><span class="count" id="regCount" data-count="33" data-delay=".5" data-dur="2.4">33</span></span><small>Regions</small></div>
+      <div class="p-badge rv" style="--d:2.1">+4 new in 2025</div>
+    </div>
+    <div class="m-band rv" style="--d:1.2">
+      <div class="p-tick"><span class="k live">Live · Bedrock tokens / sec</span><span class="v mono" id="tokTick">4,820,000</span></div>
+      <p class="insight"><b>Record year:</b> generative AI workloads on Amazon Bedrock <b>more than doubled</b> across every region.</p>
+    </div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+<script>(window.STAGE_HOOKS = window.STAGE_HOOKS || []).push(['metrics', {
+  enter(slide, ctx) {
+    const reg = slide.querySelector('#regCount');
+    if (ctx.reduced) return Pulse.globe.lit(33);
+    const tk = Pulse.ticker(slide.querySelector('#tokTick'), t => 4.82e6 + Math.sin(t * 1.3) * 1.1e5 + Math.random() * 4.5e4, { every: .09 });
+    Pulse.loop(ctx, (t, tau) => { Pulse.globe.lit(parseFloat(reg.textContent) || 0); if (tau > 1.2) tk.tick(t); });
+  },
+  leave() { Pulse.globe.lit(33); },
+  final() { if (window.Pulse) Pulse.globe.lit(33); }
+}]);</script>
+
+<!-- 4 · PLATFORM MAP — hub ↔ services; pulses alternate outbound / inbound -->
+<section class="slide s-platform" data-scene="platform" data-label="Platform Map" data-globe="backdrop"
+  data-thumb="radial-gradient(28% 50% at 50% 45%, rgba(91,52,170,.45), rgba(14,7,30,0) 70%), #07040d">
+  <div class="p-box">
+    <div class="p-hdr"><span class="p-live">AWS re:Invent 2026 · <b>Platform Map</b></span><span class="slide-index"></span></div>
+    <svg class="p-beams bright" data-links="#hub@o > .p-node.l@r | dur=.85 every=3.2 at=.9 stag=.14 alt light; #hub@o > .p-node.r@l | dur=.85 every=3.2 at=.97 stag=.14 alt light; .n-tl@b > .n-bl@t | at=2.2 dur=.9 every=3.2 curve=v; .n-tr@b > .n-br@t | at=3.8 dur=.9 every=3.2 curve=v"></svg>
+    <div class="p-hub hub rv-blur" id="hub" style="--d:.15">
+      <div class="orbit"></div><div class="p-ring"></div><div class="glass"></div>
+      <span class="k">Amazon Bedrock</span>
+      <span class="t edit">One Platform,<br>Every Model</span>
+      <span class="n grad-warm"><span class="count" data-count="200" data-delay=".5" data-dur="1.8">200</span>+</span>
+      <span class="m">models</span>
+    </div>
+    <div class="p-node l n-tl rv" style="--d:.5"><div class="nt"><i data-lucide="bot"></i>Bedrock AgentCore</div><div class="nd">Managed agents with memory &amp; tool use</div><span class="p-port r"></span></div>
+    <div class="p-node l n-bl rv" style="--d:.6"><div class="nt"><i data-lucide="shield-check"></i>Guardrails</div><div class="nd">Safety &amp; PII controls</div><span class="p-port r"></span></div>
+    <div class="p-node r n-tr rv" style="--d:.55"><div class="nt"><i data-lucide="layers"></i>SageMaker Unified Studio</div><div class="nd">Data, training, MLOps</div><span class="p-port l"></span></div>
+    <div class="p-node r n-br rv" style="--d:.65"><div class="nt"><i data-lucide="cpu"></i>Trainium3</div><div class="nd">Frontier-scale training</div><span class="p-port l"></span></div>
+    <div class="p-band rv" style="--d:1.3"><div><i data-lucide="globe-2"></i><p><b>Sub-second inference at global scale</b> — 33 Regions, 600+ edge locations</p></div></div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+
+<!-- 5 · FROM IDEA TO PRODUCTION — a packet travels stage to stage and ends inside the globe -->
+<section class="slide s-pipe" data-scene="pipeline" data-label="Idea to Production" data-globe="mini"
+  data-thumb="radial-gradient(6% 11% at 90% 48%, rgba(91,52,170,.7), rgba(14,7,30,0) 70%), #07040d">
+  <div class="p-box">
+    <div class="p-anchor" data-globe-anchor style="left:calc(var(--u)*87);top:calc(var(--u)*24);width:calc(var(--u)*6);height:calc(var(--u)*6)"></div>
+    <div class="p-hdr"><span class="p-live">AWS re:Invent 2026 · <b>Build Path</b></span><span class="slide-index"></span></div>
+    <div class="pp-head"><div class="p-eyebrow rv" style="--d:.1">Five steps</div><h2 class="p-h2 rv" style="--d:.2">From Idea to <span class="grad">Production</span></h2></div>
+    <svg class="p-beams" id="ppTrack"></svg>
+    <div class="p-step rv" style="left:calc(var(--u)*10);--d:.3"><div class="dot"><i data-lucide="boxes"></i></div><div class="n">01</div><h3 class="t">Choose Model</h3><p class="d">Pick the right foundation model in Amazon Bedrock.</p></div>
+    <div class="p-step rv" style="left:calc(var(--u)*30);--d:.4"><div class="dot"><i data-lucide="sliders-horizontal"></i></div><div class="n">02</div><h3 class="t">Customize</h3><p class="d">Fine-tune and ground it with your own data.</p></div>
+    <div class="p-step rv" style="left:calc(var(--u)*50);--d:.5"><div class="dot"><i data-lucide="bot"></i></div><div class="n">03</div><h3 class="t">Build Agents</h3><p class="d">Give it memory and tools with AgentCore.</p></div>
+    <div class="p-step rv" style="left:calc(var(--u)*70);--d:.6"><div class="dot"><i data-lucide="shield-check"></i></div><div class="n">04</div><h3 class="t">Add Guardrails</h3><p class="d">Enforce safety, PII and policy controls.</p></div>
+    <div class="p-step globe rv" style="left:calc(var(--u)*90);--d:.7"><div class="dot"></div><div class="n">05</div><h3 class="t">Deploy at Scale</h3><p class="d">Serve it worldwide across 33 Regions.</p></div>
+    <div class="pp-read p-fade" style="--d:.9"><div class="mono"><span>packet <b id="ppId">#4180</b></span><span>stage <b id="ppStage">Deploy at Scale</b></span><span>latency <b id="ppLat">112 ms</b></span><span class="ok">● healthy</span></div></div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+<script>(window.STAGE_HOOKS = window.STAGE_HOOKS || []).push(['pipeline', (() => {
+  const LAT = [8, 31, 64, 83, 112];
+  let pk = null, pkt = 4180;
+  const readout = (slide, k) => {
+    slide.querySelector('#ppId').textContent = '#' + pkt;
+    slide.querySelector('#ppStage').textContent = slide.querySelectorAll('.p-step .t')[k].textContent;
+    slide.querySelector('#ppLat').textContent = (LAT[k] + Math.round(Math.random() * 6)) + ' ms';
+  };
+  return {
+    enter(slide, ctx) {
+      if (ctx.reduced) return Pulse.packet.final(slide);
+      const steps = [...slide.querySelectorAll('.p-step')];
+      pk = Pulse.packet(slide.querySelector('#ppTrack'), steps, { onStage: (k, first) => { if (k === 0 && !first) pkt++; readout(slide, k); } });
+      pk.build(); pk.reset();
+      Pulse.loop(ctx, (t, tau) => pk.tick(tau));
+    },
+    final(slide) { Pulse.packet.final(slide); }
+  };
+})()]);</script>
+
+<!-- 6 · ANNOUNCING — streams converge, the core ignites, the chip draws in -->
+<section class="slide s-announce" data-scene="announce" data-label="Announcing Trainium4" data-globe="core"
+  data-thumb="radial-gradient(30% 45% at 30% 50%, rgba(217,70,239,.35), rgba(11,0,21,0) 70%), #05000a">
+  <canvas class="p-fx" id="annFx"></canvas>
+  <div class="p-flash"></div><div class="p-shock"></div><div class="p-shock b"></div>
+  <div class="p-box">
+    <div class="p-anchor" data-globe-anchor id="coreAnchor" style="left:calc(var(--u)*28);top:calc(var(--u)*26.5);width:calc(var(--u)*4);height:calc(var(--u)*4)"></div>
+    <div class="p-hdr"><span class="p-live">AWS re:Invent 2026 · <b>Custom Silicon</b></span><span class="slide-index"></span></div>
+    <div class="p-chip chip-wrap" style="--d:1.15"><div class="in"><div class="c3">
+      <div class="shadow"></div>
+      <div class="lay" style="transform:translateZ(calc(var(--u)*-.9));background:#0d0618"></div>
+      <div class="lay" style="transform:translateZ(calc(var(--u)*-.45));background:#130a24"></div>
+      <div class="lay"></div>
+      <div class="lay" style="transform:translateZ(calc(var(--u)*.45))"></div>
+      <div class="lay" style="transform:translateZ(calc(var(--u)*.9));background:#1e1036"></div>
+      <svg data-chip="1.15"></svg>
+      <div class="lid"><span>TRN4</span></div>
+    </div></div></div>
+    <div class="ann-text">
+      <div class="ann-k p-fade" style="--d:1.35">Announcing</div>
+      <div class="ann-aws rv" style="--d:1.55">AWS</div>
+      <h2 class="ann-name p-wipe p-glow" style="--d:1.7"><span class="grad-warm p-shimmer">Trainium4</span></h2>
+      <div class="specs">
+        <div class="p-spec p-pop" style="--d:2.1"><span class="v grad">4x</span><span class="l edit">training performance</span></div>
+        <div class="p-spec p-pop" style="--d:2.25"><span class="v grad">2x</span><span class="l edit">energy efficiency</span></div>
+        <div class="p-spec p-pop" style="--d:2.4"><span class="v live">Today</span><span class="l edit">Available today in preview</span></div>
+      </div>
+    </div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+<script>(window.STAGE_HOOKS = window.STAGE_HOOKS || []).push(['announce', {
+  enter(slide, ctx) {
+    const ig = Pulse.ignite(slide.querySelector('#annFx'), { core: slide.querySelector('#coreAnchor'), at: 1.1, onIgnite: c => Pulse.flash(slide, c[0], c[1]) });
+    if (ctx.reduced) return ig.still();
+    ig.reset();
+    Pulse.loop(ctx, (t, tau) => ig.tick(t, tau));
+  },
+  final(slide, o) { if (!o.clone) Pulse.ignite(slide.querySelector('#annFx'), { core: slide.querySelector('#coreAnchor') }).still(); }
+}]);</script>
+
+<!-- 7 · CLOSING — globe rises as a horizon; every arc fires at once; "Now go build." lands -->
+<section class="slide s-close" data-scene="close" data-label="Now go build" data-globe="horizon" data-globe-opts="fire:1.45"
+  data-thumb="radial-gradient(60% 60% at 50% 100%, rgba(91,52,170,.6), rgba(14,7,30,0) 70%), #07040d">
+  <div class="p-scrim top"></div>
+  <div class="p-box">
+    <div class="cl-quote">
+      <i data-lucide="quote" class="p-fade" style="--d:.1"></i>
+      <p data-split="words" style="--d:.2">Every application will be reinvented with generative AI.</p>
+      <div class="who rv" style="--d:1.05"><b>Andy Jassy</b> · CEO, Amazon</div>
+    </div>
+    <div class="cl-go rv-blur" style="--d:1.7"><h1><span class="grad-warm p-shimmer p-glow">Now go build.</span></h1></div>
+    <div class="p-ftr">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
+  </div>
+</section>
+
+<script>
+/* === STAGE ENGINE JS (engine/stage-engine.js) === */
+/* ===========================================================
+   STAGE ENGINE — window.Stage   (inline verbatim at the END of <body>)
+   Stacked slides + per-slide hooks + transitions + overview + lightbox.
+   See engine/ENGINE.md for the authoring contract.
+   =========================================================== */
+(function () {
+'use strict';
+if (window.Stage && window.Stage.version) return;
+var D = document, body = D.body, html = D.documentElement;
+var mq = matchMedia('(prefers-reduced-motion: reduce)');
+var REDUCED = mq.matches;
+var slides = [], N = 0, cur = -1, gen = 0, booted = false, frozen = false, pending = null;
+var HOOKS = {}, changeFns = [], transitionFn = null, tctx = null, waits = [];
+var opts = { keys: true, wheel: true, touch: true, hash: true, clickToAdvance: false };
+var noop = function () {};
+var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+var easeOut = function (t) { return 1 - Math.pow(1 - t, 4); };
+function $$(sel, root) { return Array.prototype.slice.call((root || D).querySelectorAll(sel)); }
+var STATE_CLS = ['is-active', 'is-entering', 'is-leaving', 'stage-in', 'stage-out', 'stage-reset'];
+function st(s) { return s.__stage || (s.__stage = {}); }
+function typing(t) { return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); }
+function hooksOf(s) { return (s && HOOKS[s.dataset.scene]) || []; }
+function safe(fn, self, args) { try { return fn.apply(self, args); } catch (e) { console.error('[Stage]', e); } }
+function cssMs(name, el) {
+  var v = getComputedStyle(el || body).getPropertyValue(name).trim();
+  return v ? parseFloat(v) * (/ms$/.test(v) ? 1 : 1000) : 700;
+}
+
+/* === RAF LOOP — one shared loop, paused while the tab is hidden === */
+var loops = new Set(), rafId = 0, lastT = 0;
+function frame(now) {
+  rafId = 0;
+  var dt = lastT ? Math.min(0.1, (now - lastT) / 1000) : 0.016; lastT = now;
+  loops.forEach(function (l) { if (safe(l, null, [now, dt]) === false) loops.delete(l); });
+  schedule();
+}
+function schedule() { if (!rafId && loops.size && !D.hidden) rafId = requestAnimationFrame(frame); }
+function addLoop(fn) { loops.add(fn); schedule(); return function () { loops.delete(fn); }; }
+D.addEventListener('visibilitychange', function () {
+  if (D.hidden) { cancelAnimationFrame(rafId); rafId = 0; } else { lastT = 0; schedule(); }
+});
+
+/* === CTX — handed to hooks; everything it starts dies when the slide is left === */
+function makeCtx(base) {
+  var alive = true, stops = [];
+  var ctx = Object.assign({ reduced: REDUCED, frozen: frozen }, base);
+  ctx.alive = function () { return alive; };
+  // await ctx.wait(ms): resolves only if still alive (otherwise never — the async fn just stops)
+  ctx.wait = function (ms) {
+    return new Promise(function (res) {
+      if (!alive) return;
+      var t = setTimeout(function () { if (alive) res(); }, ms || 0);
+      stops.push(function () { clearTimeout(t); });
+    });
+  };
+  // ctx.raf(fn(now, dt, elapsedMs)) — return false to stop; auto-stopped on leave
+  ctx.raf = function (fn) {
+    if (!alive) return noop;
+    var t0 = -1, stop = addLoop(function (now, dt) {
+      if (!alive) return false;
+      if (t0 < 0) t0 = now;
+      return fn(now, dt, now - t0);
+    });
+    stops.push(stop); return stop;
+  };
+  // ctx.tween({from, to, dur, delay, ease, on}) → Promise (resolves at the end, only if alive)
+  ctx.tween = function (o) {
+    o = Object.assign({ from: 0, to: 1, dur: 1000, delay: 0, ease: easeOut }, o);
+    return new Promise(function (res) {
+      if (!alive) return;
+      if (REDUCED) { o.on && o.on(o.to, 1); return res(); }
+      var t0 = performance.now() + o.delay;
+      ctx.raf(function (now) {
+        if (now < t0) return;
+        var p = Math.min(1, (now - t0) / o.dur);
+        o.on && o.on(o.from + (o.to - o.from) * o.ease(p), p);
+        if (p >= 1) { res(); return false; }
+      });
+    });
+  };
+  // ctx.on(target, type, fn, opts) — listener removed on leave
+  ctx.on = function (t, type, fn, o) {
+    t.addEventListener(type, fn, o);
+    stops.push(function () { t.removeEventListener(type, fn, o); });
+  };
+  ctx.cleanup = function (fn) { if (alive) stops.push(fn); else fn(); };   // run on leave / interrupt
+  ctx._kill = function () { alive = false; stops.splice(0).forEach(function (f) { f(); }); };
+  return ctx;
+}
+
+/* === FX — count-up, text split === */
+function fmtCount(el, v) {
+  var dec = +el.dataset.decimals || 0, s = v.toFixed(dec);
+  if (el.hasAttribute('data-sep')) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  el.textContent = s;
+}
+// .count[data-count][data-decimals][data-delay(s)][data-dur(s)][data-ease="linear"] — HTML text must already be the final value
+function countUp(root, ctx) {
+  $$('.count[data-count]', root).forEach(function (el) {
+    var to = +el.dataset.count, from = +(el.dataset.from || 0);
+    if (!ctx || ctx.reduced || ctx.frozen || !ctx.alive()) return fmtCount(el, to);
+    fmtCount(el, from);
+    ctx.tween({ from: from, to: to, dur: (+el.dataset.dur || 1.6) * 1000,
+      delay: (+el.dataset.delay || 0) * 1000 + cssMs('--rv-base', el),
+      ease: el.dataset.ease === 'linear' ? function (t) { return t; } : easeOut,
+      on: function (v) { fmtCount(el, v); } });
+  });
+}
+function finalCounts(root) { $$('.count[data-count]', root).forEach(function (el) { fmtCount(el, +el.dataset.count); }); }
+
+var SPLIT = new Map();   // el → { html, label }
+function isClipText(el) {
+  var cs = getComputedStyle(el);
+  return cs.webkitBackgroundClip === 'text' || cs.backgroundClip === 'text';
+}
+/* CJK: no spaces, so cut per ideograph (words mode: Intl.Segmenter words). Closing punctuation is glued to
+   the previous piece and opening brackets to the next one, so no line starts with ，。」 or ends with 「（ */
+var CJK = /[\u2E80-\u303F\u3040-\u30FF\u3100-\u31FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]|[\uD840-\uD87F][\uDC00-\uDFFF]/;
+var OPEN = /^[「『（《〈【〔〖〘“‘［｛＜｟｢]+$/;
+var CLOSE = /^[，。、：；！？」』）》〉】〕〗〙…—–’”・ー々〜～\u3001-\u3003\uFF01-\uFF07\uFF09-\uFF0F\uFF1A\uFF1B\uFF1D-\uFF20\uFF3D-\uFF40\uFF5D-\uFF61\uFF63-\uFF65]+$/;
+var SEG = (function () { try { return new Intl.Segmenter('zh', { granularity: 'word' }); } catch (e) { return null; } })();
+function cjkUnits(w, mode) {
+  var raw = [];
+  if (mode !== 'chars' && SEG) Array.from(SEG.segment(w)).forEach(function (x) { raw.push(x.segment); });
+  else Array.from(w).forEach(function (ch) {              // per ideograph; keep Latin/digit runs together
+    var k = raw.length - 1;
+    if (k >= 0 && !CJK.test(ch) && !CJK.test(raw[k]) && !OPEN.test(ch) && !CLOSE.test(ch) && !CLOSE.test(raw[k])) raw[k] += ch;
+    else raw.push(ch);
+  });
+  var out = [], open = '';
+  raw.forEach(function (t) {
+    if (OPEN.test(t)) open += t;
+    else if (CLOSE.test(t) && out.length && !open) out[out.length - 1] += t;
+    else { out.push(open + t); open = ''; }
+  });
+  if (open) out.push(open);
+  return out;
+}
+// split(el, 'words'|'chars') — idempotent; gradient-clipped runs stay ONE piece (.sp-unit)
+function split(el, mode) {
+  if (!el || SPLIT.has(el)) return el;
+  mode = mode || el.dataset.split || 'words';
+  if (isClipText(el)) return el;                       // refuse: the clip would break
+  var rec = { html: el.innerHTML, mode: mode, label: !el.hasAttribute('aria-label') }, i = 0;
+  if (mode === 'chars' && rec.label) el.setAttribute('aria-label', el.textContent.trim().replace(/\s+/g, ' '));
+  var piece = function (cls, txt) {
+    var s = D.createElement('span'); s.className = cls; s.style.setProperty('--i', i++);
+    if (txt != null) s.textContent = txt; return s;
+  };
+  (function walk(node) {
+    Array.prototype.slice.call(node.childNodes).forEach(function (c) {
+      if (c.nodeType === 1) {
+        if (c.tagName === 'BR') return;                  // keep line breaks as real breaks
+        if (/^(SVG|IMG|I)$/i.test(c.tagName) || isClipText(c)) { var u = piece('sp sp-unit'); c.replaceWith(u); u.appendChild(c); }
+        else walk(c);
+        return;
+      }
+      if (c.nodeType !== 3 || !c.data.trim()) return;
+      var frag = D.createDocumentFragment();
+      c.data.split(/(\s+)/).forEach(function (w) {
+        if (!w) return;
+        if (/^\s+$/.test(w)) return frag.appendChild(D.createTextNode(' '));
+        (CJK.test(w) ? cjkUnits(w, mode) : [w]).forEach(function (u) {
+          // chars mode: a Latin run becomes a nowrap word of char pieces; a CJK unit is one piece (breakable)
+          if (mode !== 'chars' || (CJK.test(u) && !/[A-Za-z0-9]{2}/.test(u))) return frag.appendChild(piece('sp', u));
+          var ww = D.createElement('span'); ww.className = 'sp-w';
+          Array.from(u).forEach(function (ch) { ww.appendChild(piece('sp', ch)); });
+          frag.appendChild(ww);
+        });
+      });
+      c.replaceWith(frag);
+    });
+  })(el);
+  SPLIT.set(el, rec);
+  return el;
+}
+function unsplit(el) {
+  var rec = SPLIT.get(el); if (!rec) return el;
+  el.innerHTML = rec.html; if (rec.label) el.removeAttribute('aria-label');
+  SPLIT.delete(el); return el;
+}
+// → [{el, mode}] so callers can re-split later
+function unsplitAll() { var out = []; SPLIT.forEach(function (r, el) { out.push({ el: el, mode: r.mode }); unsplit(el); }); return out; }
+
+// final state for a slide or an overview clone: .is-final + counters + hook.final()
+function finalize(s, i) {
+  s.classList.add('is-final');
+  finalCounts(s);
+  var src = i != null ? slides[i] : s;
+  hooksOf(src).forEach(function (h) { h.final && safe(h.final, h, [s, { index: i != null ? i : slides.indexOf(s), clone: s !== src }]); });
+}
+
+/* === LIFECYCLE === */
+function enterSlide(s, i, prev, dir) {
+  var S = st(s);
+  if (S.ctx) S.ctx._kill();
+  if (S.lctx) S.lctx._kill();
+  $$('[data-split]', s).forEach(function (el) { if (!frozen) split(el); });
+  // commit the pre-reveal state with transitions off, then flip to active → reveals replay
+  s.classList.add('stage-reset');
+  s.classList.remove('is-active', 'is-leaving', 'stage-out');
+  void s.offsetWidth;
+  s.classList.remove('stage-reset');
+  s.classList.add('is-active');
+  s.classList.toggle('is-final', REDUCED || frozen);
+  var ctx = S.ctx = makeCtx({ slide: s, index: i, prev: prev, dir: dir });
+  if (frozen) return finalize(s);
+  countUp(s, ctx);
+  hooksOf(s).forEach(function (h) { h.enter && safe(h.enter, h, [s, ctx]); });
+}
+function leaveSlide(s, i, next, dir) {
+  var S = st(s);
+  if (S.ctx) { S.ctx._kill(); S.ctx = null; }
+  var lctx = S.lctx = makeCtx({ slide: s, index: i, next: next, dir: dir });
+  s.classList.remove('is-active', 'is-entering', 'stage-in');
+  s.classList.add('is-leaving');
+  hooksOf(s).forEach(function (h) { h.leave && safe(h.leave, h, [s, lctx]); });
+}
+function settleOut(s) {
+  var S = st(s);
+  if (S.lctx) { S.lctx._kill(); S.lctx = null; }
+  if (S.ctx) { S.ctx._kill(); S.ctx = null; }
+  STATE_CLS.forEach(function (c) { s.classList.remove(c); });
+  if (!REDUCED) s.classList.remove('is-final');
+}
+
+// default: cross-dissolve with depth; incoming reveals overlap the dissolve
+function defaultTransition(from, to, t) {
+  from.classList.add('stage-out'); to.classList.add('stage-in');
+  t.enter();
+  return t.wait(t.duration);
+}
+
+/* === NAVIGATION === */
+function go(n, o) {
+  o = o || {};
+  if (!booted) { pending = n; return; }
+  n = clamp(Math.round(+n) || 0, 0, N - 1);
+  if (n === cur && !o.force) return;
+  var prev = cur, from = prev >= 0 && prev !== n ? slides[prev] : null, to = slides[n];
+  var dir = n >= prev ? 'fwd' : 'back', my = ++gen;
+  if (tctx) { tctx._kill(); tctx = null; }        // interrupt a running transition
+  // settle anything a previous (interrupted) transition left behind
+  slides.forEach(function (s, k) { if (k !== n && s !== from) settleOut(s); });
+  if (from) from.classList.remove('stage-in', 'is-entering');
+  cur = n;
+  body.dataset.dir = dir;
+  if (from) leaveSlide(from, prev, n, dir);
+  chrome();
+  if (opts.hash && !o.boot) try { history.replaceState(null, '', '#' + (n + 1)); } catch (e) {}
+  if (n !== prev) changeFns.forEach(function (fn) { safe(fn, null, [n, prev, dir, to]); });
+
+  var entered = false;
+  var enter = function () {
+    if (entered || my !== gen) return;
+    entered = true; to.classList.remove('is-entering');
+    enterSlide(to, n, prev, dir);
+  };
+  var finish = function () {
+    if (my !== gen) return;
+    enter();
+    slides.forEach(function (s, k) { if (k !== n) settleOut(s); });
+    to.classList.remove('stage-in', 'is-entering');
+    body.classList.remove('stage-busy');
+  };
+  if (!from || REDUCED || frozen || o.instant) return finish();
+  body.classList.add('stage-busy');
+  to.classList.add('is-entering');
+  var t = tctx = makeCtx({ from: from, to: to, index: n, prev: prev, dir: dir, duration: cssMs('--stage-dur') });
+  t.enter = enter;
+  var p = safe(transitionFn || defaultTransition, null, [from, to, t]);
+  Promise.resolve(p).then(function () { if (t === tctx) { t._kill(); finish(); } },
+              function (e) { console.error('[Stage]', e); if (t === tctx) finish(); });
+}
+function next() { go(cur + 1); }
+function prev() { go(cur - 1); }
+
+/* === CHROME — .progress-bar · .page-number · .nav-dots · .slide-index · [data-stage-label] === */
+var dotsEl = null;
+function chrome() {
+  $$('.progress-bar').forEach(function (b) { b.style.setProperty('--stage-progress', N > 1 ? cur / (N - 1) : 1); });
+  $$('.page-number').forEach(function (p) { p.textContent = (cur + 1) + ' / ' + N; });
+  $$('.slide-index').forEach(function (el) {
+    var s = el.closest('.slide'), k = s ? slides.indexOf(s) : cur;
+    if (k >= 0) el.textContent = pad(k + 1) + ' / ' + pad(N);
+  });
+  $$('[data-stage-label]').forEach(function (el) { el.textContent = slides[cur].dataset.label || ''; });
+  if (dotsEl) $$('button', dotsEl).forEach(function (b, k) {
+    b.classList.toggle('on', k === cur); b.classList.toggle('done', k < cur);
+    b.setAttribute('aria-current', k === cur ? 'step' : 'false');
+  });
+}
+
+/* === OVERVIEW (Esc / O) — live-DOM clones in final state === */
+var ov = { isOpen: false, focus: 0, el: null, grid: null };
+function ovBuild() {
+  if (!ov.el) {
+    ov.el = D.createElement('div'); ov.el.className = 'stage-ov';
+    ov.el.setAttribute('role', 'dialog'); ov.el.setAttribute('aria-label', 'Slide overview'); ov.el.setAttribute('aria-hidden', 'true');
+    ov.el.innerHTML = '<div class="stage-ov-hint">Click a slide or press <kbd>Esc</kbd> to close</div><div class="stage-ov-grid"></div>';
+    ov.grid = ov.el.lastChild;
+    ov.el.addEventListener('click', function (e) { if (e.target === ov.el || e.target === ov.grid) ovClose(); });
+    body.appendChild(ov.el);
+  }
+  ov.grid.innerHTML = '';
+  var W = innerWidth, H = innerHeight;
+  slides.forEach(function (s, i) {
+    var card = D.createElement('button'); card.type = 'button'; card.className = 'stage-ov-card';
+    card.setAttribute('aria-label', 'Go to slide ' + (i + 1) + (s.dataset.label ? ': ' + s.dataset.label : ''));
+    if (s.dataset.thumb) card.style.background = s.dataset.thumb;
+    var thumb = D.createElement('div'); thumb.className = 'stage-ov-thumb';
+    var c = s.cloneNode(true);
+    STATE_CLS.forEach(function (k) { c.classList.remove(k); });
+    c.classList.add('is-active');
+    $$('script', c).forEach(function (x) { x.remove(); });
+    $$('[contenteditable]', c).forEach(function (x) { x.removeAttribute('contenteditable'); });
+    var cc = $$('canvas', c);
+    $$('canvas', s).forEach(function (lv, k) {
+      try {
+        var img = D.createElement('img'); img.src = lv.toDataURL('image/png');
+        img.style.cssText = 'display:block;width:' + lv.offsetWidth + 'px;height:' + lv.offsetHeight + 'px';
+        img.className = lv.className; cc[k].replaceWith(img);
+      } catch (e) { /* tainted canvas — leave blank */ }
+    });
+    ['transform', 'transform-origin', 'visibility', 'opacity', 'filter', 'left', 'top'].forEach(function (p) { c.style.removeProperty(p); });
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    c.setAttribute('aria-hidden', 'true'); c.inert = true;
+    finalize(c, i);
+    thumb.appendChild(c);
+    var num = D.createElement('span'); num.className = 'stage-ov-num';
+    num.innerHTML = (i + 1) + ' / ' + N + (s.dataset.label ? '<em></em>' : '');
+    if (s.dataset.label) num.lastChild.textContent = s.dataset.label;
+    card.appendChild(thumb); card.appendChild(num);
+    card.addEventListener('click', function () { ovJump(i); });
+    card.addEventListener('focus', function () { ov.focus = i; });
+    ov.grid.appendChild(card);
+  });
+}
+function ovScale() {
+  if (!ov.grid) return;
+  $$('.stage-ov-card', ov.grid).forEach(function (card) {
+    var c = card.firstChild.firstChild, w = parseFloat(c.style.width), h = parseFloat(c.style.height);
+    var k = Math.min(card.clientWidth / w, card.clientHeight / h);
+    c.style.transform = 'scale(' + k + ')';
+    c.style.left = (card.clientWidth - w * k) / 2 + 'px'; c.style.top = (card.clientHeight - h * k) / 2 + 'px';
+  });
+}
+function ovOpen() {
+  if (ov.isOpen || !booted) return;
+  ovBuild();
+  ov.isOpen = true; ov.focus = cur;
+  ov.el.classList.add('active'); ov.el.setAttribute('aria-hidden', 'false');
+  body.classList.add('stage-ov-open');
+  ovScale();
+  var card = ov.grid.children[cur];
+  card.classList.add('current'); card.focus({ preventScroll: true }); card.scrollIntoView({ block: 'nearest' });
+}
+function ovClose() {
+  if (!ov.isOpen) return;
+  ov.isOpen = false;
+  ov.el.classList.remove('active'); ov.el.setAttribute('aria-hidden', 'true');
+  body.classList.remove('stage-ov-open');
+  if (ov.el.contains(D.activeElement)) D.activeElement.blur();
+  setTimeout(function () { if (!ov.isOpen) ov.grid.innerHTML = ''; }, 300);   // free the clones
+}
+function ovJump(i) { ovClose(); go(i); }
+function ovCols() {
+  var cards = ov.grid.children, c = 1;
+  while (c < cards.length && cards[c].offsetTop === cards[0].offsetTop) c++;
+  return c;
+}
+function ovKey(e) {
+  var k = e.key, n = ov.focus, last = N - 1, cols = ovCols();
+  if (k === 'ArrowRight') n++; else if (k === 'ArrowLeft') n--;
+  else if (k === 'ArrowDown') n += cols; else if (k === 'ArrowUp') n -= cols;
+  else if (k === 'Home') n = 0; else if (k === 'End') n = last;
+  else if (k === 'Enter' || k === ' ') { e.preventDefault(); return ovJump(ov.focus); }
+  else if (k === 'o' || k === 'O') { e.preventDefault(); return ovClose(); }
+  else return;
+  e.preventDefault();
+  ov.focus = clamp(n, 0, last); ov.grid.children[ov.focus].focus();
+}
+
+/* === LIGHTBOX — img[data-zoom] anywhere, or any .slide img outside [data-no-zoom] === */
+var lb = { isOpen: false, el: null };
+function lbOpen(src, alt) {
+  if (!lb.el) {
+    lb.el = D.createElement('div'); lb.el.className = 'stage-lb';
+    lb.el.setAttribute('role', 'dialog'); lb.el.setAttribute('aria-label', 'Image viewer');
+    lb.el.innerHTML = '<button class="stage-lb-close" aria-label="Close">&times;</button><img alt=""><span class="stage-lb-hint">Click anywhere or press Esc to close</span>';
+    lb.el.addEventListener('click', lbClose);
+    body.appendChild(lb.el);
+  }
+  var img = lb.el.querySelector('img'); img.src = src; img.alt = alt || '';
+  lb.el.classList.add('active'); lb.isOpen = true;
+}
+function lbClose() { if (lb.el) lb.el.classList.remove('active'); lb.isOpen = false; }
+D.addEventListener('click', function (e) {
+  var img = e.target.closest && e.target.closest('img');
+  if (!img || frozen || ov.isOpen || lb.isOpen) return;
+  if (!img.hasAttribute('data-zoom') && (!img.closest('.slide') || img.closest('[data-no-zoom]'))) return;
+  e.preventDefault(); e.stopPropagation();
+  lbOpen(img.dataset.zoom || img.currentSrc || img.src, img.alt);
+}, true);
+
+/* === INPUT — keys · wheel · touch · hash · click (all no-op under overlays / editor) === */
+var NEXT = ['ArrowRight', 'ArrowDown', 'PageDown', ' '], PREV = ['ArrowLeft', 'ArrowUp', 'PageUp'];
+addEventListener('keydown', function (e) {
+  if (!booted) return;
+  var k = e.key;
+  if (k === 'Escape') {        // priority: lightbox > overview (if open) > editor > open overview
+    if (lb.isOpen) lbClose();
+    else if (ov.isOpen) ovClose();
+    else { if (frozen || typing(e.target)) return; ovOpen(); }
+    e.preventDefault(); e.stopImmediatePropagation(); return;
+  }
+  if (lb.isOpen) { e.preventDefault(); return; }
+  if (ov.isOpen) return ovKey(e);
+  if (frozen || !opts.keys || typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (k === 'o' || k === 'O') { e.preventDefault(); return ovOpen(); }
+  if (k === ' ' && e.shiftKey) { e.preventDefault(); return prev(); }
+  if (NEXT.indexOf(k) >= 0) { e.preventDefault(); next(); }
+  else if (PREV.indexOf(k) >= 0) { e.preventDefault(); prev(); }
+  else if (k === 'Home') { e.preventDefault(); go(0); }
+  else if (k === 'End') { e.preventDefault(); go(N - 1); }
+}, true);
+
+// one slide per gesture: lock after a step, and treat a continuous trackpad-inertia stream as the same gesture
+var wLock = 0, wLast = 0, wStream = false;
+function scroller(t) {          // an element inside the slide that can actually scroll keeps the wheel
+  for (; t && t.nodeType === 1 && !t.classList.contains('slide'); t = t.parentElement)
+    if (t.scrollHeight > t.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(t).overflowY)) return true;
+  return false;
+}
+addEventListener('wheel', function (e) {
+  if (!booted || ov.isOpen || lb.isOpen || frozen || !opts.wheel || e.ctrlKey || scroller(e.target)) return;
+  e.preventDefault();
+  var now = performance.now(), gap = now - wLast; wLast = now;
+  if (now < wLock) { wStream = true; return; }
+  if (wStream && gap < 160) return;
+  wStream = false;
+  var d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (e.deltaMode === 1) d *= 16;
+  if (Math.abs(d) < 6) return;
+  wLock = now + 850;
+  if (d > 0) next(); else prev();
+}, { passive: false });
+
+var tch = null;
+addEventListener('touchstart', function (e) {
+  tch = (e.touches.length === 1 && !typing(e.target)) ? [e.touches[0].clientX, e.touches[0].clientY] : null;
+}, { passive: true });
+addEventListener('touchend', function (e) {
+  if (!tch || ov.isOpen || lb.isOpen || frozen || !opts.touch) return;
+  var t = e.changedTouches[0], dx = t.clientX - tch[0], dy = t.clientY - tch[1]; tch = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 45) return;
+  if ((Math.abs(dx) > Math.abs(dy) ? dx : dy) < 0) next(); else prev();
+}, { passive: true });
+
+D.addEventListener('click', function (e) {
+  if (!opts.clickToAdvance || frozen || ov.isOpen || lb.isOpen || e.button !== 0) return;
+  if (!e.target.closest('.slide') || e.target.closest('a,button,input,textarea,select,label,img,[data-no-advance]')) return;
+  next();
+});
+
+function hashIndex() { var h = parseInt((location.hash || '').slice(1), 10); return h >= 1 && h <= N ? h - 1 : -1; }
+addEventListener('hashchange', function () { var h = hashIndex(); if (opts.hash && h >= 0 && h !== cur) go(h); });
+
+/* === REDUCED MOTION / PRINT === */
+function applyReduced() {
+  REDUCED = mq.matches; html.classList.toggle('stage-reduced', REDUCED);
+  slides.forEach(function (s, k) { if (REDUCED) s.classList.add('is-final'); else if (k !== cur || !frozen) s.classList.remove('is-final'); });
+}
+mq.addEventListener && mq.addEventListener('change', applyReduced);
+addEventListener('beforeprint', function () { unsplitAll(); slides.forEach(function (s, k) { finalize(s, k); }); });
+addEventListener('afterprint', function () { if (booted) enterSlide(slides[cur], cur, cur, 'fwd'); slides.forEach(function (s, k) { if (k !== cur) settleOut(s); }); });
+
+/* === FREEZE (editor) — current slide final, split text restored, input off === */
+function freeze() {
+  if (frozen || !booted) return;
+  frozen = true; body.classList.add('stage-frozen');
+  if (tctx) { tctx._kill(); tctx = null; }
+  go(cur, { force: true, instant: true });      // settles any transition, applies finals
+  unsplitAll();
+}
+function thaw() {
+  if (!frozen) return;
+  frozen = false; body.classList.remove('stage-frozen');
+  go(cur, { force: true, instant: true });       // replay the current slide
+}
+
+/* === HOOK REGISTRATION (also drains window.STAGE_HOOKS queue) === */
+function hook(key, h) {
+  (HOOKS[key] || (HOOKS[key] = [])).push(h);
+  var s = slides[cur];
+  if (booted && s && s.dataset.scene === key && st(s).ctx) {     // registered late: run for the live slide
+    if (frozen) h.final && safe(h.final, h, [s, { index: cur }]);
+    else h.enter && safe(h.enter, h, [s, st(s).ctx]);
+  }
+}
+var q = window.STAGE_HOOKS;
+window.STAGE_HOOKS = { push: function () { Array.prototype.forEach.call(arguments, function (a) { hook(a[0], a[1]); }); } };
+if (Array.isArray(q)) q.forEach(function (a) { hook(a[0], a[1]); });
+
+/* === BOOT === */
+function boot() {
+  slides = $$('.slide').filter(function (s) { return !s.closest('.stage-ov'); });
+  N = slides.length;
+  if (!N) return console.warn('[Stage] no .slide elements');
+  slides.forEach(function (s) {
+    for (var p = s.parentElement; p && p !== body; p = p.parentElement) p.classList.add('stage-root');
+    if (s.dataset.thumb) s.style.setProperty('--stage-thumb', s.dataset.thumb);
+  });
+  dotsEl = D.querySelector('.nav-dots');
+  if (dotsEl && !dotsEl.children.length) slides.forEach(function (s, i) {
+    var b = D.createElement('button'); b.type = 'button';
+    b.setAttribute('aria-label', 'Slide ' + (i + 1) + (s.dataset.label ? ': ' + s.dataset.label : ''));
+    b.addEventListener('click', function () { go(i); }); dotsEl.appendChild(b);
+  });
+  booted = true;
+  applyReduced();
+  var h = hashIndex();
+  go(pending != null ? pending : h >= 0 ? h : 0, { force: true, boot: true });
+}
+function start() {
+  var cap = new Promise(function (r) { setTimeout(r, 2500); });
+  Promise.race([Promise.all(waits).catch(noop), cap]).then(boot);
+}
+if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
+
+/* === PUBLIC API === */
+window.Stage = {
+  version: '1.0',
+  go: function (n, o) { go(n, o); }, next: next, prev: prev,
+  get index() { return cur; }, get count() { return N; }, get slides() { return slides.slice(); },
+  get current() { return slides[cur]; }, get reduced() { return REDUCED; }, get frozen() { return frozen; },
+  get busy() { return body.classList.contains('stage-busy'); },
+  hook: hook,
+  onChange: function (fn) { changeFns.push(fn); if (booted && cur >= 0) safe(fn, null, [cur, -1, 'fwd', slides[cur]]); },
+  setTransition: function (fn) { transitionFn = fn || null; }, dissolve: defaultTransition,
+  raf: addLoop,
+  waitFor: function (p) { waits.push(Promise.resolve(p)); },
+  freeze: freeze, thaw: thaw,
+  overview: { open: ovOpen, close: ovClose, toggle: function () { ov.isOpen ? ovClose() : ovOpen(); }, get isOpen() { return ov.isOpen; } },
+  lightbox: { open: lbOpen, close: lbClose, get isOpen() { return lb.isOpen; } },
+  fx: { countUp: countUp, split: split, unsplit: unsplit, unsplitAll: unsplitAll, finalize: finalize, easeOut: easeOut },
+  opts: opts
+};
+addEventListener('resize', function () { if (ov.isOpen) { ovBuild(); ovScale(); ov.grid.children[cur].classList.add('current'); } });
+})();
+
+</script>
+<script>
+/* === INLINE EDITOR JS (engine/inline-editor.js) === */
+/* ===========================================================
+   INLINE EDITOR + SAVE-TO-FILE  (opt-in only; inline AFTER stage-engine.js)
+   E = edit · Esc = save & exit · Ctrl/Cmd+S = write back into index.html
+   Builds its own UI. Edits text elements inside .slide:
+   h1–h4, p, li, span.edit, [data-edit]  (skip a subtree with [data-no-edit]).
+   Rules kept from html-template.md:
+   - JS hover hotzone with 400ms grace (never a CSS ~ hover chain)
+   - showOpenFilePicker (NEVER showSaveFilePicker), handle kept in IndexedDB
+   - read the file BEFORE createWritable() (it truncates), abort if < 50 chars
+     or no .slide in the picked file; DOMParser diff-and-patch only
+   - never write runtime artifacts: split spans, is-* and stage-* classes,
+     contenteditable/spellcheck, rendered Lucide SVGs
+   =========================================================== */
+(function () {
+'use strict';
+var D = document, body = D.body, Stage = window.Stage;
+if (!Stage) return console.warn('[editor] load stage-engine.js first');
+var SEL = 'h1,h2,h3,h4,p,li,span.edit,[data-edit]';
+var STORE = 'stage-edit:' + location.pathname;
+var norm = function (t) { return (t || '').replace(/\s+/g, ' ').trim(); };
+var ICON = {
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>'
+};
+
+/* === CLEAN SERIALIZATION — what gets compared / stored / written === */
+function clean(el) {
+    var c = el.cloneNode(true);
+    c.querySelectorAll('svg[data-lucide]').forEach(function (svg) {         // rendered icon → source tag
+        var i = D.createElement('i'); i.setAttribute('data-lucide', svg.getAttribute('data-lucide'));
+        var keep = (svg.getAttribute('class') || '').split(/\s+/).filter(function (k) { return k && !/^lucide/.test(k); });
+        if (keep.length) i.className = keep.join(' ');
+        svg.replaceWith(i);
+    });
+    c.querySelectorAll('*').forEach(function (n) {
+        n.removeAttribute('contenteditable'); n.removeAttribute('spellcheck');
+        if (n.classList.length) {
+            Array.prototype.slice.call(n.classList).forEach(function (k) { if (/^(is|stage)-/.test(k)) n.classList.remove(k); });
+            if (!n.classList.length) n.removeAttribute('class');
+        }
+    });
+    return c.innerHTML;
+}
+
+/* === RECORDS — indexed on the pristine DOM, before the engine boots === */
+// key s{slide}_e{element} uses the SAME indexing on the parsed file (querySelectorAll order)
+var recs = [], byKey = {};
+Array.prototype.filter.call(D.querySelectorAll('.slide'), function (s) { return !s.closest('.stage-ov'); })
+.forEach(function (s, si) {
+    s.querySelectorAll(SEL).forEach(function (el, ei) {
+        if (el.closest('[data-no-edit], .slide-index, [data-stage-label]') || (el.parentElement && el.parentElement.closest(SEL) &&
+            s.contains(el.parentElement.closest(SEL)))) return;                // top-most editable only
+        var r = { key: 's' + si + '_e' + ei, si: si, ei: ei, el: el, text: norm(el.textContent), base: clean(el) };
+        recs.push(r); byKey[r.key] = r;
+    });
+});
+var fp = (function (str) {                        // fingerprint of the file's text → ignore stale storage
+    var h = 5381; for (var i = 0; i < str.length; i++) h = (h * 33 ^ str.charCodeAt(i)) >>> 0; return h.toString(36);
+})(recs.map(function (r) { return r.text; }).join('|'));
+
+// restore localStorage edits (before the engine splits anything)
+try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved && saved.fp === fp) Object.keys(saved.edits || {}).forEach(function (k) { if (byKey[k]) byKey[k].el.innerHTML = saved.edits[k]; });
+} catch (e) {}
+
+// snapshot changed elements (clean HTML). Split text is restored first, re-split afterwards.
+function changes() {
+    var resplit = Stage.frozen ? [] : Stage.fx.unsplitAll(), out = {};
+    recs.forEach(function (r) { var h = clean(r.el); if (h !== r.base) out[r.key] = h; });
+    resplit.forEach(function (x) { Stage.fx.split(x.el, x.mode); });
+    return out;
+}
+function saveLocal() {
+    var ch = changes();
+    try {
+        if (Object.keys(ch).length) localStorage.setItem(STORE, JSON.stringify({ fp: fp, edits: ch }));
+        else localStorage.removeItem(STORE);
+    } catch (e) {}
+    return ch;
+}
+
+/* === UI === */
+function mk(tag, cls, htmlStr, parent) { var e = D.createElement(tag); e.className = cls; if (htmlStr) e.innerHTML = htmlStr; (parent || body).appendChild(e); return e; }
+var hotzone = mk('div', 'edit-hotzone');
+var toggleBtn = mk('button', 'edit-toggle', ICON.edit + '<span>Edit</span>');
+toggleBtn.title = 'Edit mode (E)'; toggleBtn.type = 'button';
+var saveBtn = mk('button', 'edit-save-file', ICON.save + '<span>Save to file</span>');
+saveBtn.title = 'Save to file (Ctrl/Cmd+S)'; saveBtn.type = 'button';
+var bar = mk('div', 'edit-bar');
+bar.innerHTML = '<button type="button" data-a="prev" aria-label="Previous slide">&larr;</button><span class="edit-pos"></span>' +
+    '<button type="button" data-a="next" aria-label="Next slide">&rarr;</button><button type="button" data-a="ov">Overview</button>' +
+    '<button type="button" data-a="done">Done</button>';
+var toast = mk('div', 'edit-toast'); toast.setAttribute('role', 'status'); toast.setAttribute('aria-live', 'polite');
+var pos = bar.querySelector('.edit-pos');
+Stage.onChange(function (i) { pos.textContent = (i + 1) + ' / ' + Stage.count; });
+bar.addEventListener('click', function (e) {
+    var a = e.target.closest('button'); a = a && a.dataset.a;
+    if (a === 'prev') Stage.prev(); else if (a === 'next') Stage.next();
+    else if (a === 'ov') Stage.overview.open(); else if (a === 'done') editor.toggle();
+});
+
+function showToast(msg, isError) {
+    toast.textContent = msg; toast.classList.toggle('error', !!isError); toast.classList.add('show');
+    clearTimeout(showToast.t); showToast.t = setTimeout(function () { toast.classList.remove('show'); }, 2600);
+}
+
+/* === EDITOR === */
+var editor = window.__editor = {
+    isActive: false,
+    editableSelector: SEL,
+    toggle: function () { editor.isActive ? editor.exit() : editor.enter(); },
+    enter: function () {
+        if (editor.isActive) return;
+        Stage.freeze();                                   // current slide final, split text restored, nav off
+        recs.forEach(function (r) { r.el.setAttribute('contenteditable', 'true'); r.el.setAttribute('spellcheck', 'false'); });
+        editor.isActive = true;
+        body.classList.add('editing-active'); toggleBtn.classList.add('active', 'show');
+        pos.textContent = (Stage.index + 1) + ' / ' + Stage.count;
+    },
+    exit: function () {
+        if (!editor.isActive) return;
+        if (D.activeElement && D.activeElement.isContentEditable) D.activeElement.blur();
+        recs.forEach(function (r) { r.el.removeAttribute('contenteditable'); r.el.removeAttribute('spellcheck'); });
+        var n = Object.keys(saveLocal()).length;
+        editor.isActive = false;
+        body.classList.remove('editing-active'); toggleBtn.classList.remove('active', 'show');
+        Stage.thaw();
+        if (n) showToast(n + ' edit' + (n > 1 ? 's' : '') + ' kept in this browser · Ctrl/Cmd+S writes the file');
+    },
+    saveToFile: saveToFile,
+    showToast: showToast
+};
+
+/* === WIRING — click, 400ms hover grace, keys === */
+toggleBtn.addEventListener('click', editor.toggle);
+hotzone.addEventListener('click', editor.toggle);
+saveBtn.addEventListener('click', saveToFile);
+var hideT = null;
+function hideLater() { clearTimeout(hideT); hideT = setTimeout(function () { if (!editor.isActive) toggleBtn.classList.remove('show'); }, 400); }
+hotzone.addEventListener('mouseenter', function () { clearTimeout(hideT); toggleBtn.classList.add('show'); });
+hotzone.addEventListener('mouseleave', hideLater);
+toggleBtn.addEventListener('mouseenter', function () { clearTimeout(hideT); });
+toggleBtn.addEventListener('mouseleave', hideLater);
+
+D.addEventListener('keydown', function (e) {
+    var t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); return saveToFile(); }
+    if (Stage.overview.isOpen || Stage.lightbox.isOpen) return;    // engine already handled Esc for overlays
+    if (e.key === 'Escape' && editor.isActive) { e.preventDefault(); return editor.exit(); }
+    if ((e.key === 'e' || e.key === 'E') && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); editor.toggle(); }
+});
+
+/* === SAVE TO FILE (File System Access API, Chromium desktop) === */
+var HANDLE_DB = 'slide-editor', HANDLE_STORE = 'handles', HANDLE_KEY = 'html:' + location.pathname;
+function openHandleDB() {
+    return new Promise(function (resolve, reject) {
+        var req = indexedDB.open(HANDLE_DB, 1);
+        req.onupgradeneeded = function () { req.result.createObjectStore(HANDLE_STORE); };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error); };
+    });
+}
+function idb(mode, fn) {
+    return openHandleDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(HANDLE_STORE, mode), req = fn(tx.objectStore(HANDLE_STORE));
+            tx.oncomplete = function () { resolve(req && req.result); };
+            tx.onerror = function () { reject(tx.error); };
+        });
+    });
+}
+var getSavedHandle = function () { return idb('readonly', function (s) { return s.get(HANDLE_KEY); }); };
+var setSavedHandle = function (h) { return idb('readwrite', function (s) { return s.put(h, HANDLE_KEY); }); };
+var clearSavedHandle = function () { return idb('readwrite', function (s) { return s.delete(HANDLE_KEY); }); };
+
+// a writable handle to the EXISTING index.html (showOpenFilePicker never truncates)
+async function ensureHandle() {
+    if (!('showOpenFilePicker' in window)) throw new Error('Browser does not support File System Access API. Use Chrome or Edge.');
+    var handle = await getSavedHandle().catch(function () { return null; });
+    if (handle) {
+        if (await handle.queryPermission({ mode: 'readwrite' }) === 'granted') return handle;
+        if (await handle.requestPermission({ mode: 'readwrite' }) === 'granted') return handle;
+        await clearSavedHandle();                               // permission revoked → re-pick
+    }
+    var picked = (await window.showOpenFilePicker({ multiple: false, types: [{ description: 'HTML', accept: { 'text/html': ['.html', '.htm'] } }] }))[0];
+    if (await picked.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Write permission denied.');
+    await setSavedHandle(picked);
+    return picked;
+}
+
+async function saveToFile() {
+    var live = changes();                                       // clean HTML of changed elements only
+    if (!Object.keys(live).length) return showToast('No changes to save');
+    var handle;
+    try { handle = await ensureHandle(); }
+    catch (e) { if (e.name !== 'AbortError') showToast(e.message, true); return; }
+    try {
+        // CRITICAL: read BEFORE createWritable() — createWritable() truncates the file.
+        var originalHtml = await (await handle.getFile()).text();
+        if (!originalHtml || originalHtml.length < 50) throw new Error('Source file is empty or too small — aborting to avoid data loss. Pick the correct index.html again.');
+        var doc = new DOMParser().parseFromString(originalHtml, 'text/html');
+        var parsed = doc.querySelectorAll('.slide');
+        if (!parsed.length) throw new Error('No .slide elements found in picked file — wrong file?');
+        var done = [], skipped = 0;
+        Object.keys(live).forEach(function (k) {
+            var r = byKey[k], ps = parsed[r.si], pel = ps && ps.querySelectorAll(SEL)[r.ei];
+            // identity check: the file's element must still hold the text we loaded
+            if (!pel || norm(pel.textContent) !== r.text) { skipped++; return; }
+            pel.innerHTML = live[k]; done.push(k);
+        });
+        if (!done.length) throw new Error('Picked file does not match this deck — nothing written.');
+        var writable = await handle.createWritable();
+        await writable.write('<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
+        await writable.close();
+        done.forEach(function (k) { var r = byKey[k]; r.base = live[k]; r.text = norm(r.el.textContent); });   // file = new baseline
+        saveLocal();                                            // keeps only edits that were skipped
+        showToast('Saved to ' + handle.name + (skipped ? ' · ' + skipped + ' element(s) skipped (file changed)' : ''), !!skipped);
+    } catch (e) {
+        console.error(e);
+        showToast('Save failed: ' + e.message, true);
+    }
+}
+})();
+
+</script>
+<script>
+/* === FLAVOR KIT JS (flavors/pulse/kit.js) === */
+/* ===========================================================
+   PULSE FLAVOR KIT — JS   (paste verbatim AFTER stage-engine.js [+ inline-editor.js])
+   window.Pulse — persistent dotted 3D globe that re-docks per slide
+   (data-globe / data-globe-opts / [data-globe-anchor]), declarative beams
+   (svg.p-beams[data-links]), and helpers hooks call: packet, emitter,
+   ignite, chip, spark, ticker, flash. See flavors/pulse/README.md.
+   =========================================================== */
+(function () {
+'use strict';
+var Stage = window.Stage;
+if (!Stage) return console.warn('[pulse] load stage-engine.js first');
+var D = document;
+var $ = function (s, r) { return (r || D).querySelector(s); };
+var $$ = function (s, r) { return Array.prototype.slice.call((r || D).querySelectorAll(s)); };
+var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
+var lerp = function (a, b, t) { return a + (b - a) * t; };
+var easeIO = function (t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+var easeOut = function (t) { return 1 - Math.pow(1 - t, 3); };
+var DPR = Math.min(2, window.devicePixelRatio || 1);
+var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+var nowS = function () { return performance.now() / 1000; };
+var SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) {
+  var e = D.createElementNS(SVGNS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+/* geometry: .p-box is a 16:9 box of 100u × 56.25u centred in the viewport.
+   Positions use offset* (layout space) so mid-transition transforms never skew them. */
+var unit = function () { return Math.min(innerWidth / 100, innerHeight / 56.25); };
+function boxOrigin(w, h) { w = w || innerWidth; h = h || innerHeight; var u = Math.min(w / 100, h / 56.25); return { u: u, x: (w - 100 * u) / 2, y: (h - 56.25 * u) / 2 }; }
+function posIn(el, box) {
+  var x = 0, y = 0, e = el;
+  while (e && e !== box) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
+  return { x: x, y: y, w: el.offsetWidth, h: el.offsetHeight, cx: x + el.offsetWidth / 2, cy: y + el.offsetHeight / 2 };
+}
+var boxOf = function (el) { return el.closest('.p-box'); };
+
+/* ================= GLOBE DATA ================= */
+// coarse continent outlines [lon,lat] → recognisable dotted Earth
+var LAND = [
+  [[-168,66],[-140,70],[-110,73],[-80,73],[-62,60],[-55,50],[-66,44],[-76,35],[-81,25],[-90,29],[-97,26],[-97,18],[-87,15],[-80,8],[-77,8],[-85,12],[-95,16],[-105,20],[-112,28],[-118,33],[-124,40],[-125,48],[-133,56],[-150,60],[-165,60]],
+  [[-55,60],[-42,60],[-20,70],[-20,80],[-60,82],[-72,77]],
+  [[-80,8],[-60,10],[-50,0],[-35,-7],[-40,-22],[-48,-28],[-58,-38],[-65,-55],[-72,-50],[-72,-30],[-70,-18],[-80,-5]],
+  [[-10,36],[-9,43],[-2,44],[-5,48],[2,51],[8,54],[10,58],[5,62],[15,69],[28,71],[40,67],[45,55],[40,45],[28,41],[22,37],[15,38],[12,44],[5,43],[-2,37]],
+  [[-6,50],[2,51],[0,54],[-3,58],[-6,57]],
+  [[-17,15],[-17,21],[-10,30],[-5,36],[10,37],[20,32],[32,31],[35,28],[43,12],[51,12],[40,-2],[40,-15],[35,-25],[20,-35],[17,-30],[12,-15],[13,-5],[9,4],[-8,5],[-15,10]],
+  [[28,41],[40,45],[45,55],[40,67],[60,70],[80,73],[105,78],[140,72],[180,68],[170,60],[160,58],[140,54],[135,43],[128,35],[122,30],[120,22],[108,20],[106,10],[100,13],[98,8],[100,3],[95,15],[90,22],[80,15],[77,8],[72,20],[67,25],[57,25],[52,27],[48,30],[56,24],[59,22],[52,16],[44,13],[36,27],[35,33],[30,36]],
+  [[114,-22],[122,-18],[130,-12],[137,-12],[142,-11],[146,-19],[153,-26],[150,-37],[140,-38],[132,-32],[116,-35],[114,-28]],
+  [[130,31],[135,34],[141,36],[142,41],[145,44],[141,45],[139,39],[132,34]],
+  [[95,5],[105,-6],[115,-8],[120,-9],[125,-8],[140,-3],[150,-6],[140,-9],[120,-5],[110,-2],[105,2]],
+  [[44,-25],[50,-15],[49,-12],[44,-17]],
+  [[166,-46],[174,-41],[178,-38],[172,-34],[168,-44]]
+];
+// 33 region-like sites; the last 4 are "new" (drawn orange)
+var REGIONS = [
+  ['iad',-77.5,39],['cmh',-83,40],['sfo',-122,37.5],['pdx',-120,45.8],['yul',-73.6,45.5],['yyc',-114,51],['gru',-46.6,-23.5],
+  ['dub',-6.3,53.3],['lhr',-.1,51.5],['cdg',2.35,48.9],['fra',8.7,50.1],['zrh',8.5,47.4],['arn',18,59.3],['mxp',9.2,45.5],['zaz',-.9,41.6],
+  ['bah',50.6,26],['auh',54.4,24.5],['tlv',34.8,32],['cpt',18.4,-33.9],['bom',72.9,19],['hyd',78.5,17.4],
+  ['sin',103.8,1.35],['syd',151.2,-33.9],['cgk',106.8,-6.2],['mel',145,-37.8],['nrt',139.7,35.7],['icn',127,37.5],['kix',135.5,34.7],['hkg',114.2,22.3],
+  ['qro',-100,20.6],['bkk',100.5,13.7],['tpe',121.5,25],['kul',101.7,3.1]
+];
+var ARCS = [['iad','dub'],['iad','gru'],['pdx','nrt'],['sfo','syd'],['dub','fra'],['fra','bom'],['fra','cpt'],['bom','sin'],['sin','syd'],
+  ['sin','nrt'],['nrt','icn'],['fra','bah'],['gru','cpt'],['iad','fra'],['hkg','sin'],['pdx','iad'],['lhr','tlv'],['qro','iad'],['kul','bkk'],['tpe','nrt']];
+function ll2v(lon, lat) { var p = lat * Math.PI / 180, l = lon * Math.PI / 180; return [Math.cos(p) * Math.sin(l), Math.sin(p), Math.cos(p) * Math.cos(l)]; }
+function inPoly(x, y, poly) {
+  var inside = false;
+  for (var i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    var xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+var DOTS = (function () {
+  var N = 16000, GA = Math.PI * (3 - Math.sqrt(5)), out = [];
+  for (var i = 0; i < N; i++) {
+    var y = 1 - (i + .5) / N * 2, rad = Math.sqrt(1 - y * y), th = i * GA, x = Math.cos(th) * rad, z = Math.sin(th) * rad;
+    var lat = Math.asin(y) * 180 / Math.PI, lon = Math.atan2(x, z) * 180 / Math.PI;
+    if (LAND.some(function (p) { return inPoly(lon, lat, p); })) out.push(x, y, z);
+  }
+  return new Float32Array(out);
+})();
+var ND = DOTS.length / 3;
+var REG = REGIONS.map(function (r, i) { return { k: r[0], i: i, v: ll2v(r[1], r[2]), isNew: i >= REGIONS.length - 4, litAt: -9, sx: 0, sy: 0, sz: -1 }; });
+var regIdx = {}; REG.forEach(function (r, i) { regIdx[r.k] = i; });
+var S_ARC = 48;
+var ARC = ARCS.map(function (ab, j) {
+  var A = REG[regIdx[ab[0]]].v, B = REG[regIdx[ab[1]]].v;
+  var dot = clamp(A[0] * B[0] + A[1] * B[1] + A[2] * B[2], -1, 1), om = Math.acos(dot), so = Math.sin(om);
+  var lift = Math.min(.34, .1 + om * .13), pts = new Float32Array(S_ARC * 3);
+  for (var s = 0; s < S_ARC; s++) {
+    var f = s / (S_ARC - 1), wa = Math.sin((1 - f) * om) / so, wb = Math.sin(f * om) / so, h = 1 + lift * Math.sin(Math.PI * f);
+    pts[s * 3] = (A[0] * wa + B[0] * wb) * h; pts[s * 3 + 1] = (A[1] * wa + B[1] * wb) * h; pts[s * 3 + 2] = (A[2] * wa + B[2] * wb) * h;
+  }
+  return { pts: pts, P: 3.6 + (j % 5) * .6, o: j * .83, Pf: 2.3 + j * .05 };
+});
+
+/* ================= GLOBE RENDERER (pure: draws state g into any 2D context) ================= */
+function sprite(stops, size) {
+  size = size || 64;
+  var c = D.createElement('canvas'); c.width = c.height = size;
+  var g = c.getContext('2d'), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  stops.forEach(function (s) { gr.addColorStop(s[0], s[1]); }); g.fillStyle = gr; g.fillRect(0, 0, size, size); return c;
+}
+var SPR_PINK = sprite([[0, 'rgba(255,240,255,1)'], [.18, 'rgba(240,171,252,.9)'], [.45, 'rgba(217,70,239,.35)'], [1, 'rgba(217,70,239,0)']]);
+var SPR_ORNG = sprite([[0, 'rgba(255,250,235,1)'], [.18, 'rgba(255,190,90,.95)'], [.45, 'rgba(255,153,0,.4)'], [1, 'rgba(255,153,0,0)']]);
+var BUCKETS = 8, BCOL = [];
+for (var bk = 0; bk < BUCKETS; bk++) { var bt = bk / (BUCKETS - 1); BCOL.push('rgba(' + Math.round(lerp(120, 248, bt)) + ',' + Math.round(lerp(86, 196, bt)) + ',' + Math.round(lerp(210, 255, bt)) + ',' + (.16 + .84 * bt).toFixed(3) + ')'); }
+var pX = new Float32Array(ND), pY = new Float32Array(ND), pB = new Int8Array(ND);
+var LV = (function () { var v = [-.5, .55, .68], m = Math.hypot(v[0], v[1], v[2]); return v.map(function (c) { return c / m; }); })();
+var ax = new Float32Array(S_ARC), ay = new Float32Array(S_ARC), av = new Uint8Array(S_ARC);
+var tmp = { x: 0, y: 0, z: 0 };
+function proj(v, cx, cy, r, R, out) {
+  var xr = v[0] * R.cY + v[2] * R.sY, zr = v[2] * R.cY - v[0] * R.sY;
+  out.x = cx + xr * r; out.y = cy - (v[1] * R.cT - zr * R.sT) * r; out.z = v[1] * R.sT + zr * R.cT; return out;
+}
+// g: {cx,cy,r,alpha,tilt,arcs,ring,reg,lit,fireAt,boost}  ·  t: seconds  ·  still: no motion (reduced/thumb)
+function drawGlobe(ctx, W, H, g, t, still) {
+  var A = g.alpha, r = g.r, cx = g.cx, cy = g.cy;
+  if (A < .01 || r < 1) { REG.forEach(function (R) { R.sz = -1; }); return; }
+  var yaw = .55 + (still ? 0 : t * .055);
+  var Rt = { cY: Math.cos(yaw), sY: Math.sin(yaw), cT: Math.cos(g.tilt), sT: Math.sin(g.tilt) };
+  ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = A;
+  var gr = ctx.createRadialGradient(cx, cy, r * .8, cx, cy, r * 1.32);
+  gr.addColorStop(0, 'rgba(139,92,246,0)'); gr.addColorStop(.42, 'rgba(167,139,250,' + (.20 + g.boost * .25) + ')');
+  gr.addColorStop(.5, 'rgba(217,70,239,' + (.12 + g.boost * .2) + ')'); gr.addColorStop(1, 'rgba(217,70,239,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, r * 1.32, 0, 7); ctx.fill();
+  if (g.ring > .01) drawRing(ctx, g, t, -1, still);
+  ctx.globalCompositeOperation = 'source-over';
+  gr = ctx.createRadialGradient(cx - r * .38, cy - r * .42, 0, cx, cy, r * 1.05);
+  gr.addColorStop(0, 'rgba(74,42,150,.62)'); gr.addColorStop(.55, 'rgba(26,12,58,.86)'); gr.addColorStop(1, 'rgba(7,3,16,.95)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.fill();
+  var ds = Math.max(.9, r * .0052), i, j;
+  for (i = 0, j = 0; i < ND; i++, j += 3) {
+    var x = DOTS[j], y = DOTS[j + 1], z = DOTS[j + 2];
+    var xr = x * Rt.cY + z * Rt.sY, zr = z * Rt.cY - x * Rt.sY, yr = y * Rt.cT - zr * Rt.sT, zz = y * Rt.sT + zr * Rt.cT;
+    var sx = cx + xr * r, sy = cy - yr * r;
+    if (sx < -ds || sx > W + ds || sy < -ds || sy > H + ds) { pB[i] = -2; continue; }
+    pX[i] = sx; pY[i] = sy;
+    if (zz < 0) { pB[i] = -1; continue; }
+    var b = Math.max(0, xr * LV[0] + yr * LV[1] + zz * LV[2]);
+    pB[i] = Math.min(BUCKETS - 1, Math.floor((.34 + .66 * b) * Math.min(1, zz * 2.6 + .25) * BUCKETS));
+  }
+  ctx.globalAlpha = A * .5; ctx.fillStyle = 'rgba(167,139,250,.16)'; ctx.beginPath();
+  for (i = 0; i < ND; i++) if (pB[i] === -1) ctx.rect(pX[i] - ds * .4, pY[i] - ds * .4, ds * .8, ds * .8);
+  ctx.fill();
+  ctx.globalAlpha = A;
+  var round = ds > 1.8;
+  for (var k = 0; k < BUCKETS; k++) {
+    ctx.fillStyle = BCOL[k]; ctx.beginPath();
+    for (i = 0; i < ND; i++) {
+      if (pB[i] !== k) continue;
+      if (round) { ctx.moveTo(pX[i] + ds * .55, pY[i]); ctx.arc(pX[i], pY[i], ds * .55, 0, 6.2832); }
+      else ctx.rect(pX[i] - ds * .5, pY[i] - ds * .5, ds, ds);
+    }
+    ctx.fill();
+  }
+  gr = ctx.createLinearGradient(cx - r * .8, cy - r * .8, cx + r * .6, cy + r * .6);
+  gr.addColorStop(0, 'rgba(240,200,255,.6)'); gr.addColorStop(.5, 'rgba(167,139,250,.12)'); gr.addColorStop(1, 'rgba(139,92,246,0)');
+  ctx.strokeStyle = gr; ctx.lineWidth = Math.max(1, r * .006); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
+  ctx.globalCompositeOperation = 'lighter';
+  if (g.arcs > .01) drawArcs(ctx, g, t, Rt, still);
+  drawRegions(ctx, g, t, Rt, still);
+  if (g.ring > .01) drawRing(ctx, g, t, 1, still);
+  ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+}
+function drawRegions(ctx, g, t, Rt, still) {
+  var cx = g.cx, cy = g.cy, r = g.r, sz = Math.max(7, r * .075) * (.6 + .4 * g.reg);
+  for (var i = 0; i < REG.length; i++) {
+    var R = REG[i];
+    proj(R.v, cx, cy, r, Rt, tmp); R.sx = tmp.x; R.sy = tmp.y; R.sz = tmp.z;     // screen pos, read by emitters
+    if (g.reg < .01) continue;
+    if (i >= g.lit) { R.litAt = -9; continue; }
+    if (R.litAt < 0) R.litAt = t;
+    if (tmp.z < -.02) continue;
+    var vis = clamp(tmp.z * 6, 0, 1) * g.alpha * g.reg, fl = still ? 0 : Math.max(0, 1 - (t - R.litAt) / .7);
+    var s = sz * (1 + fl * 2.2) * (R.isNew ? 1.25 : 1);
+    ctx.globalAlpha = vis; ctx.drawImage(R.isNew ? SPR_ORNG : SPR_PINK, tmp.x - s / 2, tmp.y - s / 2, s, s);
+    if (r > 120 && !still) {
+      var ph = ((t * .45 + i * .137) % 1);
+      ctx.globalAlpha = vis * (1 - ph) * .5; ctx.strokeStyle = R.isNew ? '#ffb547' : '#f0abfc'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(tmp.x, tmp.y, sz * (.25 + ph * .9), 0, 7); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = g.alpha;
+}
+var vtmp = [0, 0, 0];
+function drawArcs(ctx, g, t, Rt, still) {
+  var cx = g.cx, cy = g.cy, r = g.r, fire = g.fireAt, lw = Math.max(1, r * .0042);
+  for (var j = 0; j < ARC.length; j++) {
+    var a = ARC[j], P = a.pts, u, trail = 1, s;
+    if (still) { u = 2; }
+    else if (fire !== null) {
+      var tau = t - fire; if (tau < 0) continue;
+      u = ((tau / a.Pf) % 1) * 1.3 - .05;
+      if (tau < a.Pf) trail = clamp(u, 0, 1);
+    } else u = (((t + a.o) / a.P) % 1) * 1.6 - .3;
+    for (s = 0; s < S_ARC; s++) {
+      vtmp[0] = P[s * 3]; vtmp[1] = P[s * 3 + 1]; vtmp[2] = P[s * 3 + 2];
+      proj(vtmp, cx, cy, r, Rt, tmp); ax[s] = tmp.x; ay[s] = tmp.y;
+      var dx = (tmp.x - cx) / r, dy = (tmp.y - cy) / r;
+      av[s] = (tmp.z > 0 || dx * dx + dy * dy > 1) ? 1 : 0;
+    }
+    var endS = Math.floor(trail * (S_ARC - 1));
+    ctx.globalAlpha = g.alpha * g.arcs * (fire !== null || still ? .32 : .22); ctx.strokeStyle = '#d8b4fe'; ctx.lineWidth = lw * .8; ctx.beginPath();
+    for (s = 1; s <= endS; s++) if (av[s] && av[s - 1]) { ctx.moveTo(ax[s - 1], ay[s - 1]); ctx.lineTo(ax[s], ay[s]); }
+    ctx.stroke();
+    if (u < -.05 || u > 1.3) continue;
+    var head = u * (S_ARC - 1), tail = .3 * (S_ARC - 1);
+    for (s = Math.max(1, Math.floor(head - tail)); s <= Math.min(S_ARC - 1, Math.ceil(head)); s++) {
+      if (!av[s] || !av[s - 1]) continue;
+      var f = 1 - (head - s) / tail; if (f <= 0) continue;
+      ctx.globalAlpha = g.alpha * g.arcs * f * f; ctx.strokeStyle = f > .8 ? '#ffd28a' : (f > .45 ? '#f0abfc' : '#a78bfa'); ctx.lineWidth = lw * (1 + f * 1.4);
+      ctx.beginPath(); ctx.moveTo(ax[s - 1], ay[s - 1]); ctx.lineTo(ax[s], ay[s]); ctx.stroke();
+    }
+    var hi = Math.round(head);
+    if (hi >= 0 && hi < S_ARC && av[hi]) { var sp = Math.max(6, r * .06); ctx.globalAlpha = g.alpha * g.arcs; ctx.drawImage(SPR_ORNG, ax[hi] - sp / 2, ay[hi] - sp / 2, sp, sp); }
+  }
+  ctx.globalAlpha = g.alpha;
+}
+function drawRing(ctx, g, t, side, still) {
+  var cx = g.cx, cy = g.cy, R = g.r * 1.3, cR = Math.cos(1.18), sR = Math.sin(1.18), cK = Math.cos(-.32), sK = Math.sin(-.32);
+  var pt = function (a) { var x = Math.cos(a), z = Math.sin(a), y1 = -z * sR, z1 = z * cR; return [cx + (x * cK - y1 * sK) * R, cy - (x * sK + y1 * cK) * R, z1]; };
+  ctx.globalAlpha = g.alpha * g.ring * .55; ctx.strokeStyle = 'rgba(216,180,254,.6)'; ctx.lineWidth = 1; ctx.setLineDash([2, 6]); ctx.beginPath();
+  var started = false;
+  for (var i = 0; i <= 120; i++) {
+    var p = pt(i / 120 * 6.2832);
+    if (Math.sign(p[2] || 1) !== side) { started = false; continue; }
+    if (started) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); started = true;
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+  for (var k = 0; k < 2; k++) {
+    var q = pt((still ? 1 : t * .32) + k * 3.3);
+    if (Math.sign(q[2] || 1) !== side) continue;
+    var s = Math.max(10, g.r * .07) * (side > 0 ? 1 : .6);
+    ctx.globalAlpha = g.alpha * g.ring * (side > 0 ? 1 : .4); ctx.drawImage(k ? SPR_PINK : SPR_ORNG, q[0] - s / 2, q[1] - s / 2, s, s);
+  }
+  ctx.globalAlpha = g.alpha;
+}
+
+/* ================= DOCKING — data-globe="preset" · data-globe-opts="k:v; …" · [data-globe-anchor] ================= */
+// x, y, r in u (the .p-box is 100u × 56.25u); alpha/tilt/arcs/ring/reg are 0..1-ish
+var PRESETS = {
+  'hero-right': { x: 66, y: 28.6, r: 25,  alpha: 1,   tilt: .42, arcs: 1,   ring: 1,  reg: 1 },
+  'hero-left':  { x: 27, y: 31,   r: 22,  alpha: 1,   tilt: .38, arcs: .8,  ring: 0,  reg: 1 },
+  'edge-left':  { x: 9,  y: 28,   r: 32,  alpha: .85, tilt: .30, arcs: .6,  ring: 0,  reg: .8 },
+  'edge-right': { x: 91, y: 28,   r: 32,  alpha: .85, tilt: .30, arcs: .6,  ring: 0,  reg: .8 },
+  'side-right': { x: 78, y: 20.8, r: 14.5, alpha: 1,  tilt: .38, arcs: .45, ring: .6, reg: 1 },
+  'side-left':  { x: 22, y: 24,   r: 14.5, alpha: 1,  tilt: .38, arcs: .45, ring: .6, reg: 1 },
+  'backdrop':   { x: 50, y: 25.4, r: 21,  alpha: .42, tilt: .34, arcs: .7,  ring: 0,  reg: .6 },
+  'horizon':    { x: 50, y: 78.5, r: 45,  alpha: 1,   tilt: .12, arcs: 1,   ring: 0,  reg: 1 },
+  'center':     { x: 50, y: 20.4, r: 15,  alpha: 1,   tilt: .34, arcs: 1,   ring: 1,  reg: 1 },
+  'mini':       { x: 50, y: 28,   r: 3,   alpha: 1,   tilt: .36, arcs: 0,   ring: 0,  reg: .7 },
+  'core':       { x: 50, y: 28,   r: .6,  alpha: 0,   tilt: .36, arcs: 0,   ring: 0,  reg: 0 },
+  'hidden':     {                         alpha: 0,              arcs: 0,   ring: 0,  reg: 0 }
+};
+var VIS = ['alpha', 'tilt', 'arcs', 'ring', 'reg'], KEYS = ['cx', 'cy', 'r'].concat(VIS);
+function parseOpts(s) {
+  var o = {};
+  (s || '').split(/[;,]/).forEach(function (kv) {
+    var m = kv.split(':'); if (m.length < 2) return;
+    var k = m[0].trim(), v = m[1].trim(); if (k) o[k] = isNaN(+v) ? v : +v;
+  });
+  return o;
+}
+// resolve a slide's dock for a W×H viewport → {cx,cy,r (px), alpha…, lit, power, fire, keepGeo}
+function dockOf(slide, W, H) {
+  var name = slide.dataset.globe || 'hidden', P = PRESETS[name] || PRESETS.hidden, o = parseOpts(slide.dataset.globeOpts);
+  var org = boxOrigin(W, H), u = org.u, g = {}, uu = null;
+  var an = $('[data-globe-anchor]', slide), box = an && boxOf(an);
+  if (o.x != null || o.y != null || o.r != null) uu = { x: o.x != null ? o.x : P.x || 50, y: o.y != null ? o.y : P.y || 28, r: o.r != null ? o.r : P.r || 15 };
+  else if (an && box && box.offsetWidth) { var cu = box.offsetWidth / 100, p = posIn(an, box); uu = { x: p.cx / cu, y: p.cy / cu, r: p.w / 2 / cu }; }
+  else if (P.x != null) uu = { x: P.x, y: P.y, r: P.r };
+  if (uu) { g.cx = org.x + uu.x * u; g.cy = org.y + uu.y * u; g.r = uu.r * u; } else g.keepGeo = true;
+  VIS.forEach(function (k) { g[k] = o[k] != null ? o[k] : (P[k] != null ? P[k] : (k === 'tilt' ? .36 : 0)); });
+  g.lit = o.lit != null ? o.lit : 33; g.power = o.power || 0; g.fire = o.fire != null ? o.fire : null;
+  return g;
+}
+
+/* ================= LIVE GLOBE — re-docks on Stage.onChange, one shared loop ================= */
+var cv = null, cx2 = null, W = 0, H = 0;
+var G = { cx: 0, cy: 0, r: 0, alpha: 0, tilt: .4, arcs: 0, ring: 0, reg: 0, lit: 33, fireAt: null, boost: 0 };
+var GT = { from: null, to: null, t0: 0, dur: 0 }, litPow = null, dirty = true;
+var cur = { slide: null, t0: 0 };
+function resizeCanvas(c, w, h) { c.width = Math.round(w * DPR); c.height = Math.round(h * DPR); }
+function dock(slide, instant) {
+  var to = dockOf(slide, innerWidth, innerHeight), t = nowS();
+  if (to.keepGeo) { to.cx = G.cx; to.cy = G.cy; to.r = G.r * 1.12; }
+  GT.from = {}; KEYS.forEach(function (k) { GT.from[k] = G[k]; });
+  GT.to = to; GT.t0 = t; GT.dur = (instant || Stage.reduced) ? 0 : 1.7;
+  G.fb = false;
+  G.fireAt = to.fire != null && !Stage.reduced ? t + to.fire : (to.fire != null ? 0 : null);
+  if (to.power && !Stage.reduced) { litPow = { t0: t + .4, dur: to.power, to: to.lit }; G.lit = 0; } else { litPow = null; G.lit = to.lit; }
+  dirty = true;
+}
+function frame(now, dt) {
+  var t = now / 1000;
+  if (GT.to) { var k = GT.dur ? easeIO(clamp((t - GT.t0) / GT.dur, 0, 1)) : 1; KEYS.forEach(function (key) { G[key] = lerp(GT.from[key], GT.to[key], k); }); if (k < 1) dirty = true; }
+  if (litPow) { G.lit = litPow.to * clamp((t - litPow.t0) / litPow.dur, 0, 1); if (G.lit >= litPow.to) litPow = null; }
+  if (G.fireAt !== null && G.fireAt > 0 && !G.fb && t >= G.fireAt) { G.fb = true; G.boost = 1.3; }   // every arc fires → atmosphere flares
+  if (G.boost > 0) { G.boost = Math.max(0, G.boost - dt * 1.1); dirty = true; }
+  if (cur.slide && !Stage.reduced) runLinks(cur.slide, t - cur.t0);
+  if (Stage.reduced && !dirty) return;
+  dirty = false;
+  cx2.setTransform(DPR, 0, 0, DPR, 0, 0); cx2.clearRect(0, 0, W, H);
+  drawGlobe(cx2, W, H, G, t, Stage.reduced);
+}
+
+/* ================= THUMBNAILS / PRINT — paint each slide's dock into its data-thumb ================= */
+function renderThumbs() {
+  var TW = 960, TH = 540, c = D.createElement('canvas'); c.width = TW; c.height = TH;
+  var x = c.getContext('2d');
+  Stage.slides.forEach(function (s) {
+    if (s.hasAttribute('data-thumb-keep')) return;
+    x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
+    var bg = x.createRadialGradient(TW * .7, TH * .4, 0, TW * .7, TH * .4, TW * .8);
+    bg.addColorStop(0, '#12082a'); bg.addColorStop(.45, '#0a0614'); bg.addColorStop(1, '#060309');
+    x.fillStyle = bg; x.fillRect(0, 0, TW, TH);
+    [[.1, .05, .5, 'rgba(139,92,246,.30)'], [.92, .95, .45, 'rgba(217,70,239,.20)']].forEach(function (n) {
+      var gg = x.createRadialGradient(TW * n[0], TH * n[1], 0, TW * n[0], TH * n[1], TW * n[2]);
+      gg.addColorStop(0, n[3]); gg.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gg; x.fillRect(0, 0, TW, TH);
+    });
+    var g = dockOf(s, TW, TH);
+    if (!g.keepGeo && g.alpha > .01) { g.fireAt = null; g.boost = 0; drawGlobe(x, TW, TH, g, 0, true); }
+    var url = 'url(' + c.toDataURL('image/jpeg', .82) + ') center / cover no-repeat, #07040d';
+    s.dataset.thumb = url; s.style.setProperty('--stage-thumb', url);
+  });
+  dirty = true;
+}
+
+/* ================= BEAMS — svg.p-beams[data-links="from > to | opts; …"] ================= */
+var gid = 0;
+function beamDefs(svg) {
+  var id = 'pb' + (++gid), w = svg.parentNode.offsetWidth || 1000, h = svg.parentNode.offsetHeight || 600, d = svgEl('defs', {}, svg);
+  var lg = svgEl('linearGradient', { id: id + 'g', gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: w, y2: 0 }, d);
+  [['0', '#a78bfa'], ['.5', '#e879f9'], ['1', '#ff9900']].forEach(function (s) { svgEl('stop', { offset: s[0], 'stop-color': s[1] }, lg); });
+  // userSpace filter region: a straight horizontal path has a zero-height bbox, which kills a bbox-relative blur
+  var f = svgEl('filter', { id: id + 'f', filterUnits: 'userSpaceOnUse', x: -60, y: -60, width: w + 120, height: h + 120 }, d);
+  svgEl('feGaussianBlur', { stdDeviation: 2.4 }, f);
+  svg.__pid = id; return id;
+}
+function addBeam(svg, d, n) {
+  var id = svg.__pid || beamDefs(svg), g = svgEl('g', {}, svg), c = [];
+  var base = svgEl('path', { class: 'p-beam-base', d: d }, g);
+  if (svg.classList.contains('bright')) base.setAttribute('stroke', 'url(#' + id + 'g)');
+  for (var k = 0; k < (n || 1); k++) c.push({
+    glow: svgEl('path', { class: 'p-beam-glow', d: d, pathLength: 100, 'stroke-dasharray': '18 400', stroke: 'url(#' + id + 'g)', filter: 'url(#' + id + 'f)', opacity: 0 }, g),
+    core: svgEl('path', { class: 'p-beam-core', d: d, pathLength: 100, 'stroke-dasharray': '6 400', opacity: 0 }, g), vis: false });
+  return { base: base, c: c };
+}
+// one comet: p 0→1 head travel (to 1.18 so the tail clears), rev = flow end→start
+function setBeam(b, p, rev) {
+  var on = p >= 0 && p <= 1.18;
+  if (on !== b.vis) { b.glow.setAttribute('opacity', on ? 1 : 0); b.core.setAttribute('opacity', on ? 1 : 0); b.vis = on; }
+  if (!on) return;
+  if (rev) { var hr = (1 - p) * 100; b.glow.setAttribute('stroke-dashoffset', -hr); b.core.setAttribute('stroke-dashoffset', -hr); return; }
+  var h = p * 100; b.glow.setAttribute('stroke-dashoffset', 18 - h); b.core.setAttribute('stroke-dashoffset', 6 - h);
+}
+var f1 = function (v) { return v.toFixed(1); };
+function curve(a, b, kind) {
+  var dx = b[0] - a[0], dy = b[1] - a[1];
+  if (kind === 's') return 'M' + f1(a[0]) + ' ' + f1(a[1]) + ' L' + f1(b[0]) + ' ' + f1(b[1]);
+  if (!kind || kind === 'auto') kind = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+  var c1, c2;
+  if (kind === 'v') { c1 = [a[0], a[1] + dy * .5]; c2 = [b[0], b[1] - dy * .5]; }
+  else if (kind === 'radial' && a[2]) { var L = Math.hypot(dx, dy); c1 = [a[0] + a[2][0] * L * .5, a[1] + a[2][1] * L * .5]; c2 = [b[0] - L * .45 * Math.sign(dx || 1), b[1]]; }
+  else { var m = Math.max(20, Math.abs(dx) * .5) * Math.sign(dx || 1); c1 = [a[0] + m, a[1]]; c2 = [b[0] - m, b[1]]; }
+  return 'M' + f1(a[0]) + ' ' + f1(a[1]) + ' C' + f1(c1[0]) + ' ' + f1(c1[1]) + ' ' + f1(c2[0]) + ' ' + f1(c2[1]) + ' ' + f1(b[0]) + ' ' + f1(b[1]);
+}
+// "sel@side" → [{el, pt}] in .p-box coords. side r|l|t|b|c; a child .p-port.<side> wins over the box edge
+function ends(spec, slide, box, other) {
+  var m = spec.trim().split('@'), sel = m[0].trim(), side = (m[1] || '').trim();
+  if (sel === 'globe') return [{ el: null, globe: true }];
+  // @o = a point on the element's circular outline, facing the other end (round hubs)
+  return $$(sel, slide).map(function (el) {
+    var port = side && $(':scope > .p-port.' + side, el), p = posIn(port || el, box), pt;
+    if (side === 'o') return { el: el, pt: [p.cx, p.cy], ring: Math.max(p.w, p.h) / 2 + 6 };
+    if (port || side === 'c' || !side) pt = [p.cx, p.cy];
+    else pt = side === 'r' ? [p.x + p.w, p.cy] : side === 'l' ? [p.x, p.cy] : side === 't' ? [p.cx, p.y] : [p.cx, p.y + p.h];
+    return { el: el, pt: pt };
+  });
+}
+function globePt(slide, box, toward) {      // limb point of the slide's dock, facing `toward`, in box coords
+  var g = dockOf(slide, innerWidth, innerHeight), o = boxOrigin(), cu = box.offsetWidth / 100, k = cu / o.u;
+  var c = [(g.cx - o.x) * k, (g.cy - o.y) * k], r = g.r * k, dx = toward[0] - c[0], dy = toward[1] - c[1], L = Math.hypot(dx, dy) || 1;
+  return [c[0] + dx / L * r * 1.005, c[1] + dy / L * r * 1.005, [dx / L, dy / L]];
+}
+var LINKS = [];   // {slide, svg, at, dur, every, alt, light, beam, fired}
+function buildLinks(slide) {
+  LINKS = LINKS.filter(function (L) { return L.slide !== slide; });
+  $$('svg.p-beams[data-links]', slide).forEach(function (svg) {
+    var box = boxOf(svg); if (!box || !box.offsetWidth) return;
+    svg.innerHTML = ''; svg.__pid = null; beamDefs(svg);
+    var idx = 0;
+    svg.dataset.links.split(';').forEach(function (entry) {
+      if (!entry.trim()) return;
+      var parts = entry.split('|'), ft = parts[0].split('>'), o = { n: 1, dur: .9, every: 3.2, at: .6, stag: .15 }, flags = {};
+      (parts[1] || '').trim().split(/\s+/).forEach(function (tk) { if (!tk) return; var kv = tk.split('='); if (kv.length > 1) o[kv[0]] = isNaN(+kv[1]) ? kv[1] : +kv[1]; else flags[kv[0]] = true; });
+      var A = ends(ft[0], slide, box), B = ends(ft[1] || '', slide, box), pairs = [];
+      if (A.length === B.length) A.forEach(function (a, i) { pairs.push([a, B[i]]); });
+      else if (A.length === 1) B.forEach(function (b) { pairs.push([A[0], b]); });
+      else if (B.length === 1) A.forEach(function (a) { pairs.push([a, B[0]]); });
+      else A.forEach(function (a) { B.forEach(function (b) { pairs.push([a, b]); }); });
+      pairs.forEach(function (pr) {
+        var a = pr[0], b = pr[1], kind = o.curve;
+        if (a.globe) { a = { pt: globePt(slide, box, b.pt) }; kind = kind || 'radial'; }
+        if (b.globe) { b = { pt: globePt(slide, box, a.pt) }; }
+        var rim = function (q, other) { var dx = other[0] - q.pt[0], dy = other[1] - q.pt[1], L = Math.hypot(dx, dy) || 1; return { pt: [q.pt[0] + dx / L * q.ring, q.pt[1] + dy / L * q.ring, [dx / L, dy / L]] }; };
+        if (a.ring) { a = rim(a, b.pt); kind = kind || 'radial'; }
+        if (b.ring) b = rim(b, a.pt);
+        LINKS.push({ slide: slide, at: o.at + (idx++) * o.stag, dur: o.dur, every: o.every, n: o.n, alt: !!flags.alt,
+          light: flags.light ? pr[1].el : null, beam: addBeam(svg, curve(a.pt, b.pt, kind), o.n), fired: false });
+      });
+    });
+  });
+}
+function runLinks(slide, tau) {
+  for (var i = 0; i < LINKS.length; i++) {
+    var L = LINKS[i]; if (L.slide !== slide) continue;
+    for (var k = 0; k < L.n; k++) {
+      var x = tau - L.at - k * L.every / L.n;
+      if (x < 0) { setBeam(L.beam.c[k], -1); continue; }
+      var cyc = Math.floor(x / L.every);
+      setBeam(L.beam.c[k], (x - cyc * L.every) / L.dur, L.alt && cyc % 2 === 1);
+    }
+    if (L.light && !L.fired && tau >= L.at + L.dur * .96) { L.fired = true; L.light.classList.add('on'); }
+  }
+}
+function resetLinks(slide) {
+  LINKS.forEach(function (L) { if (L.slide !== slide) return; L.fired = false; if (L.light) L.light.classList.remove('on'); L.beam.c.forEach(function (c) { setBeam(c, -1); }); });
+}
+// final state inside ANY root (live slide or overview clone): light targets on
+function finalLinks(root) {
+  $$('svg.p-beams[data-links]', root).forEach(function (svg) {
+    svg.dataset.links.split(';').forEach(function (entry) {
+      var parts = entry.split('|'); if (!/\blight\b/.test(parts[1] || '')) return;
+      var to = (parts[0].split('>')[1] || '').split('@')[0].trim();
+      if (to && to !== 'globe') $$(to, root).forEach(function (el) { el.classList.add('on'); });
+    });
+  });
+}
+
+/* ================= COMPONENT HELPERS (called from deck hooks) ================= */
+// Pulse.loop(ctx, fn(t, tau)) — per-slide loop in seconds (t = absolute, tau = since entry)
+function loop(ctx, fn) { return ctx.raf(function (now, dt, ms) { return fn(now / 1000, ms / 1000, dt); }); }
+
+// Pulse.packet(svg, steps, opts) — a packet travels stop-and-go across .p-step elements, lighting each
+function packet(svg, steps, o) {
+  o = Object.assign({ start: .7, seg: .42, loop: 3.6, hold: .8, onStage: null, onArrive: null }, o);
+  var P = { x0: 0, x1: 1, y: 0, fr: [], el: {} }, maxP = 0, lastK = -1, arrived = false, n = steps.length;
+  function build() {
+    var box = boxOf(svg); svg.innerHTML = ''; svg.__pid = null; var id = beamDefs(svg);
+    var c = steps.map(function (s) { return posIn($('.dot', s), box); }), L = c[n - 1];
+    P.x0 = c[0].cx; P.x1 = steps[n - 1].classList.contains('globe') ? L.cx - L.w * .42 : L.cx; P.y = c[0].cy;
+    P.fr = c.map(function (q) { return clamp((q.cx - P.x0) / (P.x1 - P.x0), 0, 1); });
+    var d = 'M' + P.x0 + ' ' + P.y + ' L' + P.x1 + ' ' + P.y;
+    svgEl('path', { d: d, class: 'p-beam-base', 'stroke-width': 2, 'stroke-dasharray': '2 7' }, svg);
+    P.el.prog = svgEl('path', { d: d, 'data-p': 'prog', fill: 'none', stroke: 'url(#' + id + 'g)', 'stroke-width': 2.4, pathLength: 1, 'stroke-dasharray': '1 1', 'stroke-dashoffset': 1 - maxP }, svg);
+    P.el.trail = svgEl('path', { d: d, 'data-p': 'trail', fill: 'none', stroke: 'url(#' + id + 'g)', 'stroke-width': 7, 'stroke-linecap': 'round', pathLength: 1, 'stroke-dasharray': '.1 3', filter: 'url(#' + id + 'f)', opacity: 0 }, svg);
+    P.el.pk = svgEl('g', { 'data-p': 'pk', opacity: 0 }, svg);
+    svgEl('circle', { r: 16, fill: 'rgba(232,121,249,.45)', filter: 'url(#' + id + 'f)' }, P.el.pk); svgEl('circle', { r: 5.5, fill: '#fff' }, P.el.pk);
+  }
+  function at(tau) {
+    if (tau <= 0) return 0;
+    var i = Math.min(n - 2, Math.floor(tau / o.seg)), f = clamp(tau / o.seg - i, 0, 1);
+    return tau >= (n - 1) * o.seg ? 1 : lerp(P.fr[i], P.fr[i + 1], easeIO(f));
+  }
+  var api = {
+    build: build,
+    reset: function () { maxP = 0; lastK = -1; arrived = false; steps.forEach(function (s) { s.classList.remove('on', 'hit'); }); if (P.el.prog) P.el.prog.setAttribute('stroke-dashoffset', 1); },
+    tick: function (tau) {
+      var END = o.start + (n - 1) * o.seg, first = tau < END + o.hold, p, show = true;
+      if (first) p = at(tau - o.start);
+      else { var cyc = (tau - END - o.hold) % o.loop; show = cyc < (n - 1) * o.seg + .15; p = at(cyc); if (cyc < .05 && lastK >= n - 1) { lastK = -1; arrived = false; } }
+      maxP = Math.max(maxP, p);
+      P.el.prog.setAttribute('stroke-dashoffset', 1 - maxP);
+      P.el.pk.setAttribute('opacity', show ? 1 : 0); P.el.trail.setAttribute('opacity', show && p > .005 && p < 1 ? 1 : 0);
+      P.el.pk.setAttribute('transform', 'translate(' + f1(P.x0 + p * (P.x1 - P.x0)) + ' ' + P.y + ')');
+      P.el.trail.setAttribute('stroke-dashoffset', .1 - p);
+      var k = 0; for (var i = 0; i < n; i++) if (p >= P.fr[i] - .002) k = i;
+      if (k !== lastK && (show || first)) {
+        for (var j = lastK + 1; j <= k; j++) { var e = steps[j]; e.classList.add('on'); e.classList.remove('hit'); void e.offsetWidth; e.classList.add('hit'); }
+        lastK = k; o.onStage && o.onStage(k, first);
+        if (k === n - 1 && !arrived) { arrived = true; G.boost = 1; o.onArrive && o.onArrive(); }
+      }
+    }
+  };
+  return api;
+}
+packet.final = function (root) {
+  $$('.p-step', root).forEach(function (s) { s.classList.add('on'); s.classList.remove('hit'); });
+  $$('[data-p=prog]', root).forEach(function (e) { e.setAttribute('stroke-dashoffset', 0); });
+  $$('[data-p=pk], [data-p=trail]', root).forEach(function (e) { e.setAttribute('opacity', 0); });
+};
+
+// canvas comet along a quadratic bezier with a fading tail
+function comet(x, p0, p1, p2, u, a, warm) {
+  var pt = function (q) { var m = 1 - q; return [m * m * p0[0] + 2 * m * q * p1[0] + q * q * p2[0], m * m * p0[1] + 2 * m * q * p1[1] + q * q * p2[1]]; };
+  var prev = pt(Math.max(0, u - .16));
+  for (var k = 1; k <= 8; k++) {
+    var q = Math.max(0, u - .16 + .02 * k), c = pt(q), f = k / 8;
+    x.globalAlpha = a * f * f; x.strokeStyle = f > .75 ? (warm ? '#ffd28a' : '#fbe7ff') : '#d08cf5'; x.lineWidth = .8 + f * 1.4;
+    x.beginPath(); x.moveTo(prev[0], prev[1]); x.lineTo(c[0], c[1]); x.stroke(); prev = c;
+  }
+  x.globalAlpha = a; x.drawImage(warm ? SPR_ORNG : SPR_PINK, prev[0] - 4.5, prev[1] - 4.5, 9, 9);
+}
+// Pulse.emitter(canvas, {from:'regions'|'edges', to:fn→[x,y] | 'globe', rate, dur:[a,b], start, lift, warm})
+function emitter(canvas, o) {
+  o = Object.assign({ from: 'regions', to: 'globe', rate: 13, dur: [1.1, 1.8], start: 1, lift: 6, warm: .25 }, o);
+  var x = canvas.getContext('2d'), C = [], last = 0;
+  return {
+    clear: function () { C = []; last = 0; x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height); },
+    tick: function (t, tau) {
+      var w = canvas.width / DPR, h = canvas.height / DPR;
+      x.setTransform(DPR, 0, 0, DPR, 0, 0); x.clearRect(0, 0, w, h);
+      if (!last) last = t;
+      if (tau > o.start) while (last < t) {
+        last += 1 / o.rate;
+        var d = lerp(o.dur[0], o.dur[1], Math.random()), e = { t: last, d: d, warm: Math.random() < o.warm, bend: (Math.random() - .5) * .9, lift: unit() * o.lift * (.5 + Math.random()) };
+        if (o.from === 'regions') { var vis = REG.filter(function (R) { return R.i < G.lit && R.sz > .25; }); if (!vis.length) continue; e.R = vis[(Math.random() * vis.length) | 0]; e.j = Math.random(); }
+        else { e.a = Math.random() * 6.2832; e.D = Math.hypot(w, h) * .6; }
+        C.push(e);
+      } else last = t;
+      x.globalCompositeOperation = 'lighter';
+      C = C.filter(function (e) {
+        var u = (t - e.t) / e.d; if (u >= 1.12) return false; if (u < 0) return true;
+        var p0, p1, p2, a = .85 * (u > 1 ? 1 - (u - 1) / .12 : 1);
+        if (e.R) { p0 = [e.R.sx, e.R.sy]; p2 = typeof o.to === 'function' ? o.to(e) : [G.cx, G.cy]; p1 = [lerp(p0[0], p2[0], .55), Math.min(p0[1], p2[1]) - e.lift]; }
+        else {
+          var gx = G.cx, gy = G.cy, r = G.r * 1.02;
+          p0 = [gx + Math.cos(e.a) * e.D, gy + Math.sin(e.a) * e.D];
+          p2 = typeof o.to === 'function' ? o.to(e) : [gx + Math.cos(e.a + e.bend * .3) * r, gy + Math.sin(e.a + e.bend * .3) * r];
+          p1 = [gx + Math.cos(e.a + e.bend) * e.D * .5, gy + Math.sin(e.a + e.bend) * e.D * .5];
+          a = .7 * Math.sin(Math.PI * Math.min(1, u * 1.05)) * clamp(tau / .8, 0, 1);
+        }
+        comet(x, p0, p1, p2, Math.min(1, easeIO(Math.min(1, u))), a, e.warm);
+        return true;
+      });
+      x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+    }
+  };
+}
+// Pulse.flash(slide, x, y) — restart .p-flash / .p-shock inside slide at viewport (x, y)
+function flash(slide, px, py) {
+  $$('.p-flash, .p-shock', slide).forEach(function (e) { e.style.left = px + 'px'; e.style.top = py + 'px'; e.classList.remove('go'); void e.offsetWidth; e.classList.add('go'); });
+}
+// Pulse.ignite(canvas, {core: el | [x,y], at: 1.1}) — edge streams + spiralling particles converge, the core ignites
+function ignite(canvas, o) {
+  o = Object.assign({ at: 1.1, n: 650 }, o);
+  var x = canvas.getContext('2d'), P = [], ign = false, lastT = 0, core = [0, 0], maxD = 1, u = 10;
+  var COLS = ['#f0abfc', '#a78bfa', '#ffb547'];
+  function spawn(p, ambient) {
+    p.a = Math.random() * 6.2832; p.r = maxD * (.7 + Math.random() * .45);
+    p.v = ambient ? 20 + Math.random() * 40 : 0; p.acc = ambient ? 20 + Math.random() * 50 : 700 + Math.random() * 1100;
+    p.w = (Math.random() < .5 ? -1 : 1) * (.25 + Math.random() * .7); p.c = Math.random() < .55 ? 0 : (Math.random() < .7 ? 1 : 2); p.px = p.ox = null;
+  }
+  function glow(rad, a) {
+    var g = x.createRadialGradient(core[0], core[1], 0, core[0], core[1], rad);
+    g.addColorStop(0, 'rgba(255,255,255,' + a + ')'); g.addColorStop(.12, 'rgba(250,200,255,' + a * .8 + ')');
+    g.addColorStop(.4, 'rgba(217,70,239,' + a * .3 + ')'); g.addColorStop(1, 'rgba(139,92,246,0)');
+    x.fillStyle = g; x.beginPath(); x.arc(core[0], core[1], rad, 0, 7); x.fill();
+  }
+  function place() {
+    var w = innerWidth, h = innerHeight; u = unit(); maxD = Math.hypot(w, h) * .62;
+    if (Array.isArray(o.core)) core = o.core; else { var r = o.core.getBoundingClientRect(); var b = boxOf(o.core), org = boxOrigin(), p = posIn(o.core, b); core = [org.x + p.cx, org.y + p.cy]; }
+  }
+  return {
+    get core() { return core; },
+    reset: function () { place(); ign = false; lastT = 0; P = []; for (var i = 0; i < o.n; i++) { var p = {}; spawn(p, false); p.delay = Math.random() * .55; P.push(p); } },
+    still: function () { place(); var w = canvas.width / DPR, h = canvas.height / DPR; x.setTransform(DPR, 0, 0, DPR, 0, 0); x.clearRect(0, 0, w, h); x.globalCompositeOperation = 'lighter'; glow(u * 16, .5); x.globalCompositeOperation = 'source-over'; },
+    tick: function (t, tau) {
+      var dt = lastT ? Math.min(.05, t - lastT) : .016; lastT = t;
+      var w = canvas.width / DPR, h = canvas.height / DPR;
+      x.setTransform(DPR, 0, 0, DPR, 0, 0); x.clearRect(0, 0, w, h); x.globalCompositeOperation = 'lighter';
+      if (!ign && tau >= o.at) { ign = true; P.forEach(function (p) { p.v = -(250 + Math.random() * 900); p.acc = 160 + Math.random() * 200; }); o.onIgnite && o.onIgnite(core); }
+      if (tau < o.at + .15) {
+        var k = clamp(tau / o.at, 0, 1), hd = maxD * (1 - k * k * k);
+        for (var j = 0; j < 16; j++) {
+          var an = j / 16 * 6.2832 + .19, ca = Math.cos(an), sa = Math.sin(an) * .72, tl = maxD * .38;
+          var hx = core[0] + ca * hd, hy = core[1] + sa * hd, tx = core[0] + ca * (hd + tl), ty = core[1] + sa * (hd + tl);
+          var g = x.createLinearGradient(tx, ty, hx, hy);
+          g.addColorStop(0, 'rgba(139,92,246,0)'); g.addColorStop(.7, j % 3 ? 'rgba(232,121,249,.5)' : 'rgba(255,153,0,.55)'); g.addColorStop(1, 'rgba(255,255,255,.95)');
+          x.strokeStyle = g; x.lineWidth = 1.6; x.beginPath(); x.moveTo(tx, ty); x.lineTo(hx, hy); x.stroke();
+        }
+      }
+      P.forEach(function (p) {
+        p.on = false; if (tau < p.delay) return;
+        p.v += p.acc * dt; p.r -= p.v * dt; p.a += p.w * dt * (1 + 90 / (Math.abs(p.r) + 30));
+        if (p.r < 6 || p.r > maxD * 1.25) { spawn(p, ign); return; }
+        p.ox = p.px; p.oy = p.py; p.px = core[0] + Math.cos(p.a) * p.r; p.py = core[1] + Math.sin(p.a) * p.r * .72; p.on = p.ox != null;
+      });
+      x.lineWidth = 1.3;
+      for (var ci = 0; ci < 3; ci++) for (var near = 0; near < 2; near++) {
+        x.strokeStyle = COLS[ci]; x.globalAlpha = (ign ? .32 : .5) + near * .4; x.beginPath();
+        P.forEach(function (p) { if (p.on && p.c === ci && (p.r < maxD * .45 ? 1 : 0) === near) { x.moveTo(p.ox, p.oy); x.lineTo(p.px, p.py); } });
+        x.stroke();
+      }
+      x.globalAlpha = 1;
+      if (!ign) { var q = clamp(tau / o.at, 0, 1); glow(u * (2 + 14 * q * q), .25 + .75 * q); }
+      else { var e2 = tau - o.at; glow(u * (14 + 10 * Math.exp(-e2 * 2.5) + Math.sin(t * 2) * .8), .5 + .5 * Math.exp(-e2 * 2)); }
+      x.globalCompositeOperation = 'source-over';
+    }
+  };
+}
+// Pulse.chip(svg) — die + HBM + fan-out traces + pins; <svg data-chip="1.15"> = trace draw start (s). Auto-built on init.
+function chip(svg) {
+  var s0 = parseFloat(svg.dataset.chip || '1.2'); svg.setAttribute('viewBox', '0 0 400 400'); svg.innerHTML = '';
+  var d = svgEl('defs', {}, svg), g1 = svgEl('linearGradient', { id: 'pchip' + (++gid), x1: 0, y1: 0, x2: 1, y2: 1 }, d);
+  [['0', '#ff9900'], ['.5', '#e879f9'], ['1', '#8b5cf6']].forEach(function (s) { svgEl('stop', { offset: s[0], 'stop-color': s[1] }, g1); });
+  svgEl('rect', { x: 14, y: 14, width: 372, height: 372, rx: 22, fill: '#170b2c', stroke: 'url(#' + g1.id + ')', 'stroke-opacity': .7, 'stroke-width': 2 }, svg);
+  svgEl('rect', { x: 30, y: 30, width: 340, height: 340, rx: 14, fill: 'none', stroke: 'rgba(167,139,250,.22)', 'stroke-dasharray': '2 5' }, svg);
+  [[96, 152], [96, 204], [266, 152], [266, 204]].forEach(function (xy, i) {
+    svgEl('rect', { x: xy[0], y: xy[1], width: 38, height: 44, rx: 3, fill: '#26144a', stroke: 'rgba(232,121,249,.5)', class: 'p-draw', pathLength: 1, style: '--d:' + (s0 + .15 + i * .06) }, svg);
+    for (var k = 1; k < 4; k++) svgEl('line', { x1: xy[0] + 5, x2: xy[0] + 33, y1: xy[1] + k * 11, y2: xy[1] + k * 11, stroke: 'rgba(255,255,255,.12)' }, svg);
+  });
+  svgEl('rect', { x: 148, y: 148, width: 104, height: 104, rx: 5, fill: '#2a1258', stroke: 'rgba(255,200,250,.6)' }, svg);
+  var tr = [];
+  for (var k2 = 0; k2 < 9; k2++) {
+    var xs = 158 + k2 * 10.5, xp = 70 + k2 * 32.5, ys = 156 + k2 * 11, yp = 70 + k2 * 32.5, o = Math.abs(k2 - 4);
+    tr.push(['M' + xs + ' 148 V134 L' + xp + ' 68 V22', o, xp, 22], ['M' + xs + ' 252 V266 L' + xp + ' 332 V378', o, xp, 378],
+            ['M96 ' + ys + ' H86 L66 ' + yp + ' H22', o, 22, yp], ['M304 ' + ys + ' H314 L334 ' + yp + ' H378', o, 378, yp]);
+  }
+  tr.forEach(function (q, i) {
+    svgEl('path', { d: q[0], class: 'p-trace p-draw', pathLength: 1, style: '--d:' + (s0 + .1 + q[1] * .07 + (i % 4) * .04).toFixed(2) }, svg);
+    svgEl('path', { d: q[0], class: 'p-tpulse', pathLength: 1, style: '--d:' + (s0 + 1.25 + ((i * 7) % 23) * .11).toFixed(2) }, svg);
+    svgEl('rect', { x: q[2] - 3.5, y: q[3] - 3.5, width: 7, height: 7, rx: 1.5, fill: 'rgba(255,190,90,.85)', class: 'p-fade', style: '--d:' + (s0 + .75 + q[1] * .07).toFixed(2) }, svg);
+  });
+}
+// Pulse.spark(svg, fn(t)→value, {n, dt, lo, hi, area, stroke, threshold}) — streaming chart; tick(t, k=amplitude 0..1)
+function spark(svg, fn, o) {
+  o = Object.assign({ n: 72, dt: .09, lo: 0, hi: 1, area: true, stroke: '#f0abfc', width: 1.6, grid: 3, threshold: null, fill: '#e879f9' }, o);
+  svg.setAttribute('viewBox', '0 0 300 100'); svg.setAttribute('preserveAspectRatio', 'none'); svg.innerHTML = '';
+  var id = 'psp' + (++gid), d = svgEl('defs', {}, svg), gr = svgEl('linearGradient', { id: id, x1: 0, y1: 0, x2: 0, y2: 1 }, d);
+  svgEl('stop', { offset: 0, 'stop-color': o.fill, 'stop-opacity': .45 }, gr); svgEl('stop', { offset: 1, 'stop-color': '#8b5cf6', 'stop-opacity': 0 }, gr);
+  for (var i = 1; i <= o.grid; i++) svgEl('line', { x1: 0, x2: 300, y1: i * 100 / (o.grid + 1), y2: i * 100 / (o.grid + 1), stroke: 'rgba(255,255,255,.05)' }, svg);
+  var Y = function (v) { return 100 - clamp((v - o.lo) / (o.hi - o.lo), 0, 1) * 92; };
+  if (o.threshold != null) svgEl('line', { x1: 0, x2: 300, y1: Y(o.threshold), y2: Y(o.threshold), stroke: 'rgba(251,191,36,.6)', 'stroke-dasharray': '4 4' }, svg);
+  var A = o.area ? svgEl('path', { fill: 'url(#' + id + ')' }, svg) : null, Ln = svgEl('path', { fill: 'none', stroke: o.stroke, 'stroke-width': o.width }, svg);
+  return {
+    tick: function (t, k) {
+      k = k == null ? 1 : k;
+      var a = 'M0 100', l = '';
+      for (var i = 0; i < o.n; i++) {
+        var x = (i / (o.n - 1) * 300).toFixed(1), y = (100 - (100 - Y(fn(t - (o.n - 1 - i) * o.dt))) * k).toFixed(1);
+        a += ' L' + x + ' ' + y; l += (i ? ' L' : 'M') + x + ' ' + y;
+      }
+      if (A) A.setAttribute('d', a + ' L300 100 Z'); Ln.setAttribute('d', l);
+    }
+  };
+}
+// Pulse.ticker(el, fn(t)→number, {every, format}) — throttled live number (keeps a trailing <small> unit)
+function ticker(el, fn, o) {
+  o = Object.assign({ every: .11, format: fmt }, o); var lt = -9;
+  return { tick: function (t, force) {
+    if (!force && t - lt < o.every) return; lt = t;
+    var s = o.format(fn(t)), n = el.firstChild;
+    if (n && n.nodeType === 3) n.nodeValue = s; else el.insertBefore(D.createTextNode(s), el.firstChild);
+  } };
+}
+
+/* ================= INIT ================= */
+var layoutFns = [];
+function layout() {
+  W = innerWidth; H = innerHeight; resizeCanvas(cv, W, H);
+  $$('canvas.p-fx').forEach(function (c) { resizeCanvas(c, W, H); });
+  Stage.slides.forEach(buildLinks);
+  layoutFns.forEach(function (fn) { try { fn(); } catch (e) { console.error('[pulse]', e); } });
+  if (cur.slide && GT.to) { var d2 = dockOf(cur.slide, W, H); if (!d2.keepGeo) { GT.to.cx = d2.cx; GT.to.cy = d2.cy; GT.to.r = d2.r; } }
+  dirty = true;
+}
+(function init() {
+  if (!$('.p-bg')) { var bg = D.createElement('div'); bg.className = 'p-bg stage-bg'; bg.innerHTML = '<i class="neb n1"></i><i class="neb n2"></i><i class="neb n3"></i><i class="grid"></i><i class="scan"></i><i class="vig"></i>'; D.body.insertBefore(bg, D.body.firstChild); }
+  cv = $('canvas.p-globe');
+  if (!cv) { cv = D.createElement('canvas'); cv.className = 'p-globe stage-bg'; cv.setAttribute('aria-hidden', 'true'); $('.p-bg').after(cv); }
+  cx2 = cv.getContext('2d');
+  $$('svg[data-chip]').forEach(chip);
+  if (window.lucide) window.lucide.createIcons();
+  // beams' final state (light targets) for scenes that use data-links — also runs on overview clones + print
+  var keys = {};
+  $$('.slide').forEach(function (s, i) {
+    if (!$('svg.p-beams[data-links]', s)) return;
+    if (!s.dataset.scene) s.dataset.scene = 'p-links-' + i;
+    if (!keys[s.dataset.scene]) { keys[s.dataset.scene] = 1; Stage.hook(s.dataset.scene, { final: function (slide) { finalLinks(slide); } }); }
+  });
+  var laidOut = false, thumbs = false;
+  Stage.onChange(function (to, from, dir, slide) {
+    if (!laidOut) { laidOut = true; layout(); }
+    if (cur.slide && cur.slide !== slide) resetLinks(cur.slide);
+    cur.slide = slide; cur.t0 = nowS(); resetLinks(slide);
+    if (Stage.reduced) finalLinks(slide);     // reduced motion: hooks get enter(ctx.reduced), not final() → show the end state now
+    dock(slide, from < 0);
+  });
+  Stage.raf(frame);
+  var rs = 0; addEventListener('resize', function () { clearTimeout(rs); rs = setTimeout(layout, 80); });
+  // fonts.ready resolves BEFORE the engine boots (its own .then runs later) → defer past boot
+  var after = function () { setTimeout(function () { if (!Stage.slides.length) return after(); layout(); if (!thumbs) { thumbs = true; renderThumbs(); } }, 60); };
+  if (D.fonts && D.fonts.ready) { Stage.waitFor(D.fonts.ready); D.fonts.ready.then(after); } else after();
+})();
+
+window.Pulse = {
+  version: '1.0',
+  globe: {
+    get state() { return G; }, regions: REG, presets: PRESETS,
+    lit: function (n) { litPow = null; G.lit = n; dirty = true; },
+    fire: function (delayS) { G.fireAt = nowS() + (delayS || 0); dirty = true; },
+    calm: function () { G.fireAt = null; },
+    boost: function (v) { G.boost = v == null ? 1 : v; },
+    dock: dockOf, draw: drawGlobe
+  },
+  beams: { defs: beamDefs, add: addBeam, set: setBeam, curve: curve, build: buildLinks, final: finalLinks },
+  packet: packet, emitter: emitter, ignite: ignite, flash: flash, chip: chip, spark: spark, ticker: ticker, comet: comet,
+  loop: loop, layout: layout, onLayout: function (fn) { layoutFns.push(fn); }, thumbs: renderThumbs,
+  u: unit, posIn: posIn, boxOrigin: boxOrigin, svgEl: svgEl, fmt: fmt, clamp: clamp, lerp: lerp, easeIO: easeIO, easeOut: easeOut, DPR: DPR
+};
+})();
+
+</script>
+<script>
+/* === DECK GLUE === */
+/* Kit handles motif + beams; hooks live next to their slides. */
+
+</script>
+</body>
+</html>

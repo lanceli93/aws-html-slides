@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- =====================================================================
-     Neon Cyber — Native SVG Sequence Diagram (API Request Flow)
+     re:Invent — Native SVG Sequence Diagram (API Request Flow)
      ---------------------------------------------------------------------
      ONE self-contained, OFFLINE, ZERO-DEPENDENCY file. No CDN, no web
      fonts, no images, no libraries. Double-click via file:// and it runs.
@@ -27,13 +27,13 @@
      │  ── per-message: arrow draw @A (0.35s); packet @A+0.15 (dur 0.60); │
      │     arrival FX (badge/bar/card-glow) @A+0.75 = packet end. ──       │
      │           slot  arrow A  packet    arrival   note                  │
-     │  MSG 1   POST /orders   0   1.40   1.55→2.15   2.15   cyan solid    │
+     │  MSG 1   POST /orders   0   1.40   1.55→2.15   2.15   purple solid  │
      │  MSG 2   鉴权 + 路由    1   pill @2.30 (no packet)   blue pill      │
      │  MSG 3   Invoke         2   3.20   3.35→3.95   3.95   blue solid    │
      │  MSG 4   PutItem        3   4.10   4.25→4.85   4.85   blue solid    │
-     │  MSG 5   200 OK (item)  4   5.00   5.15→5.75   5.75   magenta dash  │
-     │  MSG 6   result         5   5.90   6.05→6.65   6.65   magenta dash  │
-     │  MSG 7   201 Created    6   6.80   6.95→7.55   7.55   magenta dash+ │
+     │  MSG 5   200 OK (item)  4   5.00   5.15→5.75   5.75   pink dash     │
+     │  MSG 6   result         5   5.90   6.05→6.65   6.65   pink dash     │
+     │  MSG 7   201 Created    6   6.80   6.95→7.55   7.55   pink dash+    │
      │  END     plays ONCE, freezes on the final drawn state (no loop).    │
      │  ----------------------------------------------------------------  │
      │  Per-message cadence = 0.90s.  A_N = 1.40 + 0.90*slot.              │
@@ -54,7 +54,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Neon Cyber — Sequence / API Flow</title>
+<title>re:Invent — Sequence / API Flow</title>
 <style>
   /* ============================================================
      SELF-CONTAINED, OFFLINE styles. Fallback font stacks only —
@@ -63,13 +63,13 @@
      the graceful system fallback.
      ============================================================ */
   :root {
-    --bg:       #0a0f1c;                    /* deep navy base            */
-    --cyan:     #00ffcc;                    /* requests (client->server) */
-    --magenta:  #ff00aa;                    /* responses (return path)   */
-    --blue:     #00aaff;                    /* internal service calls    */
-    --text:     #e0e0ff;                    /* primary text              */
-    --muted:    rgba(224,224,255,0.55);     /* secondary text            */
-    --sans: 'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif;
+    --bg:       #0A0A0A;                    /* base near-black           */
+    --cyan:     #8B5CF6;                    /* requests (client->server) */
+    --magenta:  #D946EF;                    /* responses (return path)   */
+    --blue:     #38BDF8;                    /* internal service calls    */
+    --text:     #FFFFFF;                    /* primary text              */
+    --muted:    rgba(255,255,255,0.55);     /* secondary text            */
+    --sans: 'Urbanist','Albert Sans','Avenir Next','PingFang SC',sans-serif;
     --mono: 'JetBrains Mono','SF Mono',Menlo,monospace;
   }
 
@@ -84,7 +84,7 @@
     font-family: var(--sans);
   }
 
-  /* ---- Ambient background: faint cyan grid + two blurred glow orbs ----
+  /* ---- Ambient background: faint purple grid + two blurred glow orbs ----
      Pure CSS, sits behind everything. The grid is two low-alpha
      repeating-linear-gradients (vertical + horizontal); the orbs are
      big blurred radial gradients biased to opposite corners. */
@@ -92,15 +92,15 @@
   .backdrop::before {                        /* the grid */
     content: ""; position: absolute; inset: 0;
     background:
-      repeating-linear-gradient(0deg,  rgba(0,255,204,0.045) 0 1px, transparent 1px 46px),
-      repeating-linear-gradient(90deg, rgba(0,255,204,0.045) 0 1px, transparent 1px 46px);
+      repeating-linear-gradient(0deg,  rgba(139,92,246,0.045) 0 1px, transparent 1px 46px),
+      repeating-linear-gradient(90deg, rgba(139,92,246,0.045) 0 1px, transparent 1px 46px);
     mask-image: radial-gradient(ellipse 90% 80% at 50% 45%, #000 55%, transparent 100%);
   }
   .orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.5; }
   .orb.a { width: 46vw; height: 46vw; left: -12vw; top: -14vw;
-           background: radial-gradient(circle, rgba(0,170,255,0.40), transparent 70%); }
+           background: radial-gradient(circle, rgba(139,92,246,0.40), transparent 70%); }
   .orb.b { width: 42vw; height: 42vw; right: -12vw; bottom: -16vw;
-           background: radial-gradient(circle, rgba(255,0,170,0.34), transparent 70%); }
+           background: radial-gradient(circle, rgba(217,70,239,0.34), transparent 70%); }
 
   /* ---- Page shell: header / diagram / footer stacked to fill 100vh ---- */
   .page {
@@ -119,10 +119,10 @@
   h1 {
     font-size: clamp(24px, 3.6vw, 46px); line-height: 1.05; font-weight: 800;
     letter-spacing: -0.01em;
-    background: linear-gradient(100deg, #fff 0%, #b9fff0 34%, var(--cyan) 70%, var(--blue) 100%);
+    background: linear-gradient(100deg, #fff 0%, #E0D4FF 34%, var(--cyan) 70%, var(--blue) 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent; color: transparent;
-    filter: drop-shadow(0 3px 22px rgba(0,255,204,0.22));
+    filter: drop-shadow(0 3px 22px rgba(139,92,246,0.22));
   }
   .sub {
     margin-top: 0.7rem; font-size: clamp(12px, 1.5vw, 17px); font-weight: 400;
@@ -148,13 +148,13 @@
   }
   #replay {
     font-family: var(--sans); font-size: clamp(12px, 1.3vw, 15px); font-weight: 600;
-    color: var(--cyan); background: rgba(0,255,204,0.06);
-    border: 1px solid rgba(0,255,204,0.45); border-radius: 999px;
+    color: var(--cyan); background: rgba(139,92,246,0.06);
+    border: 1px solid rgba(139,92,246,0.45); border-radius: 999px;
     padding: 0.5em 1.2em; cursor: pointer; letter-spacing: 0.04em;
     transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    box-shadow: 0 0 0 rgba(0,255,204,0);
+    box-shadow: 0 0 0 rgba(139,92,246,0);
   }
-  #replay:hover { background: rgba(0,255,204,0.14); box-shadow: 0 0 22px rgba(0,255,204,0.35); }
+  #replay:hover { background: rgba(139,92,246,0.14); box-shadow: 0 0 22px rgba(139,92,246,0.35); }
   #replay:active { transform: scale(0.96); }
   #replay:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 
@@ -333,71 +333,71 @@
         <!-- Client (cyan, Lucide "monitor") -->
         <g class="card-g c0">
           <rect x="70" y="18" width="210" height="60" rx="14"
-                fill="rgba(0,255,204,0.06)" stroke="#00ffcc" stroke-width="1.5"/>
-          <g transform="translate(92,36)" fill="none" stroke="#00ffcc" stroke-width="2"
+                fill="rgba(139,92,246,0.06)" stroke="#8B5CF6" stroke-width="1.5"/>
+          <g transform="translate(92,36)" fill="none" stroke="#8B5CF6" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
             <rect width="20" height="14" x="2" y="1" rx="2"/>
             <line x1="8" x2="16" y1="19" y2="19"/><line x1="12" x2="12" y1="15" y2="19"/>
           </g>
-          <text x="130" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
-                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">Client</text>
+          <text x="130" y="55" fill="#FFFFFF" font-size="18" font-weight="600"
+                style="font-family:'Urbanist','Albert Sans','Avenir Next','PingFang SC',sans-serif">Client</text>
         </g>
         <!-- API Gateway (cyan, Lucide "server") -->
         <g class="card-g c1">
           <rect x="420" y="18" width="210" height="60" rx="14"
-                fill="rgba(0,255,204,0.06)" stroke="#00ffcc" stroke-width="1.5"/>
-          <g transform="translate(440,37)" fill="none" stroke="#00ffcc" stroke-width="2"
+                fill="rgba(139,92,246,0.06)" stroke="#8B5CF6" stroke-width="1.5"/>
+          <g transform="translate(440,37)" fill="none" stroke="#8B5CF6" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
             <rect width="20" height="8" x="2" y="0" rx="2"/><rect width="20" height="8" x="2" y="12" rx="2"/>
             <line x1="6" x2="6.01" y1="4" y2="4"/><line x1="6" x2="6.01" y1="16" y2="16"/>
           </g>
-          <text x="474" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
-                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">API Gateway</text>
+          <text x="474" y="55" fill="#FFFFFF" font-size="18" font-weight="600"
+                style="font-family:'Urbanist','Albert Sans','Avenir Next','PingFang SC',sans-serif">API Gateway</text>
         </g>
         <!-- Lambda (blue, Lucide "zap") -->
         <g class="card-g c2">
           <rect x="770" y="18" width="210" height="60" rx="14"
-                fill="rgba(0,170,255,0.07)" stroke="#00aaff" stroke-width="1.5"/>
-          <g transform="translate(792,36)" fill="none" stroke="#00aaff" stroke-width="2"
+                fill="rgba(56,189,248,0.07)" stroke="#38BDF8" stroke-width="1.5"/>
+          <g transform="translate(792,36)" fill="none" stroke="#38BDF8" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
             <polygon points="13 0 3 12 12 12 11 20 21 8 12 8 13 0"/>
           </g>
-          <text x="826" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
-                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">Lambda 函数</text>
+          <text x="826" y="55" fill="#FFFFFF" font-size="18" font-weight="600"
+                style="font-family:'Urbanist','Albert Sans','Avenir Next','PingFang SC',sans-serif">Lambda 函数</text>
         </g>
         <!-- DynamoDB (magenta, Lucide "database") -->
         <g class="card-g c3">
           <rect x="1120" y="18" width="210" height="60" rx="14"
-                fill="rgba(255,0,170,0.07)" stroke="#ff00aa" stroke-width="1.5"/>
-          <g transform="translate(1142,36)" fill="none" stroke="#ff00aa" stroke-width="2"
+                fill="rgba(217,70,239,0.07)" stroke="#D946EF" stroke-width="1.5"/>
+          <g transform="translate(1142,36)" fill="none" stroke="#D946EF" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
             <ellipse cx="12" cy="3" rx="9" ry="3"/>
             <path d="M3 3V17A9 3 0 0 0 21 17V3"/><path d="M3 10A9 3 0 0 0 21 10"/>
           </g>
-          <text x="1176" y="55" fill="#e0e0ff" font-size="18" font-weight="600"
-                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">DynamoDB</text>
+          <text x="1176" y="55" fill="#FFFFFF" font-size="18" font-weight="600"
+                style="font-family:'Urbanist','Albert Sans','Avenir Next','PingFang SC',sans-serif">DynamoDB</text>
         </g>
 
         <!-- ===== LIFELINES (wrapper <g> drops via scaleY; inner <line>
                  carries the infinite marching-ants shimmer) ===== -->
-        <g class="lifeline-wrap"><line class="lifeline" x1="175"  y1="84" x2="175"  y2="600" stroke="rgba(0,255,204,0.35)" stroke-width="1.5"/></g>
-        <g class="lifeline-wrap"><line class="lifeline" x1="525"  y1="84" x2="525"  y2="600" stroke="rgba(0,255,204,0.35)" stroke-width="1.5"/></g>
-        <g class="lifeline-wrap"><line class="lifeline" x1="875"  y1="84" x2="875"  y2="600" stroke="rgba(0,170,255,0.35)" stroke-width="1.5"/></g>
-        <g class="lifeline-wrap"><line class="lifeline" x1="1225" y1="84" x2="1225" y2="600" stroke="rgba(255,0,170,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="175"  y1="84" x2="175"  y2="600" stroke="rgba(139,92,246,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="525"  y1="84" x2="525"  y2="600" stroke="rgba(139,92,246,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="875"  y1="84" x2="875"  y2="600" stroke="rgba(56,189,248,0.35)" stroke-width="1.5"/></g>
+        <g class="lifeline-wrap"><line class="lifeline" x1="1225" y1="84" x2="1225" y2="600" stroke="rgba(217,70,239,0.35)" stroke-width="1.5"/></g>
 
         <!-- ===== ACTIVATION BARS (grow downward from the moment each
                  participant first becomes active — delays in CSS) ===== -->
-        <rect class="activation act-client"  x="170"  y="150" width="10" height="410" rx="4" fill="rgba(0,255,204,0.16)" stroke="rgba(0,255,204,0.55)" stroke-width="1"/>
-        <rect class="activation act-gateway" x="520"  y="165" width="10" height="392" rx="4" fill="rgba(0,255,204,0.16)" stroke="rgba(0,255,204,0.55)" stroke-width="1"/>
-        <rect class="activation act-lambda"  x="870"  y="265" width="10" height="228" rx="4" fill="rgba(0,170,255,0.16)" stroke="rgba(0,170,255,0.55)" stroke-width="1"/>
-        <rect class="activation act-dynamo"  x="1220" y="335" width="10" height="98"  rx="4" fill="rgba(255,0,170,0.16)" stroke="rgba(255,0,170,0.55)" stroke-width="1"/>
+        <rect class="activation act-client"  x="170"  y="150" width="10" height="410" rx="4" fill="rgba(139,92,246,0.16)" stroke="rgba(139,92,246,0.55)" stroke-width="1"/>
+        <rect class="activation act-gateway" x="520"  y="165" width="10" height="392" rx="4" fill="rgba(139,92,246,0.16)" stroke="rgba(139,92,246,0.55)" stroke-width="1"/>
+        <rect class="activation act-lambda"  x="870"  y="265" width="10" height="228" rx="4" fill="rgba(56,189,248,0.16)" stroke="rgba(56,189,248,0.55)" stroke-width="1"/>
+        <rect class="activation act-dynamo"  x="1220" y="335" width="10" height="98"  rx="4" fill="rgba(217,70,239,0.16)" stroke="rgba(217,70,239,0.55)" stroke-width="1"/>
 
         <!-- ===== CARD GLOW FLASHES (brief pulse when a message lands;
                  same geometry as the header cards, blurred + brighter) ===== -->
-        <rect class="card-glow g-gateway m1-glow" x="420"  y="18" width="210" height="60" rx="14" fill="none" stroke="#00ffcc" stroke-width="3" filter="url(#fGlow)"/>
-        <rect class="card-glow g-lambda"          x="770"  y="18" width="210" height="60" rx="14" fill="none" stroke="#00aaff" stroke-width="3" filter="url(#fGlow)"/>
-        <rect class="card-glow g-dynamo"          x="1120" y="18" width="210" height="60" rx="14" fill="none" stroke="#ff00aa" stroke-width="3" filter="url(#fGlow)"/>
-        <rect class="card-glow g-client"          x="70"   y="18" width="210" height="60" rx="14" fill="none" stroke="#00ffcc" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-gateway m1-glow" x="420"  y="18" width="210" height="60" rx="14" fill="none" stroke="#8B5CF6" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-lambda"          x="770"  y="18" width="210" height="60" rx="14" fill="none" stroke="#38BDF8" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-dynamo"          x="1120" y="18" width="210" height="60" rx="14" fill="none" stroke="#D946EF" stroke-width="3" filter="url(#fGlow)"/>
+        <rect class="card-glow g-client"          x="70"   y="18" width="210" height="60" rx="14" fill="none" stroke="#8B5CF6" stroke-width="3" filter="url(#fGlow)"/>
 
         <!-- =================================================================
              MESSAGES 1..7. Each group .mN contains:
@@ -415,36 +415,36 @@
         <g class="m1">
           <path id="p1" class="msg-path" d="M 180 180 L 516 180" fill="none" stroke="none"/>
           <line class="msg-line" x1="180" y1="180" x2="516" y2="180" pathLength="1"
-                stroke="#00ffcc" stroke-width="2.5"/>
-          <polygon class="arrowhead" points="516,180 502,173 502,187" fill="#00ffcc"/>
-          <text class="msg-label" x="348" y="166" text-anchor="middle" fill="#00ffcc"
+                stroke="#8B5CF6" stroke-width="2.5"/>
+          <polygon class="arrowhead" points="516,180 502,173 502,187" fill="#8B5CF6"/>
+          <text class="msg-label" x="348" y="166" text-anchor="middle" fill="#8B5CF6"
                 font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">POST /orders</text>
-          <g class="badge"><circle cx="180" cy="180" r="12" fill="#0a0f1c" stroke="#00ffcc" stroke-width="1.5"/>
-            <text x="180" y="185" text-anchor="middle" fill="#00ffcc" font-size="13" font-weight="700"
+          <g class="badge"><circle cx="180" cy="180" r="12" fill="#0A0A0A" stroke="#8B5CF6" stroke-width="1.5"/>
+            <text x="180" y="185" text-anchor="middle" fill="#8B5CF6" font-size="13" font-weight="700"
                   style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">1</text></g>
         </g>
 
         <!-- MSG 2: 鉴权 + 路由 — self-note pill on the Gateway lifeline, y≈215 -->
         <g class="pill-g">
           <rect x="447" y="200" width="156" height="32" rx="16"
-                fill="rgba(0,170,255,0.10)" stroke="rgba(0,170,255,0.6)" stroke-width="1.2"/>
-          <circle cx="467" cy="216" r="10" fill="#0a0f1c" stroke="#00aaff" stroke-width="1.4"/>
-          <text x="467" y="220.5" text-anchor="middle" fill="#00aaff" font-size="12" font-weight="700"
+                fill="rgba(56,189,248,0.10)" stroke="rgba(56,189,248,0.6)" stroke-width="1.2"/>
+          <circle cx="467" cy="216" r="10" fill="#0A0A0A" stroke="#38BDF8" stroke-width="1.4"/>
+          <text x="467" y="220.5" text-anchor="middle" fill="#38BDF8" font-size="12" font-weight="700"
                 style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">2</text>
-          <text x="486" y="221" fill="#e0e0ff" font-size="14.5"
-                style="font-family:'Clash Display','Satoshi','Avenir Next','PingFang SC',sans-serif">鉴权 + 路由</text>
+          <text x="486" y="221" fill="#FFFFFF" font-size="14.5"
+                style="font-family:'Urbanist','Albert Sans','Avenir Next','PingFang SC',sans-serif">鉴权 + 路由</text>
         </g>
 
         <!-- MSG 3: Invoke — Gateway -> Lambda, blue solid, y=280 -->
         <g class="m3">
           <path id="p3" class="msg-path" d="M 530 280 L 866 280" fill="none" stroke="none"/>
           <line class="msg-line" x1="530" y1="280" x2="866" y2="280" pathLength="1"
-                stroke="#00aaff" stroke-width="2.5"/>
-          <polygon class="arrowhead" points="866,280 852,273 852,287" fill="#00aaff"/>
-          <text class="msg-label" x="698" y="266" text-anchor="middle" fill="#00aaff"
+                stroke="#38BDF8" stroke-width="2.5"/>
+          <polygon class="arrowhead" points="866,280 852,273 852,287" fill="#38BDF8"/>
+          <text class="msg-label" x="698" y="266" text-anchor="middle" fill="#38BDF8"
                 font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">Invoke</text>
-          <g class="badge"><circle cx="530" cy="280" r="12" fill="#0a0f1c" stroke="#00aaff" stroke-width="1.5"/>
-            <text x="530" y="285" text-anchor="middle" fill="#00aaff" font-size="13" font-weight="700"
+          <g class="badge"><circle cx="530" cy="280" r="12" fill="#0A0A0A" stroke="#38BDF8" stroke-width="1.5"/>
+            <text x="530" y="285" text-anchor="middle" fill="#38BDF8" font-size="13" font-weight="700"
                   style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">3</text></g>
         </g>
 
@@ -452,12 +452,12 @@
         <g class="m4">
           <path id="p4" class="msg-path" d="M 880 350 L 1216 350" fill="none" stroke="none"/>
           <line class="msg-line" x1="880" y1="350" x2="1216" y2="350" pathLength="1"
-                stroke="#00aaff" stroke-width="2.5"/>
-          <polygon class="arrowhead" points="1216,350 1202,343 1202,357" fill="#00aaff"/>
-          <text class="msg-label" x="1048" y="336" text-anchor="middle" fill="#00aaff"
+                stroke="#38BDF8" stroke-width="2.5"/>
+          <polygon class="arrowhead" points="1216,350 1202,343 1202,357" fill="#38BDF8"/>
+          <text class="msg-label" x="1048" y="336" text-anchor="middle" fill="#38BDF8"
                 font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">PutItem</text>
-          <g class="badge"><circle cx="880" cy="350" r="12" fill="#0a0f1c" stroke="#00aaff" stroke-width="1.5"/>
-            <text x="880" y="355" text-anchor="middle" fill="#00aaff" font-size="13" font-weight="700"
+          <g class="badge"><circle cx="880" cy="350" r="12" fill="#0A0A0A" stroke="#38BDF8" stroke-width="1.5"/>
+            <text x="880" y="355" text-anchor="middle" fill="#38BDF8" font-size="13" font-weight="700"
                   style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">4</text></g>
         </g>
 
@@ -465,12 +465,12 @@
         <g class="m5">
           <path id="p5" class="msg-path" d="M 1220 420 L 884 420" fill="none" stroke="none"/>
           <line class="msg-line dashed" x1="1220" y1="420" x2="884" y2="420"
-                stroke="#ff00aa" stroke-width="2.2" stroke-dasharray="8 6"/>
-          <polygon class="arrowhead" points="884,420 898,413 898,427" fill="#ff00aa"/>
-          <text class="msg-label" x="1052" y="406" text-anchor="middle" fill="#ff00aa"
+                stroke="#D946EF" stroke-width="2.2" stroke-dasharray="8 6"/>
+          <polygon class="arrowhead" points="884,420 898,413 898,427" fill="#D946EF"/>
+          <text class="msg-label" x="1052" y="406" text-anchor="middle" fill="#D946EF"
                 font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">200 OK (item)</text>
-          <g class="badge"><circle cx="1220" cy="420" r="12" fill="#0a0f1c" stroke="#ff00aa" stroke-width="1.5"/>
-            <text x="1220" y="425" text-anchor="middle" fill="#ff00aa" font-size="13" font-weight="700"
+          <g class="badge"><circle cx="1220" cy="420" r="12" fill="#0A0A0A" stroke="#D946EF" stroke-width="1.5"/>
+            <text x="1220" y="425" text-anchor="middle" fill="#D946EF" font-size="13" font-weight="700"
                   style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">5</text></g>
         </g>
 
@@ -478,12 +478,12 @@
         <g class="m6">
           <path id="p6" class="msg-path" d="M 870 480 L 534 480" fill="none" stroke="none"/>
           <line class="msg-line dashed" x1="870" y1="480" x2="534" y2="480"
-                stroke="#ff00aa" stroke-width="2.2" stroke-dasharray="8 6"/>
-          <polygon class="arrowhead" points="534,480 548,473 548,487" fill="#ff00aa"/>
-          <text class="msg-label" x="702" y="466" text-anchor="middle" fill="#ff00aa"
+                stroke="#D946EF" stroke-width="2.2" stroke-dasharray="8 6"/>
+          <polygon class="arrowhead" points="534,480 548,473 548,487" fill="#D946EF"/>
+          <text class="msg-label" x="702" y="466" text-anchor="middle" fill="#D946EF"
                 font-size="15" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">result</text>
-          <g class="badge"><circle cx="870" cy="480" r="12" fill="#0a0f1c" stroke="#ff00aa" stroke-width="1.5"/>
-            <text x="870" y="485" text-anchor="middle" fill="#ff00aa" font-size="13" font-weight="700"
+          <g class="badge"><circle cx="870" cy="480" r="12" fill="#0A0A0A" stroke="#D946EF" stroke-width="1.5"/>
+            <text x="870" y="485" text-anchor="middle" fill="#D946EF" font-size="13" font-weight="700"
                   style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">6</text></g>
         </g>
 
@@ -495,12 +495,12 @@
                so any filter (incl. fGlow) collapses to a 0-height region and the
                line vanishes entirely. Emphasis comes from width instead. -->
           <line class="msg-line dashed" x1="520" y1="545" x2="184" y2="545"
-                stroke="#ff00aa" stroke-width="3.2" stroke-dasharray="8 6"/>
-          <polygon class="arrowhead" points="184,545 198,538 198,552" fill="#ff00aa" filter="url(#fGlow)"/>
-          <text class="msg-label" x="352" y="531" text-anchor="middle" fill="#ff00aa" font-weight="700"
+                stroke="#D946EF" stroke-width="3.2" stroke-dasharray="8 6"/>
+          <polygon class="arrowhead" points="184,545 198,538 198,552" fill="#D946EF" filter="url(#fGlow)"/>
+          <text class="msg-label" x="352" y="531" text-anchor="middle" fill="#D946EF" font-weight="700"
                 font-size="15.5" style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">201 Created</text>
-          <g class="badge"><circle cx="520" cy="545" r="12" fill="#0a0f1c" stroke="#ff00aa" stroke-width="1.5"/>
-            <text x="520" y="550" text-anchor="middle" fill="#ff00aa" font-size="13" font-weight="700"
+          <g class="badge"><circle cx="520" cy="545" r="12" fill="#0A0A0A" stroke="#D946EF" stroke-width="1.5"/>
+            <text x="520" y="550" text-anchor="middle" fill="#D946EF" font-size="13" font-weight="700"
                   style="font-family:'JetBrains Mono','SF Mono',Menlo,monospace">7</text></g>
         </g>
 
@@ -512,32 +512,32 @@
              <animate> so only the traveling window is visible.
              ================================================================= -->
         <g class="packet" opacity="0">
-          <circle r="6" fill="#00ffcc" filter="url(#fGlow)"/>
+          <circle r="6" fill="#8B5CF6" filter="url(#fGlow)"/>
           <animateMotion begin="clock.begin+1.55s" dur="0.6s" fill="remove"><mpath href="#p1"/></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+1.55s" dur="0.6s"/>
         </g>
         <g class="packet" opacity="0">
-          <circle r="6" fill="#00aaff" filter="url(#fGlow)"/>
+          <circle r="6" fill="#38BDF8" filter="url(#fGlow)"/>
           <animateMotion begin="clock.begin+3.35s" dur="0.6s" fill="remove"><mpath href="#p3"/></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+3.35s" dur="0.6s"/>
         </g>
         <g class="packet" opacity="0">
-          <circle r="6" fill="#00aaff" filter="url(#fGlow)"/>
+          <circle r="6" fill="#38BDF8" filter="url(#fGlow)"/>
           <animateMotion begin="clock.begin+4.25s" dur="0.6s" fill="remove"><mpath href="#p4"/></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+4.25s" dur="0.6s"/>
         </g>
         <g class="packet" opacity="0">
-          <circle r="6" fill="#ff00aa" filter="url(#fGlow)"/>
+          <circle r="6" fill="#D946EF" filter="url(#fGlow)"/>
           <animateMotion begin="clock.begin+5.15s" dur="0.6s" fill="remove"><mpath href="#p5"/></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+5.15s" dur="0.6s"/>
         </g>
         <g class="packet" opacity="0">
-          <circle r="6" fill="#ff00aa" filter="url(#fGlow)"/>
+          <circle r="6" fill="#D946EF" filter="url(#fGlow)"/>
           <animateMotion begin="clock.begin+6.05s" dur="0.6s" fill="remove"><mpath href="#p6"/></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+6.05s" dur="0.6s"/>
         </g>
         <g class="packet" opacity="0">
-          <circle r="7" fill="#ff00aa" filter="url(#fGlow)"/>
+          <circle r="7" fill="#D946EF" filter="url(#fGlow)"/>
           <animateMotion begin="clock.begin+6.95s" dur="0.6s" fill="remove"><mpath href="#p7"/></animateMotion>
           <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" begin="clock.begin+6.95s" dur="0.6s"/>
         </g>

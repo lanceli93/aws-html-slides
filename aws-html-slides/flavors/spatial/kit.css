@@ -1,0 +1,445 @@
+/* ===========================================================
+   SPATIAL KIT — flavor 2 · re:Invent "Spatial"   (paste verbatim AFTER stage-engine.css)
+   The deck is ONE CSS-3D world. Every .slide is a panel placed in it; the
+   kit's custom transition flies the camera (= inverse transform on
+   .sp-world) between panels. A fixed canvas (.sp-env) draws the grid floor,
+   horizon and dust with the SAME matrix, so floor and panels stay locked.
+   Requires <body data-stage="free">.
+   RULES
+   - .sp-world, .slide and every .d3 are preserve-3d: never put opacity /
+     filter / overflow / clip / mask on them (flattens). Fade LEAVES (.L).
+   - Components are driven by CSS custom properties (--e = entry 0→1, px
+     positions written by kit.js). Their finished state is declared below
+     under .slide.is-final with !important vars, so overview clones and print
+     need no JS.
+   =========================================================== */
+:root {
+    --bg: #0A0A0A; --bg-title: #0B0015; --indigo: #1E0B4B;
+    --purple: #8B5CF6; --pink: #D946EF; --blue: #3B82F6; --orange: #FF9900;
+    --up: #34D399; --down: #F472B6; --warn: #FBBF24;
+    --t1: #FFFFFF; --t2: rgba(255,255,255,.55); --t3: rgba(255,255,255,.38);
+    --accent: #8B5CF6;
+    --grad-accent: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6);
+    --grad-bar: linear-gradient(90deg, #8B5CF6, #D946EF, #FF9900);
+    --font-display: 'Urbanist', 'Noto Sans SC', sans-serif;
+    --font-body: 'Albert Sans', 'Noto Sans SC', sans-serif;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+    --pad: clamp(1.4rem, 4.2vw, 4.6rem);
+    --h1: clamp(2.2rem, 6.4vw, 6.2rem);
+    --h2: clamp(1.5rem, 3.6vw, 3.4rem);
+    --h3: clamp(.95rem, 1.6vw, 1.45rem);
+    --body: clamp(.78rem, 1.25vw, 1.15rem);
+    --small: clamp(.66rem, .95vw, .92rem);
+    --micro: clamp(.6rem, .75vw, .76rem);
+    /* engine re-timing: style="--d:.4" now means 0.4 s */
+    --rv-step: 1s; --rv-base: .12s; --split-step: 70ms;
+    --stage-thumb-bg: var(--sp-thumb, linear-gradient(180deg, #040009, #0B0015 48%, #3b1470 67.6%, #120327 69%, #0A0A0A));
+}
+@media screen and (max-height: 700px) {
+    :root { --h1: clamp(1.9rem, 5.6vw, 4.4rem); --h2: clamp(1.3rem, 3.1vw, 2.4rem); --body: clamp(.72rem, 1.15vw, 1rem); }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--t1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* leaf depth: registered so it does NOT inherit (a parent's --z never leaks into children) */
+@property --z { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
+/* === 1. ENVIRONMENT (fixed canvas behind the world) === */
+.sp-env { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(120% 60% at 50% 68%, rgba(91,33,182,.30), rgba(11,0,21,0) 60%),
+                linear-gradient(180deg, #040009 0%, #0B0015 52%, #120327 68%, #0A0A0A 100%); }
+.sp-env canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sp-env::after { content: ""; position: absolute; inset: 0; background: radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%); }
+
+/* === 2. WORLD + PANELS === */
+.sp-vp { position: fixed; inset: 0; z-index: 1; overflow: hidden; }       /* perspective set by kit.js */
+.sp-world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; transform-origin: 0 0; }
+.sp-world > .slide { position: absolute; transform-style: preserve-3d; }   /* size + world placement set by kit.js */
+.d3 { transform-style: preserve-3d; }
+/* leaf: sits at its own depth, carries the per-panel fade (--fade) and its own entry (--o) */
+.L { position: relative; transform: translateZ(var(--z, 0px)); opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-frame { position: absolute; inset: clamp(.6rem, 1.4vw, 1.4rem); border-radius: clamp(10px, 1.2vw, 20px);
+    transform: translateZ(-2px); opacity: var(--fr, 0); pointer-events: none;
+    border: 1px solid rgba(139,92,246,.22);
+    background: linear-gradient(160deg, rgba(139,92,246,.06), rgba(11,0,21,.10) 40%, rgba(217,70,239,.04));
+    box-shadow: 0 0 60px rgba(139,92,246,.12) inset; }
+.sp-frame::before, .sp-frame::after { content: ""; position: absolute; width: 22px; height: 22px; border: 0 solid rgba(232,121,249,.75); }
+.sp-frame::before { left: -1px; top: -1px; border-width: 2px 0 0 2px; border-top-left-radius: inherit; }
+.sp-frame::after { right: -1px; bottom: -1px; border-width: 0 2px 2px 0; border-bottom-right-radius: inherit; }
+.sp-stage { position: absolute; inset: 0; padding: var(--pad); padding-top: clamp(3.4rem, 9vh, 5.6rem); padding-bottom: clamp(2.8rem, 8vh, 4.8rem); }
+.sp-stage.center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.sp-head { max-width: 62%; }
+.sp-foot { position: absolute; left: clamp(1.8rem, 3.4vw, 3.4rem); bottom: clamp(1.3rem, 3.4vh, 2.4rem); font-size: var(--micro); color: var(--t3); }
+.sp-note { position: absolute; right: clamp(1.8rem, 3.4vw, 3.4rem); bottom: clamp(1.3rem, 3.4vh, 2.4rem); font-size: var(--micro); color: var(--t3); }
+
+/* === 3. TYPE === */
+.eyebrow { display: inline-flex; align-items: center; gap: .7em; font-family: var(--font-display); font-weight: 700;
+    font-size: var(--small); letter-spacing: .28em; text-transform: uppercase; color: #c4b5fd; }   /* Latin only */
+.eyebrow::before { content: ""; width: 2.4em; height: 2px; background: var(--grad-bar); border-radius: 2px; }
+.sp-h1 { font-family: var(--font-display); font-weight: 800; font-size: var(--h1); line-height: 1.04; letter-spacing: -.03em; }
+.sp-h2 { font-family: var(--font-display); font-weight: 800; font-size: var(--h2); line-height: 1.1; letter-spacing: -.02em; margin-top: .35em; }
+:lang(zh) .sp-h1, :lang(zh) .sp-h2 { line-height: 1.24; letter-spacing: 0; }
+.grad { background: var(--grad-accent); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.grad-block { display: inline-block; padding: 0 .05em .08em; }
+.sp-desc { font-size: var(--body); color: var(--t2); line-height: 1.6; margin-top: .9em; max-width: 34em; }
+.sp-desc b { color: #fff; font-weight: 600; }
+.sp-chips { display: flex; flex-wrap: wrap; gap: .5em; margin-top: 1.2em; }
+.sp-chip2 { display: inline-flex; align-items: center; gap: .45em; padding: .42em .85em; border-radius: 99px; font-size: var(--small);
+    background: rgba(139,92,246,.12); border: 1px solid rgba(167,139,250,.3); color: rgba(255,255,255,.86); }
+.sp-chip2 svg { width: 1.1em; height: 1.1em; color: #d8b4fe; }
+.sp-card { padding: clamp(.8rem, 1.4vw, 1.4rem); border-radius: 18px;
+    background: linear-gradient(165deg, rgba(139,92,246,.26), rgba(18,6,40,.86) 58%); border: 1px solid rgba(167,139,250,.34);
+    box-shadow: 0 26px 64px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12); }
+.sp-delta { display: inline-flex; align-items: center; gap: .35em; font-size: clamp(.72rem, 1.05vw, 1.02rem); font-weight: 600; margin-top: .5em;
+    padding: .3em .7em; border-radius: 99px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: var(--t2); }
+.sp-delta svg { width: 1.2em; height: 1.2em; }
+.sp-delta.up { color: var(--up); } .sp-delta.down { color: var(--down); }
+
+/* === 4. HUD (flat, above the world; hidden in print via .stage-bg) === */
+.sp-hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: var(--font-display); }
+.sp-brand { position: absolute; left: clamp(1.8rem, 3.4vw, 3.4rem); top: clamp(1.5rem, 4vh, 2.8rem); display: flex; align-items: center; gap: .6em;
+    font-size: var(--micro); font-weight: 700; letter-spacing: .24em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+.sp-brand b { width: .55em; height: .55em; border-radius: 50%; background: var(--orange); box-shadow: 0 0 12px var(--orange); }
+.sp-where { position: absolute; right: clamp(1.8rem, 3.4vw, 3.4rem); top: clamp(1.1rem, 3.2vh, 2.3rem); display: flex; align-items: center; gap: 1em;
+    font-size: var(--micro); letter-spacing: .2em; text-transform: uppercase; color: var(--t3); }
+.sp-where .slide-index { color: #fff; font-weight: 700; letter-spacing: .12em; }
+.sp-map { width: clamp(70px, 7vw, 112px); height: clamp(44px, 4.4vw, 70px); overflow: visible; }
+body[data-stage="free"] .nav-dots { top: auto; right: auto; left: 50%; bottom: clamp(1.5rem, 3.8vh, 2.6rem); transform: translateX(-50%);
+    flex-direction: row; gap: 6px; z-index: 6; }
+body[data-stage="free"] .nav-dots button { width: clamp(18px, 2.2vw, 34px); height: 4px; border-radius: 3px; background: rgba(255,255,255,.16); }
+body[data-stage="free"] .nav-dots button.done { background: rgba(167,139,250,.45); transform: none; }
+body[data-stage="free"] .nav-dots button.on { background: var(--grad-bar); transform: none; }
+
+/* === 5. FINAL STATE (reduced motion · overview clones · print · editor) === */
+.slide.is-final { --fade: 1 !important; --fr: 1 !important; }
+.slide.is-final :is(.sp-gate, .sp-cubes, .sp-fan > *, .sp-pillar, .sp-slab, .sp-tag, .sp-plane-tag, .sp-plane, .sp-step,
+    .sp-node, .sp-chip, .sp-tray, .sp-tier, .sp-rise, .sp-iso, .sp-graph-cap) { --e: 1 !important; }
+.slide.is-final .sp-gate { --pw: 1 !important; }
+.slide.is-final .sp-slab { --drop: 0px !important; }
+.slide.is-final .sp-iso { --gap: var(--gap-open) !important; --rz: var(--rz-home) !important; }
+.slide.is-final .sp-seg, .slide.is-final .sp-edge { --fill: 1 !important; }
+.slide.is-final :is(.sp-pulse, .sp-flow, .sp-drop, .sp-flash) { display: none !important; }
+.slide.is-final .sp-fan > * { --dim: 1 !important; --push: 0px !important; }
+/* overview cards + print pages render panels with the world's perspective */
+/* kit.js wraps each slide's content in .sp-cam: that wrapper (not the clipped slide) carries the
+   perspective in overview cards and print — Chrome's PDF output mis-clips when overflow:hidden and
+   perspective sit on the same element */
+.sp-cam { position: absolute; inset: 0; transform-style: preserve-3d; }
+.stage-ov-thumb > .slide > .sp-cam { perspective: var(--sp-P, 1500px); perspective-origin: 50% calc(50% + var(--sp-OY, 160px)); }
+@media print {
+    /* the page background lives on the slide: keep the slide itself flat (a preserve-3d slide would
+       depth-sort its own background in front of everything at negative z) */
+    body .slide { transform-style: flat !important; }
+    .sp-cam { perspective: var(--sp-P, 1520px) !important; perspective-origin: 800px calc(450px + var(--sp-OY, 162px)) !important; }
+    .sp-hud { display: none !important; }
+    /* Chrome's PDF output drops CSS masks and mis-sorts nested 3D leaves → print a simplified, flat-safe version */
+    .L { transform: none; }
+    /* fan cards print as flat 2D cards at their projected positions (kit.js writes --sx/--sy/--ss) */
+    .sp-fan > * { transform: translate(var(--sx, 0px), calc(var(--fy, 0px) + var(--sy, 0px))) scale(var(--ss, 1)) translate(-50%, -50%) !important; transform-origin: 0 0 !important; }
+    .sp-fan > .d3 { transform-style: flat !important; }
+    .sp-gate .g-ring { -webkit-mask: none !important; mask: none !important; background: none !important; border: calc(var(--lw0) * 1.2) solid #c084fc;
+        box-shadow: 0 0 40px rgba(217,70,239,.6), inset 0 0 40px rgba(217,70,239,.45); }
+    .sp-gate :is(.g-glow, .g-ticks, .g-refl, .g-floor), .sp-chip .rays { display: none !important; }
+}
+
+/* === 6. COMPONENTS ===================================================== */
+
+/* --- 6.1 sp-gate: neon light-gate standing on the floor (cover hero) ----
+   <div class="sp-gate" data-depth="1.25" data-size=".74" data-ratio="1.32"></div> */
+/* children are laid out at their on-screen size and scaled back up by --gk (= 1/perspective-scale):
+   untransformed boxes must stay inside the slide box or print fragmentation clips them */
+.sp-gate { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translate3d(0, var(--gy, 0px), var(--gz, -1200px)) scale(calc(var(--gk, 1) * (.55 + .45 * var(--e, 1)))); }
+.sp-gate > div { position: absolute; width: var(--Dw); height: var(--D); left: calc(var(--Dw) / -2); top: calc(var(--D) / -2); border-radius: 50%; }
+.sp-gate .g-fill { opacity: calc(var(--fade, 1) * var(--pw, 1));
+    background: radial-gradient(closest-side, rgba(255,236,250,.34) 0, rgba(240,171,252,.26) 18%, rgba(217,70,239,.16) 42%, rgba(139,92,246,.10) 70%, rgba(139,92,246,.22) 96%, rgba(139,92,246,0) 100%); }
+.sp-gate :is(.g-ring, .g-glow), .sp-gate .g-refl > i { --lw: var(--lw0);
+    background: conic-gradient(from var(--ga, 0deg), #8B5CF6, #D946EF, #ffb45a, #f472b6, #a78bfa, #60a5fa, #8B5CF6);
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - var(--lw)), #000 calc(100% - var(--lw) + 1px), #000 calc(100% - 1px), transparent 100%);
+            mask: radial-gradient(closest-side, transparent calc(100% - var(--lw)), #000 calc(100% - var(--lw) + 1px), #000 calc(100% - 1px), transparent 100%); }
+.sp-gate .g-ring { opacity: var(--fade, 1); }
+.sp-gate .g-glow { --lw: calc(var(--lw0) * 3.4); filter: blur(calc(var(--lw0) * 2.4)); opacity: calc(var(--fade, 1) * .95 * var(--pw, 1)); }
+.sp-gate .g-ticks { opacity: calc(var(--fade, 1) * .75);
+    background: repeating-conic-gradient(from var(--ta, 0deg), rgba(245,208,254,.95) 0 .5deg, transparent .5deg 5deg);
+    -webkit-mask: radial-gradient(closest-side, transparent 90%, #000 calc(90% + 1px), #000 92.5%, transparent calc(92.5% + 1px));
+            mask: radial-gradient(closest-side, transparent 90%, #000 calc(90% + 1px), #000 92.5%, transparent calc(92.5% + 1px)); }
+.sp-gate .g-floor { width: calc(var(--Dw) * 1.5); height: calc(var(--D) * .8); left: calc(var(--Dw) * -.75); top: calc(var(--D) * .1);
+    transform: rotateX(90deg); opacity: calc(var(--fade, 1) * var(--pw, 1));
+    background: radial-gradient(closest-side, rgba(245,208,254,.55), rgba(217,70,239,.28) 35%, rgba(139,92,246,.10) 65%, rgba(139,92,246,0)); }
+.sp-gate .g-refl { top: calc(var(--D) / 2); opacity: calc(var(--fade, 1) * .3);
+    -webkit-mask: linear-gradient(180deg, #000, transparent 48%); mask: linear-gradient(180deg, #000, transparent 48%); }
+.sp-gate .g-refl > i { position: absolute; inset: 0; border-radius: 50%; }
+
+/* --- 6.2 sp-cubes: nested wireframe "table" cubes (data / Iceberg hero) ---
+   <div class="sp-cubes" data-at="50,42" data-depth="-640"></div> */
+.sp-cubes { position: absolute; left: 50%; top: 42%; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translateZ(var(--cz, -640px)) scale(calc(.3 + .7 * var(--e, 1))); }
+.sp-cubes .core { position: absolute; width: 60vh; height: 60vh; left: -30vh; top: -30vh; border-radius: 50%; transform: translateZ(-300px);
+    opacity: var(--fade, 1); background: radial-gradient(circle, rgba(232,121,249,.45), rgba(139,92,246,.18) 35%, rgba(11,0,21,0) 68%); }
+.sp-cube { position: absolute; transform-style: preserve-3d; }
+.sp-cube.c0 { transform: rotateX(-24deg) rotateY(calc(var(--t, 0) * 9deg + 32deg)); --cs: 58vh; }
+.sp-cube.c1 { transform: rotateX(calc(28deg + var(--t, 0) * 6deg)) rotateY(calc(var(--t, 0) * -24deg)); --cs: 22vh; }
+.sp-cube i { position: absolute; width: var(--cs); height: var(--cs); left: calc(var(--cs) / -2); top: calc(var(--cs) / -2); opacity: var(--fade, 1);
+    border: 1.5px solid rgba(196,181,253,.55); border-radius: 4px;
+    background: linear-gradient(90deg, transparent 33%, rgba(167,139,250,.32) 33% calc(33% + 1px), transparent calc(33% + 1px) 66%, rgba(167,139,250,.32) 66% calc(66% + 1px), transparent calc(66% + 1px)),
+                linear-gradient(0deg, transparent 33%, rgba(167,139,250,.32) 33% calc(33% + 1px), transparent calc(33% + 1px) 66%, rgba(167,139,250,.32) 66% calc(66% + 1px), transparent calc(66% + 1px)),
+                linear-gradient(135deg, rgba(139,92,246,.10), rgba(217,70,239,.05));
+    box-shadow: 0 0 40px rgba(139,92,246,.25), inset 0 0 50px rgba(217,70,239,.12); }
+.sp-cube.c1 i { border-color: rgba(255,200,140,.75); background: linear-gradient(135deg, rgba(255,153,0,.16), rgba(217,70,239,.12));
+    box-shadow: 0 0 30px rgba(255,153,0,.35), inset 0 0 30px rgba(255,180,90,.25); }
+.sp-cube i:nth-child(1) { transform: translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(2) { transform: rotateY(180deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(3) { transform: rotateY(90deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(4) { transform: rotateY(-90deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(5) { transform: rotateX(90deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(6) { transform: rotateX(-90deg) translateZ(calc(var(--cs) / 2)); }
+
+/* --- 6.3 sp-fan: cards on a concave (agenda) or convex (comparison) arc ---
+   <div class="sp-fan" data-at="50,61" data-shape="concave|convex" data-focus="3.2"> <item>… </div>
+   Items fly in from depth. An item that holds depth layers must be .d3 (its leaves fade);
+   any other item is a leaf itself. */
+.sp-fan { position: absolute; left: 50%; top: 0; width: 0; height: 0; transform-style: preserve-3d; }   /* row offset = --fy (print-safe) */
+.sp-fan > * { position: absolute; left: 0; top: 0;
+    --o: calc(min(1, max(0, var(--e, 1) * 1.6)) * var(--dim, 1));
+    transform: translate3d(var(--tx, 0px), calc(var(--fy, 0px) + var(--ty, 0px) + (1 - var(--e, 1)) * 60px + var(--bob, 0px)), calc(var(--tz, 0px) + var(--push, 0px) - (1 - var(--e, 1)) * 1600px))
+               rotateY(calc(var(--ry, 0deg) + (1 - var(--e, 1)) * var(--ryin, 35deg))) translate(-50%, -50%); }
+.sp-fan > :not(.d3) { opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-fan > .sp-focus.sp-card { border-color: rgba(245,208,254,.8); box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 50px rgba(217,70,239,.35); }
+/* monolith (agenda-style tall card with a big outlined number floating in front) */
+.sp-mono { --cw: min(18vw, 36vh); --ch: min(48vh, calc(var(--cw) * 1.5)); width: var(--cw); height: var(--ch); transform-style: preserve-3d; }
+.sp-mono > .sp-mono-face { position: absolute; inset: 0; border-radius: clamp(12px, 1.3vw, 22px);
+    background: linear-gradient(172deg, rgba(139,92,246,.30), rgba(30,11,75,.62) 42%, rgba(10,6,20,.78));
+    border: 1px solid rgba(167,139,250,.30); box-shadow: 0 40px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 50px rgba(139,92,246,.18); }
+.sp-mono > .sp-mono-face::before { content: ""; position: absolute; left: 12%; right: 12%; top: -1px; height: 2px; background: var(--grad-bar); border-radius: 2px; box-shadow: 0 0 18px rgba(217,70,239,.8); }
+.sp-mono > .sp-mono-face::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.07) 45%, transparent 60%); }
+.sp-mono-num { position: absolute !important; left: 10%; top: 6%; --z: 70px; font-family: var(--font-display); font-weight: 900; font-size: calc(var(--cw) * .46); line-height: 1;
+    color: transparent; -webkit-text-stroke: 1.5px rgba(232,121,249,.85); text-shadow: 0 0 30px rgba(217,70,239,.35); }
+.sp-mono-body { position: absolute !important; left: 10%; right: 10%; bottom: 9%; --z: 34px; }
+.sp-mono-body .ico { width: clamp(34px, 3.2vw, 52px); height: clamp(34px, 3.2vw, 52px); border-radius: 12px; display: grid; place-items: center;
+    background: rgba(139,92,246,.18); border: 1px solid rgba(167,139,250,.35); margin-bottom: 1em; color: #e9d5ff; }
+.sp-mono-body .ico svg { width: 52%; height: 52%; }
+.sp-mono-body h3 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); line-height: 1.15; }
+.sp-mono-body p { font-size: var(--micro); letter-spacing: .22em; text-transform: uppercase; color: var(--t3); margin-top: .7em; }
+/* meter (5 segments) for comparison cards: <span class="sp-meter" data-v="4"><b></b>×5</span> */
+.sp-meter { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.sp-meter b { height: 7px; border-radius: 2px; background: rgba(255,255,255,.1); }
+.sp-meter b.on { background: linear-gradient(90deg, #a78bfa, #e879f9); box-shadow: 0 0 8px rgba(217,70,239,.6); }
+
+/* --- 6.4 sp-pillars: lit 3D bars rising from the grid floor ------------------
+   <div class="sp-pillars" data-depth=".3"> <div class="sp-pillar pink" data-v="6" [data-x="39"]> <div class="sp-plab">…</div> </div> … */
+.sp-pillars { position: absolute; left: 50%; top: 100%; width: 0; height: 0; transform-style: preserve-3d; transform: translateZ(var(--pz, -400px)); }
+.sp-pillar { position: absolute; bottom: 0; transform-style: preserve-3d; width: var(--pw); height: calc(var(--ph, 200px) * var(--e, 1));
+    left: calc(var(--px, 0px) - var(--pw) / 2);
+    --c1: #c4b5fd; --c2: #8B5CF6; --c3: rgba(46,16,101,.85); }
+.sp-pillar.pink { --c1: #f5d0fe; --c2: #D946EF; --c3: rgba(88,16,110,.85); }
+.sp-pillar.blue { --c1: #bfdbfe; --c2: #3B82F6; --c3: rgba(23,37,110,.85); }
+.sp-pillar.orange { --c1: #fed7aa; --c2: #FF9900; --c3: rgba(110,45,10,.85); }
+.sp-pillar.magenta { --c1: #f5d0fe; --c2: #c026d3; --c3: rgba(76,29,149,.9); }
+.sp-pillar.ghost { --c1: #9ca3af; --c2: #6b7280; --c3: rgba(31,41,55,.9); }
+.sp-pillar > .fc { position: absolute; opacity: var(--fade, 1); backface-visibility: hidden; }
+.sp-pillar > .fc.front { inset: 0; transform: translateZ(calc(var(--pd) / 2)); background: linear-gradient(180deg, var(--c1) 0%, var(--c2) 38%, var(--c3) 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+.sp-pillar > .fc.front::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(180deg, rgba(255,255,255,.10) 0 1px, transparent 1px 22px); }
+.sp-pillar > .fc.back { inset: 0; transform: translateZ(calc(var(--pd) / -2)) rotateY(180deg); background: var(--c3); }
+.sp-pillar > .fc.sl, .sp-pillar > .fc.sr { top: 0; bottom: 0; width: var(--pd); left: calc(50% - var(--pd) / 2); background: linear-gradient(180deg, var(--c2), var(--c3) 70%, #0b0418); filter: brightness(.62); }
+.sp-pillar > .fc.sl { transform: rotateY(-90deg) translateZ(calc(var(--pw) / 2)); }
+.sp-pillar > .fc.sr { transform: rotateY(90deg) translateZ(calc(var(--pw) / 2)); }
+.sp-pillar > .fc.top { left: 0; width: 100%; height: var(--pd); top: calc(var(--pd) / -2); transform: rotateX(90deg); background: radial-gradient(circle at 50% 50%, #fff, var(--c1) 65%); box-shadow: 0 0 30px 2px var(--c1); }
+.sp-pillar.ghost > .fc.front { background: linear-gradient(180deg, rgba(156,163,175,.55), rgba(75,85,99,.45)); }
+.sp-pillar.ghost > .fc.top { background: rgba(209,213,219,.6); box-shadow: none; }
+.sp-pool { position: absolute; width: calc(var(--pw) * 3); height: calc(var(--pw) * 3); left: calc(50% - var(--pw) * 1.5); top: calc(100% - var(--pw) * 1.5);
+    transform: rotateX(90deg); border-radius: 50%; opacity: calc(var(--fade, 1) * var(--e, 1) * var(--pool, .55)); background: radial-gradient(circle, var(--c1), rgba(0,0,0,0) 62%); }
+.sp-plab { position: absolute; left: 50%; bottom: 100%; width: max-content; text-align: center;
+    transform: translate3d(-50%, calc(var(--pd) * -.32 - 1.4vh), calc(var(--pd) / 2 + 2px)); opacity: calc(var(--fade, 1) * min(1, var(--e, 1) * 4)); }
+.sp-plab .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(2.3rem, 5.2vw, 5.4rem); line-height: 1; letter-spacing: -.02em; text-shadow: 0 0 30px rgba(217,70,239,.35); }
+.sp-plab h4 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.05rem, 1.9vw, 1.8rem); margin-top: .15em; }
+.sp-pillar.ghost .sp-plab .v { font-size: clamp(1rem, 1.9vw, 1.9rem); color: rgba(255,255,255,.6); text-shadow: none; }
+.sp-pillars.compact .sp-plab .v { font-size: clamp(1.5rem, 3vw, 3rem); }
+.sp-pillars.compact .sp-plab h4 { font-size: clamp(.85rem, 1.4vw, 1.35rem); }
+
+/* --- 6.5 sp-stack: exploded isometric layer stack (+ optional cutting plane) --
+   <div class="sp-stack" data-at="61,57" data-size=".27" [data-orbit="17"] [data-flow="12"]>
+     <div class="sp-slab orange"><i data-lucide="cpu"></i>
+       <div class="sp-tag"><span class="lv">Silicon</span><h4>Trainium3</h4><p>Frontier-scale training</p></div></div> …(bottom → top)
+     [<div class="sp-plane-tag"><span class="lv">GOVERNANCE</span><h4>…</h4><p>…</p></div>]   */
+.sp-stack { position: absolute; left: 61%; top: 57%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-iso { position: absolute; transform-style: preserve-3d; --rx: 57deg;
+    --base: calc((var(--n) - 1) * var(--gap) / -2 - var(--t) / 2 - var(--s) * .04);
+    transform: rotateX(var(--rx)) rotateZ(var(--rz, -42deg)); }
+.sp-slab { position: absolute; width: var(--s); height: var(--s); left: calc(var(--s) / -2); top: calc(var(--s) / -2); transform-style: preserve-3d;
+    --o: var(--e, 1); transform: translateZ(calc(var(--base) + var(--k) * var(--gap) + var(--drop, 0px)));
+    --top: linear-gradient(135deg, #a78bfa, #6d28d9); --side: linear-gradient(90deg, #2e1065, #5b21b6); --gl: #c4b5fd;
+    --pat: radial-gradient(circle, rgba(255,255,255,.22) 1.5px, transparent 2px) 0 0/14% 14%; }
+.sp-slab.orange { --top: linear-gradient(135deg, #ffb347, #c2410c); --side: linear-gradient(90deg, #7c2d12, #c2410c); --gl: #FF9900;
+    --pat: repeating-linear-gradient(0deg, rgba(255,255,255,.14) 0 1px, transparent 1px 10%), repeating-linear-gradient(90deg, rgba(255,255,255,.14) 0 1px, transparent 1px 10%); }
+.sp-slab.blue { --top: linear-gradient(135deg, #60a5fa, #1d4ed8); --side: linear-gradient(90deg, #172554, #1e40af); --gl: #93c5fd;
+    --pat: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 2px, transparent 2px 12px); }
+.sp-slab.pink { --top: linear-gradient(135deg, #f0abfc, #a21caf); --side: linear-gradient(90deg, #701a75, #c026d3); --gl: #f0abfc;
+    --pat: repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 2px, transparent 2px 12px); }
+.sp-slab.glass { --top: linear-gradient(135deg, rgba(245,208,254,.55), rgba(217,70,239,.35)); --side: linear-gradient(90deg, rgba(134,25,143,.7), rgba(217,70,239,.6)); --gl: #e879f9; --pat: none; }
+.sp-slab.slate { --top: linear-gradient(135deg, #94a3b8, #334155); --side: linear-gradient(90deg, #1e293b, #475569); --gl: #cbd5e1;
+    --pat: repeating-linear-gradient(0deg, rgba(255,255,255,.14) 0 1px, transparent 1px 12%); }
+.sp-slab > .ft { position: absolute; inset: 0; transform: translateZ(var(--t)); border-radius: 6px; opacity: calc(var(--fade, 1) * var(--o, 1));
+    background: var(--top); box-shadow: inset 0 0 0 1px rgba(255,255,255,.28), inset 0 0 40px rgba(255,255,255,.08); display: grid; place-items: center; }
+.sp-slab > .ft::before { content: ""; position: absolute; inset: 8%; border-radius: 4px; border: 1px solid rgba(255,255,255,.22); background: var(--pat); }
+.sp-slab > .ft svg { position: relative; width: 24%; height: 24%; color: #fff; filter: drop-shadow(0 0 10px rgba(255,255,255,.6)); }
+.sp-slab > .fs { position: absolute; opacity: calc(var(--fade, 1) * var(--o, 1)); background: var(--side); }
+.sp-slab > .fs.s { left: 0; top: 100%; width: 100%; height: var(--t); transform-origin: 50% 0; transform: rotateX(90deg); }
+.sp-slab > .fs.n { left: 0; top: 0; width: 100%; height: var(--t); transform-origin: 50% 0; transform: rotateX(90deg); filter: brightness(.7); }
+.sp-slab > .fs.w { left: 0; top: 0; width: var(--t); height: 100%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(1.25); }
+.sp-slab > .fs.e { left: 100%; top: 0; width: var(--t); height: 100%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(.8); }
+.sp-slab > .glow { position: absolute; inset: -14%; border-radius: 50%; transform: translateZ(-1px); opacity: calc(var(--fade, 1) * var(--o, 1) * .55); background: radial-gradient(circle, var(--gl), transparent 65%); }
+/* billboard label: anchored at the slab's right-most corner, counter-rotated to face the camera */
+.sp-anchor { position: absolute; left: 100%; top: 100%; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translateZ(var(--t)) rotateZ(calc(-1 * var(--rz, -42deg))) rotateX(calc(-1 * var(--rx))); }
+.sp-tag { position: absolute; left: 0; top: 0; white-space: nowrap; padding-left: clamp(2rem, 4vw, 4.4rem);
+    transform: translate(1.4vw, -50%); --o: var(--e, 1); opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-tag::before { content: ""; position: absolute; left: 0; top: 50%; width: clamp(1.6rem, 3.4vw, 3.8rem); height: 1px; background: linear-gradient(90deg, rgba(255,255,255,.1), var(--gl)); }
+.sp-tag::after { content: ""; position: absolute; left: -3px; top: calc(50% - 3px); width: 6px; height: 6px; border-radius: 50%; background: var(--gl); box-shadow: 0 0 10px var(--gl); }
+.sp-tag h4 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); line-height: 1.15; }
+.sp-tag p { font-size: var(--small); color: var(--t2); margin-top: .2em; }
+.sp-tag .lv { display: block; font-family: var(--font-display); font-size: var(--micro); letter-spacing: .22em; text-transform: uppercase; color: var(--gl); font-weight: 700; margin-bottom: .3em; }
+.sp-stack.dense .sp-tag h4 { font-size: clamp(.92rem, 1.45vw, 1.4rem); }
+.sp-stack.dense .sp-tag p { font-size: clamp(.66rem, .95vw, .92rem); color: rgba(255,255,255,.62); }
+.sp-plane { position: absolute; top: 0; transform-origin: 0 0; border-radius: 6px; --o: calc(var(--e, 1) * .9); opacity: calc(var(--fade, 1) * var(--o, 1));
+    left: calc(var(--s) * -.6); width: calc(var(--s) * 1.2); height: calc((var(--n) - 1) * var(--gap) + var(--t) + var(--s) * .2);
+    transform: translateZ(calc(var(--base) - var(--s) * .1)) rotateX(90deg);
+    background: linear-gradient(0deg, rgba(217,70,239,.30), rgba(217,70,239,.10)),
+                repeating-linear-gradient(0deg, rgba(245,208,254,.28) 0 1px, transparent 1px 10%), repeating-linear-gradient(90deg, rgba(245,208,254,.16) 0 1px, transparent 1px 12.5%);
+    border: 1px solid rgba(245,208,254,.55); box-shadow: 0 0 40px rgba(217,70,239,.35), inset 0 0 30px rgba(217,70,239,.2); }
+.sp-plane-anchor { position: absolute; left: calc(var(--s) * -.6); top: 0; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translateZ(calc(var(--base) + ((var(--n) - 1) * var(--gap) + var(--t)) * .62)) rotateZ(calc(-1 * var(--rz, -42deg))) rotateX(calc(-1 * var(--rx))); }
+.sp-plane-tag { position: absolute; right: 0; bottom: 0; transform: translate(-1.4vw, -.4vh); white-space: nowrap; text-align: right;
+    padding: .55em .9em; border-radius: 12px; background: rgba(40,8,50,.72); border: 1px solid rgba(245,208,254,.45);
+    --o: var(--e, 1); opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-plane-tag .lv { display: block; font-family: var(--font-display); font-size: var(--micro); letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: #f0abfc; }
+.sp-plane-tag h4 { font-weight: 700; font-size: clamp(.85rem, 1.3vw, 1.25rem); }
+.sp-plane-tag p { font-size: var(--small); color: var(--t2); }
+.sp-flow { position: absolute; width: 10px; height: 10px; left: -5px; top: -5px; border-radius: 50%; opacity: calc(var(--fade, 1) * var(--o, 0));
+    background: #fff; box-shadow: 0 0 12px 4px rgba(232,121,249,.9), 0 0 30px 8px rgba(139,92,246,.5); }
+
+/* --- 6.6 sp-runway: steps standing on a rising 3D path; a light pulse runs it --
+   <div class="sp-runway" data-path="13,66,.03 87,40,-.27" [data-grow="1.25"] [data-tour]>
+     <div class="sp-step sp-card">…</div> … </div>      (data-tour = the CAMERA travels stop to stop) */
+.sp-runway { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-seg { position: absolute; left: 0; top: -2px; height: 4px; transform-origin: 0 50%; opacity: var(--fade, 1); background: rgba(167,139,250,.16); border-radius: 2px; }
+.sp-seg.fade-in { background: linear-gradient(90deg, transparent, rgba(167,139,250,.16)); }
+.sp-seg.fade-out { background: linear-gradient(90deg, rgba(167,139,250,.16), transparent); }
+.sp-seg i { position: absolute; inset: 0; background: linear-gradient(90deg, #8B5CF6, #e879f9); box-shadow: 0 0 14px #d946ef; transform: scaleX(var(--fill, 0)); transform-origin: 0 50%; border-radius: 2px; }
+.sp-rnode { position: absolute; width: 2.6vh; height: 2.6vh; left: -1.3vh; top: -1.3vh; border-radius: 50%; opacity: var(--fade, 1);
+    border: 2px solid rgba(232,121,249,.55); background: radial-gradient(circle, rgba(217,70,239,.45), transparent 62%); transition: box-shadow .4s, border-color .4s; }
+.sp-rnode.hit, .slide.is-final .sp-rnode { border-color: #fff; box-shadow: 0 0 30px 6px rgba(217,70,239,.7), inset 0 0 20px rgba(255,255,255,.4); }
+.sp-stem { position: absolute; left: -1px; top: 0; width: 2px; opacity: var(--fade, 1); background: linear-gradient(0deg, rgba(232,121,249,.8), rgba(232,121,249,0)); }
+.sp-step { position: absolute; left: 0; top: 0; width: min(16.5vw, 33vh); transform-origin: 50% 100%;
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), var(--tz, 0px)) translate(-50%, -100%) translateY(calc((1 - var(--e, 1)) * 24px)) scale(calc(var(--k, 1) * (.94 + .06 * var(--e, 1))));
+    opacity: calc(var(--fade, 1) * min(1, var(--e, 1) * 1.5)); }
+.sp-step .no { font-family: var(--font-display); font-weight: 800; font-size: var(--small); letter-spacing: .2em; color: #f0abfc; }
+.sp-step h3 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); line-height: 1.2; margin: .3em 0 .35em; }
+.sp-step p { font-size: var(--small); color: var(--t2); line-height: 1.45; }
+.sp-step > svg { position: absolute; right: .9em; top: .9em; width: 1.4em; height: 1.4em; color: #c4b5fd; }
+.sp-pulse { position: absolute; width: 5vh; height: 5vh; left: -2.5vh; top: -2.5vh; border-radius: 50%; opacity: calc(var(--fade, 1) * var(--o, 0));
+    background: radial-gradient(circle, #fff 0, #f5d0fe 25%, rgba(217,70,239,.6) 45%, rgba(217,70,239,0) 70%); }
+
+/* --- 6.7 sp-chip: product-reveal chip (CSS-3D cuboid, lit, spinning) -------
+   <div class="sp-chip" data-at="30,46" data-name="TRAINIUM4"></div> */
+.sp-chip { position: absolute; left: 30%; top: 46%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-chip .aura { position: absolute; width: 120vh; height: 120vh; left: -60vh; top: -60vh; border-radius: 50%; transform: translateZ(-300px);
+    opacity: calc(var(--fade, 1) * var(--e, 1)); background: radial-gradient(circle, rgba(217,70,239,.42), rgba(139,92,246,.20) 30%, rgba(11,0,21,0) 62%); }
+.sp-chip .rays { position: absolute; width: 150vh; height: 150vh; left: -75vh; top: -75vh; border-radius: 50%; opacity: calc(var(--fade, 1) * .55);
+    transform: translateZ(-420px) rotate(var(--rr, 0deg));
+    background: repeating-conic-gradient(from 0deg, rgba(232,121,249,.22) 0deg 2deg, transparent 2deg 15deg);
+    -webkit-mask: radial-gradient(circle, #000 8%, transparent 62%); mask: radial-gradient(circle, #000 8%, transparent 62%); }
+.sp-chip .sp-flash { position: absolute; width: 80vh; height: 80vh; left: -40vh; top: -40vh; border-radius: 50%; opacity: calc(var(--fade, 1) * var(--fl, 0));
+    transform: translateZ(-60px) scale(var(--fls, 1)); background: radial-gradient(circle, rgba(255,255,255,.95), rgba(245,208,254,.5) 18%, rgba(217,70,239,0) 55%); }
+.sp-chip .body { position: absolute; --cs: min(40vh, 27vw); --ct: calc(var(--cs) * .075); width: var(--cs); height: var(--cs); left: calc(var(--cs) / -2); top: calc(var(--cs) / -2);
+    transform-style: preserve-3d;
+    transform: translate3d(0, var(--bob, 0px), calc((1 - var(--e, 1)) * -2800px)) rotateX(calc(8deg + 44deg * var(--e, 1))) rotateZ(calc((1 - var(--e, 1)) * -300deg + var(--spin, 0deg))); }
+.sp-chip .ctop { position: absolute; inset: 0; transform: translateZ(var(--ct)); border-radius: 7%; opacity: var(--fade, 1); overflow: hidden;
+    background: linear-gradient(135deg, #2a1450, #120726 55%, #1d0b3a); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), inset 0 0 0 calc(var(--cs) * .03) rgba(139,92,246,.18); }
+.sp-chip .ctop::before { content: ""; position: absolute; inset: 5%; border-radius: 5%;
+    background: repeating-linear-gradient(90deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) top/100% 4% no-repeat,
+                repeating-linear-gradient(90deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) bottom/100% 4% no-repeat,
+                repeating-linear-gradient(0deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) left/4% 100% no-repeat,
+                repeating-linear-gradient(0deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) right/4% 100% no-repeat; }
+.sp-chip .die { position: absolute; inset: 17%; border-radius: 4%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 9%;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.10) 0 1px, transparent 1px 12.5%), repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, transparent 1px 12.5%),
+                radial-gradient(circle at 50% 50%, #c084fc, #7c3aed 45%, #3b0764 100%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.45), 0 0 40px rgba(217,70,239,.75), inset 0 0 30px rgba(0,0,0,.45); }
+.sp-chip .cores { position: absolute; inset: 14%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7%; }
+.sp-chip .cores b { border-radius: 3px; background: linear-gradient(135deg, rgba(255,255,255,.5), rgba(232,121,249,.25)); box-shadow: 0 0 10px rgba(255,255,255,.35); }
+.sp-chip .cores b:nth-child(3n) { background: linear-gradient(135deg, rgba(255,200,120,.65), rgba(255,153,0,.25)); }
+.sp-chip .nm { position: relative; font-family: var(--font-display); font-weight: 800; font-size: calc(var(--cs) * .055); letter-spacing: .2em; color: #fff;
+    background: rgba(10,4,24,.55); padding: .2em .6em; border-radius: 4px; }
+.sp-chip .spec { position: absolute; inset: -40%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%);
+    transform: translateX(var(--sx, 0%)); mix-blend-mode: screen; pointer-events: none; }
+.sp-chip .cbot { position: absolute; inset: 0; border-radius: 7%; background: #0c0418; opacity: var(--fade, 1); }
+.sp-chip .cs { position: absolute; opacity: var(--fade, 1); background: linear-gradient(90deg, #3b1d6e, #6d3fc0 50%, #3b1d6e); }
+.sp-chip .cs::after { content: ""; position: absolute; inset: 25% 6%; background: repeating-linear-gradient(90deg, #ffb45a 0 3px, transparent 3px 10px); opacity: .75; }
+.sp-chip .cs.s { left: 4%; top: 100%; width: 92%; height: var(--ct); transform-origin: 50% 0; transform: rotateX(90deg); }
+.sp-chip .cs.n { left: 4%; top: 0; width: 92%; height: var(--ct); transform-origin: 50% 0; transform: rotateX(90deg); filter: brightness(.6); }
+.sp-chip .cs.w { left: 0; top: 4%; width: var(--ct); height: 92%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(1.2); }
+.sp-chip .cs.e { left: 100%; top: 4%; width: var(--ct); height: 92%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(.75); }
+.sp-chip .cs.w::after, .sp-chip .cs.e::after { inset: 6% 25%; background: repeating-linear-gradient(0deg, #ffb45a 0 3px, transparent 3px 10px); }
+
+/* --- 6.8 sp-graph: nodes at screen anchors + depth, 3D edges, query highlight --
+   <div class="sp-graph" [data-hot="a b c | a d e"]>
+     <div class="sp-node" data-id="meta" data-link="cat" data-at="72,35" data-z="-.32" data-lv="1"><h4>…</h4><p>…</p></div> …
+     [<div class="sp-graph-cap" data-at="72,87"><p>caption for hot set 1</p><p>…set 2</p></div>] */
+.sp-graph { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-node { position: absolute; left: 0; top: 0; white-space: nowrap; padding: .55em .95em; border-radius: 12px;
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), var(--tz, 0px)) translate(-50%, -50%);
+    opacity: calc(var(--fade, 1) * var(--e, 1) * var(--hot, 1));
+    background: linear-gradient(160deg, rgba(139,92,246,.30), rgba(18,6,40,.85)); border: 1px solid rgba(167,139,250,.4); box-shadow: 0 18px 40px rgba(0,0,0,.45);
+    transition: border-color .4s, box-shadow .4s, filter .4s; }
+.sp-node h4 { font-family: var(--font-display); font-weight: 700; font-size: clamp(.82rem, 1.25vw, 1.2rem); display: flex; align-items: center; gap: .45em; }
+.sp-node h4 svg { width: 1.05em; height: 1.05em; color: #d8b4fe; }
+.sp-node p { font-size: clamp(.62rem, .86vw, .82rem); color: var(--t2); margin-top: .15em; }
+.sp-node.accent { background: linear-gradient(160deg, rgba(255,153,0,.28), rgba(40,16,4,.85)); border-color: rgba(255,180,90,.55); }
+.sp-node.accent h4 svg { color: #fdba74; }
+.sp-node.small { padding: .45em .55em; border-radius: 9px; }
+.sp-node.small h4 { font-size: clamp(.66rem, .9vw, .86rem); }
+.sp-node.sp-dim { --hot: .32; filter: saturate(.3); }
+.sp-node.sp-hot { border-color: #f5d0fe; box-shadow: 0 0 0 1px rgba(245,208,254,.4), 0 0 34px rgba(217,70,239,.55); }
+.sp-edge { position: absolute; left: 0; top: -1px; height: 2px; transform-origin: 0 50%; opacity: calc(var(--fade, 1) * var(--hot, 1)); background: rgba(167,139,250,.28); }
+.sp-edge.sp-dim { --hot: .25; }
+.sp-edge i { position: absolute; inset: 0; background: linear-gradient(90deg, #c084fc, #f0abfc); box-shadow: 0 0 10px #d946ef; transform: scaleX(var(--fill, 0)); transform-origin: 0 50%; }
+.sp-graph-cap { position: absolute; left: 0; top: 0; white-space: nowrap; opacity: calc(var(--fade, 1) * var(--e, 1));
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translate(-50%, 0); }
+.sp-graph-cap > * { display: none; font-size: var(--small); color: #f5d0fe; padding: .35em .8em; border-radius: 99px; background: rgba(217,70,239,.14); border: 1px solid rgba(240,171,252,.4); }
+.sp-graph-cap > .on, .slide.is-final .sp-graph-cap > :first-child { display: block; }
+
+/* --- 6.9 sp-tiers: records fall through tilted trays, fewer at each tier ------
+   <div class="sp-tiers" data-tray-x="31" data-row-x="52" data-y="39,81" data-pass=".55,.4">
+     <div class="sp-tier bronze">…row content…</div> … */
+.sp-tiers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-tray { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; --o: var(--e, 1);
+    --m1: #a78bfa; --m2: #6d28d9; --m3: #2e1065;
+    transform: translate3d(var(--tx, 0px), calc(var(--ty, 0px) - (1 - var(--e, 1)) * 80px), var(--tz, 0px)) rotateX(58deg); }
+.sp-tray > i { position: absolute; opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-tray > .tt { width: var(--tw); height: var(--td); left: calc(var(--tw) / -2); top: calc(var(--td) / -2); transform: translateZ(var(--th)); border-radius: 10px; overflow: hidden;
+    background: linear-gradient(135deg, var(--m1), var(--m2)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), inset 0 0 40px rgba(255,255,255,.12); }
+.sp-tray > .tt::before { content: ""; position: absolute; inset: 7%; border-radius: 6px; border: 1px dashed rgba(255,255,255,.35); }
+.sp-tray > .tf { width: var(--tw); height: var(--th); left: calc(var(--tw) / -2); top: calc(var(--td) / 2); transform-origin: 50% 0; transform: rotateX(90deg); background: linear-gradient(90deg, var(--m3), var(--m2), var(--m3)); }
+.sp-tray > .tw { width: var(--th); height: var(--td); left: calc(var(--tw) / -2); top: calc(var(--td) / -2); transform-origin: 0 50%; transform: rotateY(-90deg); background: var(--m3); filter: brightness(1.2); }
+.sp-tray > .te { width: var(--th); height: var(--td); left: calc(var(--tw) / 2); top: calc(var(--td) / -2); transform-origin: 0 50%; transform: rotateY(-90deg); background: var(--m3); filter: brightness(.7); }
+.sp-rip { position: absolute; width: 5vh; height: 5vh; margin: -2.5vh 0 0 -2.5vh; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); opacity: 0; pointer-events: none; }
+.sp-drop { position: absolute; width: 12px; height: 12px; left: -6px; top: -6px; border-radius: 3px; opacity: calc(var(--fade, 1) * var(--o, 0)); background: var(--dc, #fff); box-shadow: 0 0 12px 3px var(--dc, #fff); }
+.sp-tier { position: absolute; left: 0; top: 0; width: min(44vw, 640px); --o: var(--e, 1); opacity: calc(var(--fade, 1) * var(--o, 1));
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translateY(-50%);
+    display: grid; grid-template-columns: auto 1fr; gap: .2em 1.2em; align-items: baseline;
+    --m1: #a78bfa; --m2: #6d28d9; --m3: #2e1065; --mc: #c4b5fd; }
+.sp-tier.bronze, .sp-tray.bronze { --m1: #f3b483; --m2: #9a5a2a; --m3: #5c3415; --mc: #f0b07a; }
+.sp-tier.silver, .sp-tray.silver { --m1: #f1f5f9; --m2: #94a3b8; --m3: #475569; --mc: #e2e8f0; }
+.sp-tier.gold, .sp-tray.gold { --m1: #fde68a; --m2: #d99a0b; --m3: #7a5205; --mc: #fbbf24; }
+.sp-tier .tier { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.05rem, 1.9vw, 1.8rem); letter-spacing: .06em; color: var(--mc); }
+.sp-tier h4 { font-weight: 700; font-size: clamp(.92rem, 1.5vw, 1.45rem); }
+.sp-tier p { grid-column: 2; font-size: var(--small); color: var(--t2); line-height: 1.55; }
+.sp-tier p.rows { font-family: var(--font-display); font-weight: 700; color: var(--mc); margin-top: .2em; }
+
+/* --- 6.10 sp-rise: any leaf that flies up out of the depth on entry ----------
+   <div class="sp-rise" data-delay="1.3">…</div>   (delay in seconds after landing) */
+.sp-rise { position: relative; transform: translateZ(calc((1 - var(--e, 1)) * -1600px)); opacity: calc(var(--fade, 1) * min(1, var(--e, 1) * 1.8)); }
+
+/* === 7. REDUCED MOTION === */
+@media (prefers-reduced-motion: reduce) {
+    .sp-rnode, .sp-node { transition: none; }
+}

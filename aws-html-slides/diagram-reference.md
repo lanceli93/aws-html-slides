@@ -51,10 +51,10 @@ DynamoDB --> Client: 201 Created
 | Demo | Type | Palette | Signature techniques |
 |------|------|---------|---------------------|
 | `../demos/diagrams/01-flowchart-flow/` | flowchart | re:Invent purple | node pop + edge draw-in choreography, SMIL packets chained through the graph, dashed marching-ants return edge, golden-node glow pulse |
-| `../demos/diagrams/02-sequence-api/` | sequence | Neon cyan | lifelines + growing activation bars, 7 messages fired strictly in order, **two-clock sync** (SMIL packets + CSS delays from one delay table), JS cycle loop |
+| `../demos/diagrams/02-sequence-api/` | sequence | re:Invent | lifelines + growing activation bars, 7 messages fired strictly in order, **two-clock sync** (SMIL packets + CSS delays from one delay table), JS cycle loop |
 | `../demos/diagrams/03-er-schema/` | er | re:Invent purple | **geometrically correct crow's-foot markers** (the drawio failure case), entity cards with PK/FK tags, hover/click subtree highlight |
 | `../demos/diagrams/04-arch-isometric-3d/` | arch (3D) | re:Invent purple | CSS isometric plane (`rotateX(55°) rotateZ(-45°)`), extruded tiles, billboarded labels, request/response packet waves, pointer tilt |
-| `../demos/diagrams/05-mindmap-radial/` | mindmap | Neon cyan | radial bezier limbs, staggered bloom entrance, per-branch ambient drift, subtree hover highlight |
+| `../demos/diagrams/05-mindmap-radial/` | mindmap | re:Invent | radial bezier limbs, staggered bloom entrance, per-branch ambient drift, subtree hover highlight |
 
 All five are single-file, offline, zero-dependency, emoji-free (Lucide inline), `prefers-reduced-motion`-safe, console-clean. When generating a diagram slide, open the matching demo and adapt its patterns to the deck's palette and content.
 
@@ -74,7 +74,13 @@ Standard two-phase pattern (see demos 01/02 for full implementations):
 - **Phase A — entrance (~2–2.5s, replayable)**: nodes pop staggered (`scale(.85)→1` + fade, `transform-box:fill-box; transform-origin:center`), edges draw in via `pathLength="1"` + `stroke-dasharray:1; stroke-dashoffset:1→0` (length-independent), arrowheads/badges pop on arrival.
 - **Phase B — ambient loop**: glowing packets ride the edges via SMIL `<animateMotion><mpath href="#edge-path"/></animateMotion>`; dashed return edges run a marching-ants `stroke-dashoffset` loop; key nodes breathe (slow glow pulse).
 - **Two-clock sync** (when packets must line up with CSS FX): one hidden SMIL `<animate id="clock">` kicked by JS `beginElement()`; every packet begins at `clock.begin+OFFSETs`; CSS `animation-delay`s use the same offsets; document both in ONE delay-table comment. Restart cycle = remove/re-add `.play` class + `clock.beginElement()` (demo 02).
-- **In-slide activation**: inside a deck, start the choreography when the slide becomes active (hook the deck's existing slide-change handler or an IntersectionObserver) and reset it on leave, so the entrance replays each visit and packets don't run behind other slides.
+- **In-slide activation**: diagram choreography starts in the slide's `enter` hook
+  (`Stage.hook(scene, { enter(slide, ctx) { … } })`, using `ctx.raf`/`ctx.cleanup` for
+  the ambient loop) — or purely in CSS keyed on `.is-active` — per
+  [engine/ENGINE.md](engine/ENGINE.md), never an IntersectionObserver. This way it
+  replays every time the presenter enters the slide, and it needs a `.slide.is-final`
+  final state (or `final(slide)` for JS-driven parts) so it also looks finished in
+  the overview, print and reduced motion.
 - **`prefers-reduced-motion`**: land on the fully-drawn final state, hide packets, no loops. Default no-JS state should also be the final drawn state (never blank).
 
 ### Isometric 3D architecture (showpiece option)
@@ -91,19 +97,21 @@ For `type: arch` when the user wants the 3D look (demo 04). Key facts:
 Native diagrams are part of the slide markup — no `<img>`, no lightbox needed (they're already full-resolution vector):
 
 ```html
-<section class="slide">
-    <div class="slide-content">
-        <h2 class="reveal">一次 API 请求的完整流转</h2>
-        <figure class="diagram-figure reveal">
-            <svg class="native-diagram" viewBox="0 0 1400 640" role="img" aria-label="...">
-                <!-- nodes / edges / packets, per the demo patterns -->
-            </svg>
-            <figcaption class="diagram-caption">POST /orders — 从客户端到数据库再回来</figcaption>
-        </figure>
-    </div>
+<section class="slide" data-scene="api-flow" data-label="API Flow">
+    <h2 class="rv">一次 API 请求的完整流转</h2>
+    <figure class="diagram-figure rv">
+        <svg class="native-diagram" viewBox="0 0 1400 640" role="img" aria-label="...">
+            <!-- nodes / edges / packets, per the demo patterns -->
+        </svg>
+        <figcaption class="diagram-caption">POST /orders — 从客户端到数据库再回来</figcaption>
+    </figure>
     <div class="slide-footer">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</div>
 </section>
 ```
+
+No `.slide-content` wrapper is required — the Stage Engine lays out `.slide` directly
+(see [engine/ENGINE.md](engine/ENGINE.md) §2). `rv`/`rv-mask`/etc. replace `.reveal`;
+the footer stays mandatory on every slide.
 
 ```css
 /* === NATIVE DIAGRAM === */

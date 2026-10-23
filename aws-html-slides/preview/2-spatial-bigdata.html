@@ -1,0 +1,2535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lakehouse 架构深潜 — re:Invent 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600&family=Urbanist:wght@400;500;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+/* === STAGE ENGINE CSS (engine/stage-engine.css) === */
+/* ===========================================================
+   STAGE ENGINE — BASE CSS  (paste verbatim into <style>, BEFORE theme CSS)
+   Replaces viewport-base.css (scroll-snap). Slides are stacked fixed
+   layers; JS (stage-engine.js) toggles state classes:
+     .slide.is-active    current slide (reveals play)
+     .slide.is-entering  incoming during a transition (visible, pre-reveal)
+     .slide.is-leaving   outgoing during a transition
+     .slide.is-final     everything rendered in its finished state
+     body[data-dir=fwd|back]   direction of the last navigation
+     body.stage-busy     a transition is running
+   Free mode: <body data-stage="free"> → engine does NOT position/hide
+   slides (e.g. a CSS-3D world that places slides itself).
+   =========================================================== */
+:root {
+    --stage-dur: 700ms;                         /* default transition length */
+    --stage-ease: cubic-bezier(.16, 1, .3, 1);
+    --rv-base: 180ms;                           /* reveal start offset (lets the dissolve begin) */
+    --rv-step: 90ms;                            /* one unit of style="--d:N" */
+    --rv-dur: 900ms;
+    --split-step: 45ms;                         /* per word / char of [data-split] */
+    --stage-accent: var(--accent, #8B5CF6);
+    --stage-thumb-bg: radial-gradient(80% 70% at 70% 40%, rgba(139,92,246,.35), transparent 70%),
+                      radial-gradient(60% 60% at 20% 80%, rgba(217,70,239,.22), transparent 70%), #0A0A0A;
+}
+
+/* === 1. VIEWPORT LOCK === */
+html, body { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+
+/* === 2. STACKED SLIDES (default mode) === */
+:where(body:not([data-stage="free"])) .slide {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh; height: 100dvh;
+    overflow: hidden;
+    visibility: hidden; pointer-events: none;
+}
+:where(body:not([data-stage="free"])) .slide:is(.is-active, .is-entering, .is-leaving) { visibility: visible; }
+:where(body:not([data-stage="free"])) .slide.is-active { pointer-events: auto; z-index: 2; }
+:where(body:not([data-stage="free"])) .slide.is-leaving { z-index: 1; }
+
+/* === 3. DEFAULT TRANSITION — cross-dissolve with depth (direction-aware) === */
+.slide.stage-out { animation: stage-out var(--stage-dur) var(--stage-ease) both; }
+.slide.stage-in  { animation: stage-in  var(--stage-dur) var(--stage-ease) both; }
+body[data-dir="back"] .slide.stage-out { animation-name: stage-out-back; }
+body[data-dir="back"] .slide.stage-in  { animation-name: stage-in-back; }
+@keyframes stage-out      { to { opacity: 0; filter: blur(12px); transform: scale(.94); } }
+@keyframes stage-out-back { to { opacity: 0; filter: blur(12px); transform: scale(1.06); } }
+@keyframes stage-in       { from { opacity: 0; transform: scale(1.04); } }
+@keyframes stage-in-back  { from { opacity: 0; transform: scale(.96); } }
+
+/* === 4. REVEAL PRIMITIVES — replay on every entry ===
+   <h2 class="rv" style="--d:2">  delay = --rv-base + d × --rv-step
+   Variants: rv (rise+fade) · rv-blur (focus in) · rv-mask (clip wipe, safe
+   for gradient text) · rv-scale (pop) · rv-left (slide from left) */
+.rv, .rv-blur, .rv-mask, .rv-scale, .rv-left {
+    --rv-delay: calc(var(--rv-base) + var(--d, 0) * var(--rv-step));
+    transition: opacity var(--rv-dur) var(--stage-ease) var(--rv-delay),
+                transform calc(var(--rv-dur) * 1.25) var(--stage-ease) var(--rv-delay),
+                filter var(--rv-dur) var(--stage-ease) var(--rv-delay),
+                clip-path calc(var(--rv-dur) * 1.4) var(--stage-ease) var(--rv-delay);
+}
+.rv       { opacity: 0; transform: translateY(clamp(14px, 2.6vh, 30px)); }
+.rv-left  { opacity: 0; transform: translateX(clamp(-40px, -3vw, -16px)); }
+.rv-blur  { opacity: 0; filter: blur(10px); transform: scale(1.04); }
+.rv-scale { opacity: 0; transform: scale(.86); }
+.rv-mask  { clip-path: inset(-15% 100% -25% 0); }
+:is(.is-active, .is-leaving) :is(.rv, .rv-left, .rv-blur, .rv-scale) { opacity: 1; transform: none; filter: none; }
+:is(.is-active, .is-leaving) .rv-mask { clip-path: inset(-15% -4% -25% -2%); }
+
+/* split text: Stage.fx.split / [data-split="words|chars"] → .sp pieces with --i */
+.sp { display: inline-block; white-space: pre; opacity: 0; transform: translateY(.45em); filter: blur(6px);
+      transition: opacity .8s var(--stage-ease), transform 1s var(--stage-ease), filter .8s var(--stage-ease);
+      transition-delay: calc(var(--rv-base) + var(--d, 0) * var(--rv-step) + var(--i, 0) * var(--split-step)); }
+.sp-unit { white-space: normal; }               /* gradient run kept whole */
+.sp-w { display: inline-block; white-space: nowrap; }   /* word wrapper in chars mode */
+:is(.is-active, .is-leaving) .sp { opacity: 1; transform: none; filter: none; }
+
+/* reset frame (engine-internal): snap reveals back to their start state */
+.stage-reset, .stage-reset *, .stage-reset *::before, .stage-reset *::after { transition: none !important; animation: none !important; }
+
+/* === 5. FINAL STATE — reduced motion, overview thumbnails, print, editor ===
+   Every component MUST look finished under .is-final. Keyframe animations
+   jump to their last frame; override per component if that frame is wrong. */
+.slide.is-final, .slide.is-final *, .slide.is-final *::before, .slide.is-final *::after {
+    transition-duration: 0s !important; transition-delay: 0s !important;
+    animation-duration: 1ms !important; animation-delay: 0s !important;
+    animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+}
+.slide.is-final :is(.rv, .rv-left, .rv-blur, .rv-scale, .sp) { opacity: 1 !important; transform: none !important; filter: none !important; }
+.slide.is-final .rv-mask { clip-path: none !important; }
+.slide.is-final.stage-out, .slide.is-final.stage-in { animation: none !important; }
+
+/* === 6. CHROME — progress bar, page number, nav dots === */
+.progress-bar {
+    position: fixed; top: 0; left: 0; z-index: 900; height: 3px; width: 100%;
+    background: var(--grad-accent, var(--stage-accent));
+    transform-origin: left; transform: scaleX(var(--stage-progress, 0));
+    transition: transform .6s var(--stage-ease); pointer-events: none;
+}
+.page-number {
+    position: fixed; bottom: clamp(8px, 1.2vh, 16px); right: clamp(12px, 2vw, 24px); z-index: 900;
+    font-size: clamp(.6rem, .9vw, .75rem); letter-spacing: .05em; font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,.38); pointer-events: none;
+}
+.nav-dots {
+    position: fixed; right: clamp(10px, 1.6vw, 22px); top: 50%; transform: translateY(-50%); z-index: 900;
+    display: flex; flex-direction: column; gap: clamp(6px, 1.1vh, 10px);
+}
+.nav-dots button {
+    all: unset; cursor: pointer; width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,.22); transition: transform .3s, background .3s;
+}
+.nav-dots button.on { background: var(--stage-accent); transform: scale(1.5); }
+.nav-dots button:focus-visible { outline: 1px solid var(--stage-accent); outline-offset: 3px; }
+@media (max-height: 600px) { .page-number, .nav-dots { display: none; } }
+
+/* === 7. OVERVIEW (Esc / O) — built by JS === */
+.stage-ov {
+    position: fixed; inset: 0; z-index: 9998; overflow-y: auto;
+    background: rgba(8, 6, 14, .94); backdrop-filter: blur(14px);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
+}
+.stage-ov.active { opacity: 1; pointer-events: auto; }
+.stage-ov-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(200px, 20vw, 300px), 1fr));
+    gap: clamp(14px, 2.2vw, 30px); padding: clamp(48px, 7vh, 80px) clamp(24px, 5vw, 72px);
+    max-width: 1700px; margin: 0 auto;
+}
+.stage-ov-card {
+    all: unset; box-sizing: border-box; position: relative; aspect-ratio: 16 / 9; cursor: pointer; overflow: hidden;
+    border: 2px solid rgba(255,255,255,.12); border-radius: 10px; background: var(--stage-thumb-bg);
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.stage-ov-card:hover, .stage-ov-card:focus-visible {
+    border-color: var(--stage-accent); transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,.5);
+}
+.stage-ov-card.current { border-color: var(--stage-accent); box-shadow: 0 0 0 3px rgba(139,92,246,.4); }
+.stage-ov-thumb { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.stage-ov-thumb > .slide {
+    position: absolute !important; inset: auto !important; left: 0; top: 0; margin: 0 !important;
+    visibility: visible !important; opacity: 1 !important; filter: none !important;
+    transform-origin: 0 0; overflow: hidden; pointer-events: none;
+}
+.stage-ov-num {
+    position: absolute; bottom: 8px; right: 10px; z-index: 2; padding: 2px 8px; border-radius: 4px;
+    font: 500 .75rem/1.4 var(--font-body, system-ui, sans-serif); font-variant-numeric: tabular-nums;
+    color: #fff; background: rgba(0,0,0,.65);
+}
+.stage-ov-num em { font-style: normal; color: rgba(255,255,255,.6); margin-left: .5em; }
+.stage-ov-hint {
+    position: fixed; top: clamp(12px, 2vh, 20px); right: clamp(16px, 2vw, 24px);
+    font: .8rem var(--font-body, system-ui, sans-serif); color: rgba(255,255,255,.55);
+}
+.stage-ov-hint kbd { background: rgba(255,255,255,.12); padding: 2px 6px; border-radius: 3px; font: .75rem monospace; }
+
+/* === 8. LIGHTBOX — img[data-zoom] or any .slide img outside [data-no-zoom] === */
+.slide img:not([data-no-zoom] img, [data-no-zoom]) { cursor: zoom-in; }
+.stage-lb {
+    position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.92); backdrop-filter: blur(8px); cursor: zoom-out;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.stage-lb.active { opacity: 1; pointer-events: auto; }
+.stage-lb img {
+    max-width: 92vw; max-height: 88vh; object-fit: contain; border-radius: 8px;
+    transform: scale(.92); transition: transform .3s var(--stage-ease);
+}
+.stage-lb.active img { transform: none; }
+.stage-lb-close {
+    all: unset; position: absolute; top: clamp(12px, 2vh, 24px); right: clamp(12px, 2vw, 24px);
+    font-size: clamp(1.4rem, 2.2vw, 2rem); line-height: 1; color: rgba(255,255,255,.6); cursor: pointer;
+}
+.stage-lb-close:hover { color: var(--stage-accent); }
+.stage-lb-hint {
+    position: absolute; bottom: clamp(12px, 2vh, 24px); left: 50%; transform: translateX(-50%);
+    font-size: clamp(.65rem, 1vw, .85rem); color: rgba(255,255,255,.35);
+}
+
+/* === 9. REDUCED MOTION (JS also marks every slide .is-final) === */
+@media (prefers-reduced-motion: reduce) {
+    .slide.stage-in, .slide.stage-out { animation: none !important; }
+    .slide :is(.rv, .rv-left, .rv-blur, .rv-scale, .sp) { opacity: 1; transform: none; filter: none; transition: none; }
+    .slide .rv-mask { clip-path: none; transition: none; }
+}
+
+/* === 10. PRINT — "Print → Save as PDF" exports the deck, one 16:9 page per slide === */
+@page { size: 1600px 900px; margin: 0; }
+@media print {
+    html, body { width: 1600px !important; height: auto !important; overflow: visible !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .stage-root { position: static !important; transform: none !important; overflow: visible !important;
+                  perspective: none !important; width: auto !important; height: auto !important; }
+    body .slide {
+        position: relative !important; inset: auto !important; left: 0 !important; top: 0 !important;
+        width: 1600px !important; height: 900px !important; margin: 0 !important;
+        visibility: visible !important; opacity: 1 !important; filter: none !important; transform: none !important;
+        overflow: hidden !important; break-after: page; break-inside: avoid; page-break-after: always;
+        animation: none !important;
+        background-color: var(--bg, #0A0A0A);
+    }
+    body .slide[data-thumb] { background: var(--stage-thumb) !important; }
+    body .slide:last-of-type { break-after: auto; page-break-after: auto; }
+    .slide, .slide *, .slide *::before, .slide *::after {
+        transition-duration: 0s !important; transition-delay: 0s !important;
+        animation-duration: 1ms !important; animation-delay: 0s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+    }
+    .slide :is(.rv, .rv-left, .rv-blur, .rv-scale, .sp) { opacity: 1 !important; transform: none !important; filter: none !important; }
+    .slide .rv-mask { clip-path: none !important; }
+    .stage-bg, .stage-ov, .stage-lb, .progress-bar, .page-number, .nav-dots,
+    .edit-hotzone, .edit-toggle, .edit-save-file, .edit-toast, .edit-bar { display: none !important; }
+}
+
+/* === INLINE EDITOR CSS === */
+/* ===========================================================
+   INLINE EDITOR — CSS  (opt-in only; paste after stage-engine.css)
+   Visibility of the toggle is controlled by JS classes only —
+   do NOT use a CSS `~` sibling hover chain (pointer-events:none breaks it).
+   =========================================================== */
+.edit-hotzone {
+    position: fixed; top: 0; left: 0; width: 80px; height: 80px;
+    z-index: 10000; cursor: pointer;
+}
+.edit-toggle, .edit-save-file, .edit-bar button {
+    font: 500 .8rem/1 var(--font-body, system-ui, sans-serif);
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: none; border-radius: 6px; padding: 7px 11px;
+}
+.edit-toggle svg, .edit-save-file svg, .edit-bar svg { width: 16px; height: 16px; flex: none; }
+.edit-toggle {
+    position: fixed; top: clamp(12px, 2vh, 20px); left: clamp(12px, 1.6vw, 20px); z-index: 10001;
+    background: rgba(20, 14, 34, .85); color: #fff; border: 1px solid rgba(255,255,255,.18);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { background: var(--stage-accent, #8B5CF6); border-color: transparent; }
+.edit-save-file {
+    position: fixed; top: clamp(12px, 2vh, 20px); left: clamp(96px, 9vw, 112px); z-index: 10001;
+    background: var(--stage-accent, #8B5CF6); color: #fff;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+body.editing-active .edit-save-file { opacity: 1; pointer-events: auto; }
+
+/* slide navigation while editing (keys belong to the text cursor) */
+.edit-bar {
+    position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); z-index: 10001;
+    display: flex; gap: 6px; padding: 6px; border-radius: 10px;
+    background: rgba(12, 8, 22, .88); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(10px);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+body.editing-active .edit-bar { opacity: 1; pointer-events: auto; }
+.edit-bar button { background: rgba(255,255,255,.08); color: #fff; }
+.edit-bar button:hover { background: rgba(255,255,255,.16); }
+.edit-bar .edit-pos { align-self: center; padding: 0 8px; font: .8rem var(--font-body, system-ui, sans-serif);
+    color: rgba(255,255,255,.6); font-variant-numeric: tabular-nums; }
+
+/* editable affordance */
+body.editing-active [contenteditable="true"] { outline: 1px dashed rgba(167,139,250,.45); outline-offset: 4px; border-radius: 2px; cursor: text; }
+body.editing-active [contenteditable="true"]:hover { outline-color: rgba(232,121,249,.8); }
+body.editing-active [contenteditable="true"]:focus { outline: 2px solid var(--stage-accent, #8B5CF6); background: rgba(139,92,246,.06); }
+
+.edit-toast {
+    position: fixed; bottom: clamp(70px, 10vh, 96px); left: 50%; z-index: 10002;
+    transform: translateX(-50%) translateY(20px); padding: 10px 20px; border-radius: 6px;
+    background: rgba(0,0,0,.85); color: #fff; font: .85rem var(--font-body, system-ui, sans-serif);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .3s ease;
+}
+.edit-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.edit-toast.error { background: rgba(220, 38, 38, .92); }
+@media print { .edit-hotzone, .edit-toggle, .edit-save-file, .edit-bar, .edit-toast { display: none !important; } }
+
+/* === FLAVOR KIT CSS (flavors/spatial/kit.css) === */
+/* ===========================================================
+   SPATIAL KIT — flavor 2 · re:Invent "Spatial"   (paste verbatim AFTER stage-engine.css)
+   The deck is ONE CSS-3D world. Every .slide is a panel placed in it; the
+   kit's custom transition flies the camera (= inverse transform on
+   .sp-world) between panels. A fixed canvas (.sp-env) draws the grid floor,
+   horizon and dust with the SAME matrix, so floor and panels stay locked.
+   Requires <body data-stage="free">.
+   RULES
+   - .sp-world, .slide and every .d3 are preserve-3d: never put opacity /
+     filter / overflow / clip / mask on them (flattens). Fade LEAVES (.L).
+   - Components are driven by CSS custom properties (--e = entry 0→1, px
+     positions written by kit.js). Their finished state is declared below
+     under .slide.is-final with !important vars, so overview clones and print
+     need no JS.
+   =========================================================== */
+:root {
+    --bg: #0A0A0A; --bg-title: #0B0015; --indigo: #1E0B4B;
+    --purple: #8B5CF6; --pink: #D946EF; --blue: #3B82F6; --orange: #FF9900;
+    --up: #34D399; --down: #F472B6; --warn: #FBBF24;
+    --t1: #FFFFFF; --t2: rgba(255,255,255,.55); --t3: rgba(255,255,255,.38);
+    --accent: #8B5CF6;
+    --grad-accent: linear-gradient(135deg, #a78bfa, #e879f9, #f472b6);
+    --grad-bar: linear-gradient(90deg, #8B5CF6, #D946EF, #FF9900);
+    --font-display: 'Urbanist', 'Noto Sans SC', sans-serif;
+    --font-body: 'Albert Sans', 'Noto Sans SC', sans-serif;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+    --pad: clamp(1.4rem, 4.2vw, 4.6rem);
+    --h1: clamp(2.2rem, 6.4vw, 6.2rem);
+    --h2: clamp(1.5rem, 3.6vw, 3.4rem);
+    --h3: clamp(.95rem, 1.6vw, 1.45rem);
+    --body: clamp(.78rem, 1.25vw, 1.15rem);
+    --small: clamp(.66rem, .95vw, .92rem);
+    --micro: clamp(.6rem, .75vw, .76rem);
+    /* engine re-timing: style="--d:.4" now means 0.4 s */
+    --rv-step: 1s; --rv-base: .12s; --split-step: 70ms;
+    --stage-thumb-bg: var(--sp-thumb, linear-gradient(180deg, #040009, #0B0015 48%, #3b1470 67.6%, #120327 69%, #0A0A0A));
+}
+@media screen and (max-height: 700px) {
+    :root { --h1: clamp(1.9rem, 5.6vw, 4.4rem); --h2: clamp(1.3rem, 3.1vw, 2.4rem); --body: clamp(.72rem, 1.15vw, 1rem); }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--t1); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+/* leaf depth: registered so it does NOT inherit (a parent's --z never leaks into children) */
+@property --z { syntax: '<length>'; inherits: false; initial-value: 0px; }
+
+/* === 1. ENVIRONMENT (fixed canvas behind the world) === */
+.sp-env { position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(120% 60% at 50% 68%, rgba(91,33,182,.30), rgba(11,0,21,0) 60%),
+                linear-gradient(180deg, #040009 0%, #0B0015 52%, #120327 68%, #0A0A0A 100%); }
+.sp-env canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.sp-env::after { content: ""; position: absolute; inset: 0; background: radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%); }
+
+/* === 2. WORLD + PANELS === */
+.sp-vp { position: fixed; inset: 0; z-index: 1; overflow: hidden; }       /* perspective set by kit.js */
+.sp-world { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; transform-origin: 0 0; }
+.sp-world > .slide { position: absolute; transform-style: preserve-3d; }   /* size + world placement set by kit.js */
+.d3 { transform-style: preserve-3d; }
+/* leaf: sits at its own depth, carries the per-panel fade (--fade) and its own entry (--o) */
+.L { position: relative; transform: translateZ(var(--z, 0px)); opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-frame { position: absolute; inset: clamp(.6rem, 1.4vw, 1.4rem); border-radius: clamp(10px, 1.2vw, 20px);
+    transform: translateZ(-2px); opacity: var(--fr, 0); pointer-events: none;
+    border: 1px solid rgba(139,92,246,.22);
+    background: linear-gradient(160deg, rgba(139,92,246,.06), rgba(11,0,21,.10) 40%, rgba(217,70,239,.04));
+    box-shadow: 0 0 60px rgba(139,92,246,.12) inset; }
+.sp-frame::before, .sp-frame::after { content: ""; position: absolute; width: 22px; height: 22px; border: 0 solid rgba(232,121,249,.75); }
+.sp-frame::before { left: -1px; top: -1px; border-width: 2px 0 0 2px; border-top-left-radius: inherit; }
+.sp-frame::after { right: -1px; bottom: -1px; border-width: 0 2px 2px 0; border-bottom-right-radius: inherit; }
+.sp-stage { position: absolute; inset: 0; padding: var(--pad); padding-top: clamp(3.4rem, 9vh, 5.6rem); padding-bottom: clamp(2.8rem, 8vh, 4.8rem); }
+.sp-stage.center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.sp-head { max-width: 62%; }
+.sp-foot { position: absolute; left: clamp(1.8rem, 3.4vw, 3.4rem); bottom: clamp(1.3rem, 3.4vh, 2.4rem); font-size: var(--micro); color: var(--t3); }
+.sp-note { position: absolute; right: clamp(1.8rem, 3.4vw, 3.4rem); bottom: clamp(1.3rem, 3.4vh, 2.4rem); font-size: var(--micro); color: var(--t3); }
+
+/* === 3. TYPE === */
+.eyebrow { display: inline-flex; align-items: center; gap: .7em; font-family: var(--font-display); font-weight: 700;
+    font-size: var(--small); letter-spacing: .28em; text-transform: uppercase; color: #c4b5fd; }   /* Latin only */
+.eyebrow::before { content: ""; width: 2.4em; height: 2px; background: var(--grad-bar); border-radius: 2px; }
+.sp-h1 { font-family: var(--font-display); font-weight: 800; font-size: var(--h1); line-height: 1.04; letter-spacing: -.03em; }
+.sp-h2 { font-family: var(--font-display); font-weight: 800; font-size: var(--h2); line-height: 1.1; letter-spacing: -.02em; margin-top: .35em; }
+:lang(zh) .sp-h1, :lang(zh) .sp-h2 { line-height: 1.24; letter-spacing: 0; }
+.grad { background: var(--grad-accent); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.grad-block { display: inline-block; padding: 0 .05em .08em; }
+.sp-desc { font-size: var(--body); color: var(--t2); line-height: 1.6; margin-top: .9em; max-width: 34em; }
+.sp-desc b { color: #fff; font-weight: 600; }
+.sp-chips { display: flex; flex-wrap: wrap; gap: .5em; margin-top: 1.2em; }
+.sp-chip2 { display: inline-flex; align-items: center; gap: .45em; padding: .42em .85em; border-radius: 99px; font-size: var(--small);
+    background: rgba(139,92,246,.12); border: 1px solid rgba(167,139,250,.3); color: rgba(255,255,255,.86); }
+.sp-chip2 svg { width: 1.1em; height: 1.1em; color: #d8b4fe; }
+.sp-card { padding: clamp(.8rem, 1.4vw, 1.4rem); border-radius: 18px;
+    background: linear-gradient(165deg, rgba(139,92,246,.26), rgba(18,6,40,.86) 58%); border: 1px solid rgba(167,139,250,.34);
+    box-shadow: 0 26px 64px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.12); }
+.sp-delta { display: inline-flex; align-items: center; gap: .35em; font-size: clamp(.72rem, 1.05vw, 1.02rem); font-weight: 600; margin-top: .5em;
+    padding: .3em .7em; border-radius: 99px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: var(--t2); }
+.sp-delta svg { width: 1.2em; height: 1.2em; }
+.sp-delta.up { color: var(--up); } .sp-delta.down { color: var(--down); }
+
+/* === 4. HUD (flat, above the world; hidden in print via .stage-bg) === */
+.sp-hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: var(--font-display); }
+.sp-brand { position: absolute; left: clamp(1.8rem, 3.4vw, 3.4rem); top: clamp(1.5rem, 4vh, 2.8rem); display: flex; align-items: center; gap: .6em;
+    font-size: var(--micro); font-weight: 700; letter-spacing: .24em; text-transform: uppercase; color: rgba(255,255,255,.7); }
+.sp-brand b { width: .55em; height: .55em; border-radius: 50%; background: var(--orange); box-shadow: 0 0 12px var(--orange); }
+.sp-where { position: absolute; right: clamp(1.8rem, 3.4vw, 3.4rem); top: clamp(1.1rem, 3.2vh, 2.3rem); display: flex; align-items: center; gap: 1em;
+    font-size: var(--micro); letter-spacing: .2em; text-transform: uppercase; color: var(--t3); }
+.sp-where .slide-index { color: #fff; font-weight: 700; letter-spacing: .12em; }
+.sp-map { width: clamp(70px, 7vw, 112px); height: clamp(44px, 4.4vw, 70px); overflow: visible; }
+body[data-stage="free"] .nav-dots { top: auto; right: auto; left: 50%; bottom: clamp(1.5rem, 3.8vh, 2.6rem); transform: translateX(-50%);
+    flex-direction: row; gap: 6px; z-index: 6; }
+body[data-stage="free"] .nav-dots button { width: clamp(18px, 2.2vw, 34px); height: 4px; border-radius: 3px; background: rgba(255,255,255,.16); }
+body[data-stage="free"] .nav-dots button.done { background: rgba(167,139,250,.45); transform: none; }
+body[data-stage="free"] .nav-dots button.on { background: var(--grad-bar); transform: none; }
+
+/* === 5. FINAL STATE (reduced motion · overview clones · print · editor) === */
+.slide.is-final { --fade: 1 !important; --fr: 1 !important; }
+.slide.is-final :is(.sp-gate, .sp-cubes, .sp-fan > *, .sp-pillar, .sp-slab, .sp-tag, .sp-plane-tag, .sp-plane, .sp-step,
+    .sp-node, .sp-chip, .sp-tray, .sp-tier, .sp-rise, .sp-iso, .sp-graph-cap) { --e: 1 !important; }
+.slide.is-final .sp-gate { --pw: 1 !important; }
+.slide.is-final .sp-slab { --drop: 0px !important; }
+.slide.is-final .sp-iso { --gap: var(--gap-open) !important; --rz: var(--rz-home) !important; }
+.slide.is-final .sp-seg, .slide.is-final .sp-edge { --fill: 1 !important; }
+.slide.is-final :is(.sp-pulse, .sp-flow, .sp-drop, .sp-flash) { display: none !important; }
+.slide.is-final .sp-fan > * { --dim: 1 !important; --push: 0px !important; }
+/* overview cards + print pages render panels with the world's perspective */
+/* kit.js wraps each slide's content in .sp-cam: that wrapper (not the clipped slide) carries the
+   perspective in overview cards and print — Chrome's PDF output mis-clips when overflow:hidden and
+   perspective sit on the same element */
+.sp-cam { position: absolute; inset: 0; transform-style: preserve-3d; }
+.stage-ov-thumb > .slide > .sp-cam { perspective: var(--sp-P, 1500px); perspective-origin: 50% calc(50% + var(--sp-OY, 160px)); }
+@media print {
+    /* the page background lives on the slide: keep the slide itself flat (a preserve-3d slide would
+       depth-sort its own background in front of everything at negative z) */
+    body .slide { transform-style: flat !important; }
+    .sp-cam { perspective: var(--sp-P, 1520px) !important; perspective-origin: 800px calc(450px + var(--sp-OY, 162px)) !important; }
+    .sp-hud { display: none !important; }
+    /* Chrome's PDF output drops CSS masks and mis-sorts nested 3D leaves → print a simplified, flat-safe version */
+    .L { transform: none; }
+    /* fan cards print as flat 2D cards at their projected positions (kit.js writes --sx/--sy/--ss) */
+    .sp-fan > * { transform: translate(var(--sx, 0px), calc(var(--fy, 0px) + var(--sy, 0px))) scale(var(--ss, 1)) translate(-50%, -50%) !important; transform-origin: 0 0 !important; }
+    .sp-fan > .d3 { transform-style: flat !important; }
+    .sp-gate .g-ring { -webkit-mask: none !important; mask: none !important; background: none !important; border: calc(var(--lw0) * 1.2) solid #c084fc;
+        box-shadow: 0 0 40px rgba(217,70,239,.6), inset 0 0 40px rgba(217,70,239,.45); }
+    .sp-gate :is(.g-glow, .g-ticks, .g-refl, .g-floor), .sp-chip .rays { display: none !important; }
+}
+
+/* === 6. COMPONENTS ===================================================== */
+
+/* --- 6.1 sp-gate: neon light-gate standing on the floor (cover hero) ----
+   <div class="sp-gate" data-depth="1.25" data-size=".74" data-ratio="1.32"></div> */
+/* children are laid out at their on-screen size and scaled back up by --gk (= 1/perspective-scale):
+   untransformed boxes must stay inside the slide box or print fragmentation clips them */
+.sp-gate { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translate3d(0, var(--gy, 0px), var(--gz, -1200px)) scale(calc(var(--gk, 1) * (.55 + .45 * var(--e, 1)))); }
+.sp-gate > div { position: absolute; width: var(--Dw); height: var(--D); left: calc(var(--Dw) / -2); top: calc(var(--D) / -2); border-radius: 50%; }
+.sp-gate .g-fill { opacity: calc(var(--fade, 1) * var(--pw, 1));
+    background: radial-gradient(closest-side, rgba(255,236,250,.34) 0, rgba(240,171,252,.26) 18%, rgba(217,70,239,.16) 42%, rgba(139,92,246,.10) 70%, rgba(139,92,246,.22) 96%, rgba(139,92,246,0) 100%); }
+.sp-gate :is(.g-ring, .g-glow), .sp-gate .g-refl > i { --lw: var(--lw0);
+    background: conic-gradient(from var(--ga, 0deg), #8B5CF6, #D946EF, #ffb45a, #f472b6, #a78bfa, #60a5fa, #8B5CF6);
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - var(--lw)), #000 calc(100% - var(--lw) + 1px), #000 calc(100% - 1px), transparent 100%);
+            mask: radial-gradient(closest-side, transparent calc(100% - var(--lw)), #000 calc(100% - var(--lw) + 1px), #000 calc(100% - 1px), transparent 100%); }
+.sp-gate .g-ring { opacity: var(--fade, 1); }
+.sp-gate .g-glow { --lw: calc(var(--lw0) * 3.4); filter: blur(calc(var(--lw0) * 2.4)); opacity: calc(var(--fade, 1) * .95 * var(--pw, 1)); }
+.sp-gate .g-ticks { opacity: calc(var(--fade, 1) * .75);
+    background: repeating-conic-gradient(from var(--ta, 0deg), rgba(245,208,254,.95) 0 .5deg, transparent .5deg 5deg);
+    -webkit-mask: radial-gradient(closest-side, transparent 90%, #000 calc(90% + 1px), #000 92.5%, transparent calc(92.5% + 1px));
+            mask: radial-gradient(closest-side, transparent 90%, #000 calc(90% + 1px), #000 92.5%, transparent calc(92.5% + 1px)); }
+.sp-gate .g-floor { width: calc(var(--Dw) * 1.5); height: calc(var(--D) * .8); left: calc(var(--Dw) * -.75); top: calc(var(--D) * .1);
+    transform: rotateX(90deg); opacity: calc(var(--fade, 1) * var(--pw, 1));
+    background: radial-gradient(closest-side, rgba(245,208,254,.55), rgba(217,70,239,.28) 35%, rgba(139,92,246,.10) 65%, rgba(139,92,246,0)); }
+.sp-gate .g-refl { top: calc(var(--D) / 2); opacity: calc(var(--fade, 1) * .3);
+    -webkit-mask: linear-gradient(180deg, #000, transparent 48%); mask: linear-gradient(180deg, #000, transparent 48%); }
+.sp-gate .g-refl > i { position: absolute; inset: 0; border-radius: 50%; }
+
+/* --- 6.2 sp-cubes: nested wireframe "table" cubes (data / Iceberg hero) ---
+   <div class="sp-cubes" data-at="50,42" data-depth="-640"></div> */
+.sp-cubes { position: absolute; left: 50%; top: 42%; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translateZ(var(--cz, -640px)) scale(calc(.3 + .7 * var(--e, 1))); }
+.sp-cubes .core { position: absolute; width: 60vh; height: 60vh; left: -30vh; top: -30vh; border-radius: 50%; transform: translateZ(-300px);
+    opacity: var(--fade, 1); background: radial-gradient(circle, rgba(232,121,249,.45), rgba(139,92,246,.18) 35%, rgba(11,0,21,0) 68%); }
+.sp-cube { position: absolute; transform-style: preserve-3d; }
+.sp-cube.c0 { transform: rotateX(-24deg) rotateY(calc(var(--t, 0) * 9deg + 32deg)); --cs: 58vh; }
+.sp-cube.c1 { transform: rotateX(calc(28deg + var(--t, 0) * 6deg)) rotateY(calc(var(--t, 0) * -24deg)); --cs: 22vh; }
+.sp-cube i { position: absolute; width: var(--cs); height: var(--cs); left: calc(var(--cs) / -2); top: calc(var(--cs) / -2); opacity: var(--fade, 1);
+    border: 1.5px solid rgba(196,181,253,.55); border-radius: 4px;
+    background: linear-gradient(90deg, transparent 33%, rgba(167,139,250,.32) 33% calc(33% + 1px), transparent calc(33% + 1px) 66%, rgba(167,139,250,.32) 66% calc(66% + 1px), transparent calc(66% + 1px)),
+                linear-gradient(0deg, transparent 33%, rgba(167,139,250,.32) 33% calc(33% + 1px), transparent calc(33% + 1px) 66%, rgba(167,139,250,.32) 66% calc(66% + 1px), transparent calc(66% + 1px)),
+                linear-gradient(135deg, rgba(139,92,246,.10), rgba(217,70,239,.05));
+    box-shadow: 0 0 40px rgba(139,92,246,.25), inset 0 0 50px rgba(217,70,239,.12); }
+.sp-cube.c1 i { border-color: rgba(255,200,140,.75); background: linear-gradient(135deg, rgba(255,153,0,.16), rgba(217,70,239,.12));
+    box-shadow: 0 0 30px rgba(255,153,0,.35), inset 0 0 30px rgba(255,180,90,.25); }
+.sp-cube i:nth-child(1) { transform: translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(2) { transform: rotateY(180deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(3) { transform: rotateY(90deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(4) { transform: rotateY(-90deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(5) { transform: rotateX(90deg) translateZ(calc(var(--cs) / 2)); }
+.sp-cube i:nth-child(6) { transform: rotateX(-90deg) translateZ(calc(var(--cs) / 2)); }
+
+/* --- 6.3 sp-fan: cards on a concave (agenda) or convex (comparison) arc ---
+   <div class="sp-fan" data-at="50,61" data-shape="concave|convex" data-focus="3.2"> <item>… </div>
+   Items fly in from depth. An item that holds depth layers must be .d3 (its leaves fade);
+   any other item is a leaf itself. */
+.sp-fan { position: absolute; left: 50%; top: 0; width: 0; height: 0; transform-style: preserve-3d; }   /* row offset = --fy (print-safe) */
+.sp-fan > * { position: absolute; left: 0; top: 0;
+    --o: calc(min(1, max(0, var(--e, 1) * 1.6)) * var(--dim, 1));
+    transform: translate3d(var(--tx, 0px), calc(var(--fy, 0px) + var(--ty, 0px) + (1 - var(--e, 1)) * 60px + var(--bob, 0px)), calc(var(--tz, 0px) + var(--push, 0px) - (1 - var(--e, 1)) * 1600px))
+               rotateY(calc(var(--ry, 0deg) + (1 - var(--e, 1)) * var(--ryin, 35deg))) translate(-50%, -50%); }
+.sp-fan > :not(.d3) { opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-fan > .sp-focus.sp-card { border-color: rgba(245,208,254,.8); box-shadow: 0 30px 70px rgba(0,0,0,.55), 0 0 50px rgba(217,70,239,.35); }
+/* monolith (agenda-style tall card with a big outlined number floating in front) */
+.sp-mono { --cw: min(18vw, 36vh); --ch: min(48vh, calc(var(--cw) * 1.5)); width: var(--cw); height: var(--ch); transform-style: preserve-3d; }
+.sp-mono > .sp-mono-face { position: absolute; inset: 0; border-radius: clamp(12px, 1.3vw, 22px);
+    background: linear-gradient(172deg, rgba(139,92,246,.30), rgba(30,11,75,.62) 42%, rgba(10,6,20,.78));
+    border: 1px solid rgba(167,139,250,.30); box-shadow: 0 40px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 50px rgba(139,92,246,.18); }
+.sp-mono > .sp-mono-face::before { content: ""; position: absolute; left: 12%; right: 12%; top: -1px; height: 2px; background: var(--grad-bar); border-radius: 2px; box-shadow: 0 0 18px rgba(217,70,239,.8); }
+.sp-mono > .sp-mono-face::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.07) 45%, transparent 60%); }
+.sp-mono-num { position: absolute !important; left: 10%; top: 6%; --z: 70px; font-family: var(--font-display); font-weight: 900; font-size: calc(var(--cw) * .46); line-height: 1;
+    color: transparent; -webkit-text-stroke: 1.5px rgba(232,121,249,.85); text-shadow: 0 0 30px rgba(217,70,239,.35); }
+.sp-mono-body { position: absolute !important; left: 10%; right: 10%; bottom: 9%; --z: 34px; }
+.sp-mono-body .ico { width: clamp(34px, 3.2vw, 52px); height: clamp(34px, 3.2vw, 52px); border-radius: 12px; display: grid; place-items: center;
+    background: rgba(139,92,246,.18); border: 1px solid rgba(167,139,250,.35); margin-bottom: 1em; color: #e9d5ff; }
+.sp-mono-body .ico svg { width: 52%; height: 52%; }
+.sp-mono-body h3 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); line-height: 1.15; }
+.sp-mono-body p { font-size: var(--micro); letter-spacing: .22em; text-transform: uppercase; color: var(--t3); margin-top: .7em; }
+/* meter (5 segments) for comparison cards: <span class="sp-meter" data-v="4"><b></b>×5</span> */
+.sp-meter { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.sp-meter b { height: 7px; border-radius: 2px; background: rgba(255,255,255,.1); }
+.sp-meter b.on { background: linear-gradient(90deg, #a78bfa, #e879f9); box-shadow: 0 0 8px rgba(217,70,239,.6); }
+
+/* --- 6.4 sp-pillars: lit 3D bars rising from the grid floor ------------------
+   <div class="sp-pillars" data-depth=".3"> <div class="sp-pillar pink" data-v="6" [data-x="39"]> <div class="sp-plab">…</div> </div> … */
+.sp-pillars { position: absolute; left: 50%; top: 100%; width: 0; height: 0; transform-style: preserve-3d; transform: translateZ(var(--pz, -400px)); }
+.sp-pillar { position: absolute; bottom: 0; transform-style: preserve-3d; width: var(--pw); height: calc(var(--ph, 200px) * var(--e, 1));
+    left: calc(var(--px, 0px) - var(--pw) / 2);
+    --c1: #c4b5fd; --c2: #8B5CF6; --c3: rgba(46,16,101,.85); }
+.sp-pillar.pink { --c1: #f5d0fe; --c2: #D946EF; --c3: rgba(88,16,110,.85); }
+.sp-pillar.blue { --c1: #bfdbfe; --c2: #3B82F6; --c3: rgba(23,37,110,.85); }
+.sp-pillar.orange { --c1: #fed7aa; --c2: #FF9900; --c3: rgba(110,45,10,.85); }
+.sp-pillar.magenta { --c1: #f5d0fe; --c2: #c026d3; --c3: rgba(76,29,149,.9); }
+.sp-pillar.ghost { --c1: #9ca3af; --c2: #6b7280; --c3: rgba(31,41,55,.9); }
+.sp-pillar > .fc { position: absolute; opacity: var(--fade, 1); backface-visibility: hidden; }
+.sp-pillar > .fc.front { inset: 0; transform: translateZ(calc(var(--pd) / 2)); background: linear-gradient(180deg, var(--c1) 0%, var(--c2) 38%, var(--c3) 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.18); }
+.sp-pillar > .fc.front::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(180deg, rgba(255,255,255,.10) 0 1px, transparent 1px 22px); }
+.sp-pillar > .fc.back { inset: 0; transform: translateZ(calc(var(--pd) / -2)) rotateY(180deg); background: var(--c3); }
+.sp-pillar > .fc.sl, .sp-pillar > .fc.sr { top: 0; bottom: 0; width: var(--pd); left: calc(50% - var(--pd) / 2); background: linear-gradient(180deg, var(--c2), var(--c3) 70%, #0b0418); filter: brightness(.62); }
+.sp-pillar > .fc.sl { transform: rotateY(-90deg) translateZ(calc(var(--pw) / 2)); }
+.sp-pillar > .fc.sr { transform: rotateY(90deg) translateZ(calc(var(--pw) / 2)); }
+.sp-pillar > .fc.top { left: 0; width: 100%; height: var(--pd); top: calc(var(--pd) / -2); transform: rotateX(90deg); background: radial-gradient(circle at 50% 50%, #fff, var(--c1) 65%); box-shadow: 0 0 30px 2px var(--c1); }
+.sp-pillar.ghost > .fc.front { background: linear-gradient(180deg, rgba(156,163,175,.55), rgba(75,85,99,.45)); }
+.sp-pillar.ghost > .fc.top { background: rgba(209,213,219,.6); box-shadow: none; }
+.sp-pool { position: absolute; width: calc(var(--pw) * 3); height: calc(var(--pw) * 3); left: calc(50% - var(--pw) * 1.5); top: calc(100% - var(--pw) * 1.5);
+    transform: rotateX(90deg); border-radius: 50%; opacity: calc(var(--fade, 1) * var(--e, 1) * var(--pool, .55)); background: radial-gradient(circle, var(--c1), rgba(0,0,0,0) 62%); }
+.sp-plab { position: absolute; left: 50%; bottom: 100%; width: max-content; text-align: center;
+    transform: translate3d(-50%, calc(var(--pd) * -.32 - 1.4vh), calc(var(--pd) / 2 + 2px)); opacity: calc(var(--fade, 1) * min(1, var(--e, 1) * 4)); }
+.sp-plab .v { font-family: var(--font-display); font-weight: 800; font-size: clamp(2.3rem, 5.2vw, 5.4rem); line-height: 1; letter-spacing: -.02em; text-shadow: 0 0 30px rgba(217,70,239,.35); }
+.sp-plab h4 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.05rem, 1.9vw, 1.8rem); margin-top: .15em; }
+.sp-pillar.ghost .sp-plab .v { font-size: clamp(1rem, 1.9vw, 1.9rem); color: rgba(255,255,255,.6); text-shadow: none; }
+.sp-pillars.compact .sp-plab .v { font-size: clamp(1.5rem, 3vw, 3rem); }
+.sp-pillars.compact .sp-plab h4 { font-size: clamp(.85rem, 1.4vw, 1.35rem); }
+
+/* --- 6.5 sp-stack: exploded isometric layer stack (+ optional cutting plane) --
+   <div class="sp-stack" data-at="61,57" data-size=".27" [data-orbit="17"] [data-flow="12"]>
+     <div class="sp-slab orange"><i data-lucide="cpu"></i>
+       <div class="sp-tag"><span class="lv">Silicon</span><h4>Trainium3</h4><p>Frontier-scale training</p></div></div> …(bottom → top)
+     [<div class="sp-plane-tag"><span class="lv">GOVERNANCE</span><h4>…</h4><p>…</p></div>]   */
+.sp-stack { position: absolute; left: 61%; top: 57%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-iso { position: absolute; transform-style: preserve-3d; --rx: 57deg;
+    --base: calc((var(--n) - 1) * var(--gap) / -2 - var(--t) / 2 - var(--s) * .04);
+    transform: rotateX(var(--rx)) rotateZ(var(--rz, -42deg)); }
+.sp-slab { position: absolute; width: var(--s); height: var(--s); left: calc(var(--s) / -2); top: calc(var(--s) / -2); transform-style: preserve-3d;
+    --o: var(--e, 1); transform: translateZ(calc(var(--base) + var(--k) * var(--gap) + var(--drop, 0px)));
+    --top: linear-gradient(135deg, #a78bfa, #6d28d9); --side: linear-gradient(90deg, #2e1065, #5b21b6); --gl: #c4b5fd;
+    --pat: radial-gradient(circle, rgba(255,255,255,.22) 1.5px, transparent 2px) 0 0/14% 14%; }
+.sp-slab.orange { --top: linear-gradient(135deg, #ffb347, #c2410c); --side: linear-gradient(90deg, #7c2d12, #c2410c); --gl: #FF9900;
+    --pat: repeating-linear-gradient(0deg, rgba(255,255,255,.14) 0 1px, transparent 1px 10%), repeating-linear-gradient(90deg, rgba(255,255,255,.14) 0 1px, transparent 1px 10%); }
+.sp-slab.blue { --top: linear-gradient(135deg, #60a5fa, #1d4ed8); --side: linear-gradient(90deg, #172554, #1e40af); --gl: #93c5fd;
+    --pat: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 2px, transparent 2px 12px); }
+.sp-slab.pink { --top: linear-gradient(135deg, #f0abfc, #a21caf); --side: linear-gradient(90deg, #701a75, #c026d3); --gl: #f0abfc;
+    --pat: repeating-linear-gradient(45deg, rgba(255,255,255,.14) 0 2px, transparent 2px 12px); }
+.sp-slab.glass { --top: linear-gradient(135deg, rgba(245,208,254,.55), rgba(217,70,239,.35)); --side: linear-gradient(90deg, rgba(134,25,143,.7), rgba(217,70,239,.6)); --gl: #e879f9; --pat: none; }
+.sp-slab.slate { --top: linear-gradient(135deg, #94a3b8, #334155); --side: linear-gradient(90deg, #1e293b, #475569); --gl: #cbd5e1;
+    --pat: repeating-linear-gradient(0deg, rgba(255,255,255,.14) 0 1px, transparent 1px 12%); }
+.sp-slab > .ft { position: absolute; inset: 0; transform: translateZ(var(--t)); border-radius: 6px; opacity: calc(var(--fade, 1) * var(--o, 1));
+    background: var(--top); box-shadow: inset 0 0 0 1px rgba(255,255,255,.28), inset 0 0 40px rgba(255,255,255,.08); display: grid; place-items: center; }
+.sp-slab > .ft::before { content: ""; position: absolute; inset: 8%; border-radius: 4px; border: 1px solid rgba(255,255,255,.22); background: var(--pat); }
+.sp-slab > .ft svg { position: relative; width: 24%; height: 24%; color: #fff; filter: drop-shadow(0 0 10px rgba(255,255,255,.6)); }
+.sp-slab > .fs { position: absolute; opacity: calc(var(--fade, 1) * var(--o, 1)); background: var(--side); }
+.sp-slab > .fs.s { left: 0; top: 100%; width: 100%; height: var(--t); transform-origin: 50% 0; transform: rotateX(90deg); }
+.sp-slab > .fs.n { left: 0; top: 0; width: 100%; height: var(--t); transform-origin: 50% 0; transform: rotateX(90deg); filter: brightness(.7); }
+.sp-slab > .fs.w { left: 0; top: 0; width: var(--t); height: 100%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(1.25); }
+.sp-slab > .fs.e { left: 100%; top: 0; width: var(--t); height: 100%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(.8); }
+.sp-slab > .glow { position: absolute; inset: -14%; border-radius: 50%; transform: translateZ(-1px); opacity: calc(var(--fade, 1) * var(--o, 1) * .55); background: radial-gradient(circle, var(--gl), transparent 65%); }
+/* billboard label: anchored at the slab's right-most corner, counter-rotated to face the camera */
+.sp-anchor { position: absolute; left: 100%; top: 100%; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translateZ(var(--t)) rotateZ(calc(-1 * var(--rz, -42deg))) rotateX(calc(-1 * var(--rx))); }
+.sp-tag { position: absolute; left: 0; top: 0; white-space: nowrap; padding-left: clamp(2rem, 4vw, 4.4rem);
+    transform: translate(1.4vw, -50%); --o: var(--e, 1); opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-tag::before { content: ""; position: absolute; left: 0; top: 50%; width: clamp(1.6rem, 3.4vw, 3.8rem); height: 1px; background: linear-gradient(90deg, rgba(255,255,255,.1), var(--gl)); }
+.sp-tag::after { content: ""; position: absolute; left: -3px; top: calc(50% - 3px); width: 6px; height: 6px; border-radius: 50%; background: var(--gl); box-shadow: 0 0 10px var(--gl); }
+.sp-tag h4 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); line-height: 1.15; }
+.sp-tag p { font-size: var(--small); color: var(--t2); margin-top: .2em; }
+.sp-tag .lv { display: block; font-family: var(--font-display); font-size: var(--micro); letter-spacing: .22em; text-transform: uppercase; color: var(--gl); font-weight: 700; margin-bottom: .3em; }
+.sp-stack.dense .sp-tag h4 { font-size: clamp(.92rem, 1.45vw, 1.4rem); }
+.sp-stack.dense .sp-tag p { font-size: clamp(.66rem, .95vw, .92rem); color: rgba(255,255,255,.62); }
+.sp-plane { position: absolute; top: 0; transform-origin: 0 0; border-radius: 6px; --o: calc(var(--e, 1) * .9); opacity: calc(var(--fade, 1) * var(--o, 1));
+    left: calc(var(--s) * -.6); width: calc(var(--s) * 1.2); height: calc((var(--n) - 1) * var(--gap) + var(--t) + var(--s) * .2);
+    transform: translateZ(calc(var(--base) - var(--s) * .1)) rotateX(90deg);
+    background: linear-gradient(0deg, rgba(217,70,239,.30), rgba(217,70,239,.10)),
+                repeating-linear-gradient(0deg, rgba(245,208,254,.28) 0 1px, transparent 1px 10%), repeating-linear-gradient(90deg, rgba(245,208,254,.16) 0 1px, transparent 1px 12.5%);
+    border: 1px solid rgba(245,208,254,.55); box-shadow: 0 0 40px rgba(217,70,239,.35), inset 0 0 30px rgba(217,70,239,.2); }
+.sp-plane-anchor { position: absolute; left: calc(var(--s) * -.6); top: 0; width: 0; height: 0; transform-style: preserve-3d;
+    transform: translateZ(calc(var(--base) + ((var(--n) - 1) * var(--gap) + var(--t)) * .62)) rotateZ(calc(-1 * var(--rz, -42deg))) rotateX(calc(-1 * var(--rx))); }
+.sp-plane-tag { position: absolute; right: 0; bottom: 0; transform: translate(-1.4vw, -.4vh); white-space: nowrap; text-align: right;
+    padding: .55em .9em; border-radius: 12px; background: rgba(40,8,50,.72); border: 1px solid rgba(245,208,254,.45);
+    --o: var(--e, 1); opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-plane-tag .lv { display: block; font-family: var(--font-display); font-size: var(--micro); letter-spacing: .22em; text-transform: uppercase; font-weight: 700; color: #f0abfc; }
+.sp-plane-tag h4 { font-weight: 700; font-size: clamp(.85rem, 1.3vw, 1.25rem); }
+.sp-plane-tag p { font-size: var(--small); color: var(--t2); }
+.sp-flow { position: absolute; width: 10px; height: 10px; left: -5px; top: -5px; border-radius: 50%; opacity: calc(var(--fade, 1) * var(--o, 0));
+    background: #fff; box-shadow: 0 0 12px 4px rgba(232,121,249,.9), 0 0 30px 8px rgba(139,92,246,.5); }
+
+/* --- 6.6 sp-runway: steps standing on a rising 3D path; a light pulse runs it --
+   <div class="sp-runway" data-path="13,66,.03 87,40,-.27" [data-grow="1.25"] [data-tour]>
+     <div class="sp-step sp-card">…</div> … </div>      (data-tour = the CAMERA travels stop to stop) */
+.sp-runway { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-seg { position: absolute; left: 0; top: -2px; height: 4px; transform-origin: 0 50%; opacity: var(--fade, 1); background: rgba(167,139,250,.16); border-radius: 2px; }
+.sp-seg.fade-in { background: linear-gradient(90deg, transparent, rgba(167,139,250,.16)); }
+.sp-seg.fade-out { background: linear-gradient(90deg, rgba(167,139,250,.16), transparent); }
+.sp-seg i { position: absolute; inset: 0; background: linear-gradient(90deg, #8B5CF6, #e879f9); box-shadow: 0 0 14px #d946ef; transform: scaleX(var(--fill, 0)); transform-origin: 0 50%; border-radius: 2px; }
+.sp-rnode { position: absolute; width: 2.6vh; height: 2.6vh; left: -1.3vh; top: -1.3vh; border-radius: 50%; opacity: var(--fade, 1);
+    border: 2px solid rgba(232,121,249,.55); background: radial-gradient(circle, rgba(217,70,239,.45), transparent 62%); transition: box-shadow .4s, border-color .4s; }
+.sp-rnode.hit, .slide.is-final .sp-rnode { border-color: #fff; box-shadow: 0 0 30px 6px rgba(217,70,239,.7), inset 0 0 20px rgba(255,255,255,.4); }
+.sp-stem { position: absolute; left: -1px; top: 0; width: 2px; opacity: var(--fade, 1); background: linear-gradient(0deg, rgba(232,121,249,.8), rgba(232,121,249,0)); }
+.sp-step { position: absolute; left: 0; top: 0; width: min(16.5vw, 33vh); transform-origin: 50% 100%;
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), var(--tz, 0px)) translate(-50%, -100%) translateY(calc((1 - var(--e, 1)) * 24px)) scale(calc(var(--k, 1) * (.94 + .06 * var(--e, 1))));
+    opacity: calc(var(--fade, 1) * min(1, var(--e, 1) * 1.5)); }
+.sp-step .no { font-family: var(--font-display); font-weight: 800; font-size: var(--small); letter-spacing: .2em; color: #f0abfc; }
+.sp-step h3 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); line-height: 1.2; margin: .3em 0 .35em; }
+.sp-step p { font-size: var(--small); color: var(--t2); line-height: 1.45; }
+.sp-step > svg { position: absolute; right: .9em; top: .9em; width: 1.4em; height: 1.4em; color: #c4b5fd; }
+.sp-pulse { position: absolute; width: 5vh; height: 5vh; left: -2.5vh; top: -2.5vh; border-radius: 50%; opacity: calc(var(--fade, 1) * var(--o, 0));
+    background: radial-gradient(circle, #fff 0, #f5d0fe 25%, rgba(217,70,239,.6) 45%, rgba(217,70,239,0) 70%); }
+
+/* --- 6.7 sp-chip: product-reveal chip (CSS-3D cuboid, lit, spinning) -------
+   <div class="sp-chip" data-at="30,46" data-name="TRAINIUM4"></div> */
+.sp-chip { position: absolute; left: 30%; top: 46%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-chip .aura { position: absolute; width: 120vh; height: 120vh; left: -60vh; top: -60vh; border-radius: 50%; transform: translateZ(-300px);
+    opacity: calc(var(--fade, 1) * var(--e, 1)); background: radial-gradient(circle, rgba(217,70,239,.42), rgba(139,92,246,.20) 30%, rgba(11,0,21,0) 62%); }
+.sp-chip .rays { position: absolute; width: 150vh; height: 150vh; left: -75vh; top: -75vh; border-radius: 50%; opacity: calc(var(--fade, 1) * .55);
+    transform: translateZ(-420px) rotate(var(--rr, 0deg));
+    background: repeating-conic-gradient(from 0deg, rgba(232,121,249,.22) 0deg 2deg, transparent 2deg 15deg);
+    -webkit-mask: radial-gradient(circle, #000 8%, transparent 62%); mask: radial-gradient(circle, #000 8%, transparent 62%); }
+.sp-chip .sp-flash { position: absolute; width: 80vh; height: 80vh; left: -40vh; top: -40vh; border-radius: 50%; opacity: calc(var(--fade, 1) * var(--fl, 0));
+    transform: translateZ(-60px) scale(var(--fls, 1)); background: radial-gradient(circle, rgba(255,255,255,.95), rgba(245,208,254,.5) 18%, rgba(217,70,239,0) 55%); }
+.sp-chip .body { position: absolute; --cs: min(40vh, 27vw); --ct: calc(var(--cs) * .075); width: var(--cs); height: var(--cs); left: calc(var(--cs) / -2); top: calc(var(--cs) / -2);
+    transform-style: preserve-3d;
+    transform: translate3d(0, var(--bob, 0px), calc((1 - var(--e, 1)) * -2800px)) rotateX(calc(8deg + 44deg * var(--e, 1))) rotateZ(calc((1 - var(--e, 1)) * -300deg + var(--spin, 0deg))); }
+.sp-chip .ctop { position: absolute; inset: 0; transform: translateZ(var(--ct)); border-radius: 7%; opacity: var(--fade, 1); overflow: hidden;
+    background: linear-gradient(135deg, #2a1450, #120726 55%, #1d0b3a); box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), inset 0 0 0 calc(var(--cs) * .03) rgba(139,92,246,.18); }
+.sp-chip .ctop::before { content: ""; position: absolute; inset: 5%; border-radius: 5%;
+    background: repeating-linear-gradient(90deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) top/100% 4% no-repeat,
+                repeating-linear-gradient(90deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) bottom/100% 4% no-repeat,
+                repeating-linear-gradient(0deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) left/4% 100% no-repeat,
+                repeating-linear-gradient(0deg, rgba(255,180,90,.45) 0 2px, transparent 2px 9px) right/4% 100% no-repeat; }
+.sp-chip .die { position: absolute; inset: 17%; border-radius: 4%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 9%;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.10) 0 1px, transparent 1px 12.5%), repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, transparent 1px 12.5%),
+                radial-gradient(circle at 50% 50%, #c084fc, #7c3aed 45%, #3b0764 100%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.45), 0 0 40px rgba(217,70,239,.75), inset 0 0 30px rgba(0,0,0,.45); }
+.sp-chip .cores { position: absolute; inset: 14%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7%; }
+.sp-chip .cores b { border-radius: 3px; background: linear-gradient(135deg, rgba(255,255,255,.5), rgba(232,121,249,.25)); box-shadow: 0 0 10px rgba(255,255,255,.35); }
+.sp-chip .cores b:nth-child(3n) { background: linear-gradient(135deg, rgba(255,200,120,.65), rgba(255,153,0,.25)); }
+.sp-chip .nm { position: relative; font-family: var(--font-display); font-weight: 800; font-size: calc(var(--cs) * .055); letter-spacing: .2em; color: #fff;
+    background: rgba(10,4,24,.55); padding: .2em .6em; border-radius: 4px; }
+.sp-chip .spec { position: absolute; inset: -40%; background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,.28) 50%, transparent 60%);
+    transform: translateX(var(--sx, 0%)); mix-blend-mode: screen; pointer-events: none; }
+.sp-chip .cbot { position: absolute; inset: 0; border-radius: 7%; background: #0c0418; opacity: var(--fade, 1); }
+.sp-chip .cs { position: absolute; opacity: var(--fade, 1); background: linear-gradient(90deg, #3b1d6e, #6d3fc0 50%, #3b1d6e); }
+.sp-chip .cs::after { content: ""; position: absolute; inset: 25% 6%; background: repeating-linear-gradient(90deg, #ffb45a 0 3px, transparent 3px 10px); opacity: .75; }
+.sp-chip .cs.s { left: 4%; top: 100%; width: 92%; height: var(--ct); transform-origin: 50% 0; transform: rotateX(90deg); }
+.sp-chip .cs.n { left: 4%; top: 0; width: 92%; height: var(--ct); transform-origin: 50% 0; transform: rotateX(90deg); filter: brightness(.6); }
+.sp-chip .cs.w { left: 0; top: 4%; width: var(--ct); height: 92%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(1.2); }
+.sp-chip .cs.e { left: 100%; top: 4%; width: var(--ct); height: 92%; transform-origin: 0 50%; transform: rotateY(-90deg); filter: brightness(.75); }
+.sp-chip .cs.w::after, .sp-chip .cs.e::after { inset: 6% 25%; background: repeating-linear-gradient(0deg, #ffb45a 0 3px, transparent 3px 10px); }
+
+/* --- 6.8 sp-graph: nodes at screen anchors + depth, 3D edges, query highlight --
+   <div class="sp-graph" [data-hot="a b c | a d e"]>
+     <div class="sp-node" data-id="meta" data-link="cat" data-at="72,35" data-z="-.32" data-lv="1"><h4>…</h4><p>…</p></div> …
+     [<div class="sp-graph-cap" data-at="72,87"><p>caption for hot set 1</p><p>…set 2</p></div>] */
+.sp-graph { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-node { position: absolute; left: 0; top: 0; white-space: nowrap; padding: .55em .95em; border-radius: 12px;
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), var(--tz, 0px)) translate(-50%, -50%);
+    opacity: calc(var(--fade, 1) * var(--e, 1) * var(--hot, 1));
+    background: linear-gradient(160deg, rgba(139,92,246,.30), rgba(18,6,40,.85)); border: 1px solid rgba(167,139,250,.4); box-shadow: 0 18px 40px rgba(0,0,0,.45);
+    transition: border-color .4s, box-shadow .4s, filter .4s; }
+.sp-node h4 { font-family: var(--font-display); font-weight: 700; font-size: clamp(.82rem, 1.25vw, 1.2rem); display: flex; align-items: center; gap: .45em; }
+.sp-node h4 svg { width: 1.05em; height: 1.05em; color: #d8b4fe; }
+.sp-node p { font-size: clamp(.62rem, .86vw, .82rem); color: var(--t2); margin-top: .15em; }
+.sp-node.accent { background: linear-gradient(160deg, rgba(255,153,0,.28), rgba(40,16,4,.85)); border-color: rgba(255,180,90,.55); }
+.sp-node.accent h4 svg { color: #fdba74; }
+.sp-node.small { padding: .45em .55em; border-radius: 9px; }
+.sp-node.small h4 { font-size: clamp(.66rem, .9vw, .86rem); }
+.sp-node.sp-dim { --hot: .32; filter: saturate(.3); }
+.sp-node.sp-hot { border-color: #f5d0fe; box-shadow: 0 0 0 1px rgba(245,208,254,.4), 0 0 34px rgba(217,70,239,.55); }
+.sp-edge { position: absolute; left: 0; top: -1px; height: 2px; transform-origin: 0 50%; opacity: calc(var(--fade, 1) * var(--hot, 1)); background: rgba(167,139,250,.28); }
+.sp-edge.sp-dim { --hot: .25; }
+.sp-edge i { position: absolute; inset: 0; background: linear-gradient(90deg, #c084fc, #f0abfc); box-shadow: 0 0 10px #d946ef; transform: scaleX(var(--fill, 0)); transform-origin: 0 50%; }
+.sp-graph-cap { position: absolute; left: 0; top: 0; white-space: nowrap; opacity: calc(var(--fade, 1) * var(--e, 1));
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translate(-50%, 0); }
+.sp-graph-cap > * { display: none; font-size: var(--small); color: #f5d0fe; padding: .35em .8em; border-radius: 99px; background: rgba(217,70,239,.14); border: 1px solid rgba(240,171,252,.4); }
+.sp-graph-cap > .on, .slide.is-final .sp-graph-cap > :first-child { display: block; }
+
+/* --- 6.9 sp-tiers: records fall through tilted trays, fewer at each tier ------
+   <div class="sp-tiers" data-tray-x="31" data-row-x="52" data-y="39,81" data-pass=".55,.4">
+     <div class="sp-tier bronze">…row content…</div> … */
+.sp-tiers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform-style: preserve-3d; }
+.sp-tray { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-style: preserve-3d; --o: var(--e, 1);
+    --m1: #a78bfa; --m2: #6d28d9; --m3: #2e1065;
+    transform: translate3d(var(--tx, 0px), calc(var(--ty, 0px) - (1 - var(--e, 1)) * 80px), var(--tz, 0px)) rotateX(58deg); }
+.sp-tray > i { position: absolute; opacity: calc(var(--fade, 1) * var(--o, 1)); }
+.sp-tray > .tt { width: var(--tw); height: var(--td); left: calc(var(--tw) / -2); top: calc(var(--td) / -2); transform: translateZ(var(--th)); border-radius: 10px; overflow: hidden;
+    background: linear-gradient(135deg, var(--m1), var(--m2)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.35), inset 0 0 40px rgba(255,255,255,.12); }
+.sp-tray > .tt::before { content: ""; position: absolute; inset: 7%; border-radius: 6px; border: 1px dashed rgba(255,255,255,.35); }
+.sp-tray > .tf { width: var(--tw); height: var(--th); left: calc(var(--tw) / -2); top: calc(var(--td) / 2); transform-origin: 50% 0; transform: rotateX(90deg); background: linear-gradient(90deg, var(--m3), var(--m2), var(--m3)); }
+.sp-tray > .tw { width: var(--th); height: var(--td); left: calc(var(--tw) / -2); top: calc(var(--td) / -2); transform-origin: 0 50%; transform: rotateY(-90deg); background: var(--m3); filter: brightness(1.2); }
+.sp-tray > .te { width: var(--th); height: var(--td); left: calc(var(--tw) / 2); top: calc(var(--td) / -2); transform-origin: 0 50%; transform: rotateY(-90deg); background: var(--m3); filter: brightness(.7); }
+.sp-rip { position: absolute; width: 5vh; height: 5vh; margin: -2.5vh 0 0 -2.5vh; border-radius: 50%; border: 2px solid rgba(255,255,255,.9); opacity: 0; pointer-events: none; }
+.sp-drop { position: absolute; width: 12px; height: 12px; left: -6px; top: -6px; border-radius: 3px; opacity: calc(var(--fade, 1) * var(--o, 0)); background: var(--dc, #fff); box-shadow: 0 0 12px 3px var(--dc, #fff); }
+.sp-tier { position: absolute; left: 0; top: 0; width: min(44vw, 640px); --o: var(--e, 1); opacity: calc(var(--fade, 1) * var(--o, 1));
+    transform: translate3d(var(--tx, 0px), var(--ty, 0px), 0) translateY(-50%);
+    display: grid; grid-template-columns: auto 1fr; gap: .2em 1.2em; align-items: baseline;
+    --m1: #a78bfa; --m2: #6d28d9; --m3: #2e1065; --mc: #c4b5fd; }
+.sp-tier.bronze, .sp-tray.bronze { --m1: #f3b483; --m2: #9a5a2a; --m3: #5c3415; --mc: #f0b07a; }
+.sp-tier.silver, .sp-tray.silver { --m1: #f1f5f9; --m2: #94a3b8; --m3: #475569; --mc: #e2e8f0; }
+.sp-tier.gold, .sp-tray.gold { --m1: #fde68a; --m2: #d99a0b; --m3: #7a5205; --mc: #fbbf24; }
+.sp-tier .tier { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.05rem, 1.9vw, 1.8rem); letter-spacing: .06em; color: var(--mc); }
+.sp-tier h4 { font-weight: 700; font-size: clamp(.92rem, 1.5vw, 1.45rem); }
+.sp-tier p { grid-column: 2; font-size: var(--small); color: var(--t2); line-height: 1.55; }
+.sp-tier p.rows { font-family: var(--font-display); font-weight: 700; color: var(--mc); margin-top: .2em; }
+
+/* --- 6.10 sp-rise: any leaf that flies up out of the depth on entry ----------
+   <div class="sp-rise" data-delay="1.3">…</div>   (delay in seconds after landing) */
+.sp-rise { position: relative; transform: translateZ(calc((1 - var(--e, 1)) * -1600px)); opacity: calc(var(--fade, 1) * min(1, var(--e, 1) * 1.8)); }
+
+/* === 7. REDUCED MOTION === */
+@media (prefers-reduced-motion: reduce) {
+    .sp-rnode, .sp-node { transition: none; }
+}
+
+/* === DECK CSS === */
+/* cover */
+.s-cover .sp-stage { padding-bottom: clamp(5rem, 16vh, 10rem); }
+.cover-t { margin-top: .45em; line-height: 1.18; filter: drop-shadow(0 0 32px rgba(217,70,239,.32)); }
+.cover-t .l1 { display: block; font-size: .7em; font-weight: 700; letter-spacing: 0; }
+.cover-t .l2 { display: inline-block; font-size: 1.02em; letter-spacing: .01em; padding: 0 .04em .08em; }
+.cover-sub { font-size: clamp(.9rem, 1.5vw, 1.4rem); color: var(--t2); margin-top: 1.1em; line-height: 1.5; }
+/* architecture */
+.b2 .sp-desc { max-width: none; white-space: nowrap; }
+.b2 .sp-tag h4 em { font-style: normal; font-family: var(--font-display); font-weight: 600; font-size: .62em; letter-spacing: .18em; color: var(--gl); margin-left: .6em; vertical-align: .12em; }
+/* iceberg tree */
+.b3 .sp-head { position: absolute; left: var(--pad); top: 50%; width: 40%; max-width: none; transform: translate3d(0, -50%, 0); }
+/* medallion */
+.b4 .sp-head { max-width: 50%; }
+/* engines */
+.b5 .sp-head { max-width: 70%; }
+.eng { width: min(27vw, 50vh); padding: clamp(.9rem, 1.6vw, 1.6rem); border-radius: 20px; transition: border-color .5s, box-shadow .5s; }
+.eng .top { display: flex; align-items: center; gap: .7em; }
+.eng .ei { width: clamp(30px, 2.8vw, 46px); height: clamp(30px, 2.8vw, 46px); border-radius: 11px; display: grid; place-items: center; background: var(--eg); color: #fff; flex: none; }
+.eng .ei svg { width: 55%; height: 55%; }
+.eng h3 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.05rem, 1.8vw, 1.75rem); line-height: 1.1; }
+.eng .et { font-size: var(--small); color: #e9d5ff; margin-top: .1em; }
+.eng .use { font-size: var(--small); color: var(--t2); line-height: 1.6; margin: .9em 0 .8em; }
+.eng .m { display: grid; grid-template-columns: 5.8em 1fr; align-items: center; gap: .6em; font-size: var(--small); color: rgba(255,255,255,.75); margin-top: .45em; white-space: nowrap; }
+.ins { position: absolute; left: 50%; bottom: clamp(3.2rem, 9vh, 5.4rem); transform: translate3d(-50%, 0, 0); white-space: nowrap; }
+.ins p { display: flex; align-items: center; gap: .7em; font-size: var(--body); padding: .6em 1.2em; border-radius: 99px; background: rgba(10,4,24,.6); border: 1px solid rgba(167,139,250,.3); }
+.ins svg { width: 1.2em; height: 1.2em; color: var(--orange); }
+/* benchmark */
+.b6 .sp-head { max-width: 62%; }
+.legend { display: flex; gap: 1.4em; margin-top: .9em; font-size: var(--small); color: var(--t2); }
+.legend i { width: .9em; height: .9em; border-radius: 3px; display: inline-block; margin-right: .5em; vertical-align: -.1em; }
+/* migration */
+.b7 .sp-head { max-width: 60%; }
+.b7 .sp-step { width: min(23vw, 44vh); }
+.b7 .sp-step.old { background: linear-gradient(165deg, rgba(148,163,184,.18), rgba(15,15,22,.9)); border-color: rgba(148,163,184,.35); }
+.b7 .sp-step.goal { border-color: rgba(245,208,254,.75); box-shadow: 0 30px 70px rgba(0,0,0,.5), 0 0 60px rgba(217,70,239,.35); }
+.b7 .sp-step .no { letter-spacing: .2em; }
+.b7 .sp-step.old .no { color: #cbd5e1; }
+.b7 .sp-step h3 { font-weight: 800; font-size: clamp(1.05rem, 1.8vw, 1.75rem); line-height: 1.25; }
+.b7 .sp-step .wh { color: #e9d5ff; }
+.b7 .sp-step .sp-chips { margin-top: .8em; gap: .4em; }
+.b7 .sp-step .sp-chip2 { font-size: var(--micro); }
+/* closing */
+.b8 .sp-stage { padding-bottom: clamp(5rem, 26vh, 18rem); }
+.big2 { font-weight: 900; font-size: clamp(2.2rem, 5.6vw, 5.8rem); line-height: 1.2; letter-spacing: -.01em; }
+.big2 .grad { display: inline-block; padding: 0 .04em .06em; }
+.sub2 { font-size: var(--body); color: var(--t2); margin-top: .9em; }
+.takes { display: flex; gap: clamp(.6rem, 1.4vw, 1.2rem); margin-top: clamp(1.2rem, 4vh, 2.6rem); }
+.take { display: flex; align-items: center; gap: .7em; padding: .75em 1.15em; border-radius: 14px; font-size: var(--body);
+    background: linear-gradient(160deg, rgba(139,92,246,.22), rgba(18,6,40,.8)); border: 1px solid rgba(167,139,250,.35); }
+.take svg { width: 1.3em; height: 1.3em; color: #f0abfc; }
+.sig { margin-top: clamp(1rem, 4vh, 2.4rem); font-family: var(--font-display); font-weight: 900; font-size: clamp(1.6rem, 3.6vw, 3.4rem); letter-spacing: -.04em; line-height: 1; }
+.sig .grad { display: inline-block; padding: 0 .05em .08em; }
+
+</style>
+</head>
+<body data-stage="free">
+<div class="sp-env stage-bg"><canvas></canvas></div>
+<div class="sp-hud stage-bg">
+  <div class="sp-brand"><b></b>AWS re:Invent 2026</div>
+  <div class="sp-where"><span data-stage-label></span><span class="slide-index"></span><svg class="sp-map"></svg></div>
+</div>
+<nav class="nav-dots" aria-label="Slides"></nav>
+
+<div class="sp-vp"><div class="sp-world">
+
+<!-- ============ 1 · COVER — nested Iceberg "table" cubes ============ -->
+<section class="slide s-cover" data-label="Opening" data-thumb="var(--sp-thumb)" data-world="0,0,0" data-env="scroll:.05" aria-label="封面">
+  <div class="sp-frame"></div>
+  <div class="sp-cubes" data-at="50,42" data-depth="-640"></div>
+  <div class="sp-stage center d3">
+    <div class="L" style="--z:24px"><span class="eyebrow rv" style="--d:.05">AWS re:Invent 2026 · Deep Dive</span></div>
+    <div class="L"><h1 class="sp-h1 cover-t"><span class="l1" data-split="chars" style="--d:.2">Lakehouse 架构深潜</span>
+      <span class="l2 grad rv-mask" style="--d:.85">开放 · 统一 · 实时</span></h1></div>
+    <div class="L" style="--z:-8px"><p class="cover-sub rv" style="--d:1.2">基于 Amazon S3 Tables 与 Apache Iceberg 的端到端数据架构</p></div>
+  </div>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 2 · ARCHITECTURE (the wow) — orbiting exploded stack + governance plane ============ -->
+<section class="slide b2" data-label="Architecture" data-thumb="var(--sp-thumb)" data-world="1.75,-1.1,-40" data-fly="dive" data-env="warp:.015" aria-label="全景架构">
+  <div class="sp-frame"></div>
+  <div class="sp-stage d3">
+    <div class="L sp-head"><span class="eyebrow rv">Reference Architecture</span>
+      <h2 class="sp-h2 rv" style="--d:.1">全景架构：<span class="grad">五层 + 治理平面</span></h2>
+      <p class="sp-desc rv" style="--d:.25">数据自下而上流动，<b>治理平面</b>贯穿每一层：一份数据、一套权限、多种引擎。</p></div>
+  </div>
+  <div class="sp-stack dense" data-at="35,61" data-size=".23" data-gap=".44" data-thick=".07" data-rz="-40" data-spin="130" data-orbit="17" data-orbit-speed=".21" data-flow="12">
+    <div class="sp-slab slate"><i data-lucide="database"></i><div class="sp-tag"><h4>数据源<em>SOURCES</em></h4><p>业务数据库 · 日志 · IoT · SaaS 应用</p></div></div>
+    <div class="sp-slab blue"><i data-lucide="arrow-down-to-line"></i><div class="sp-tag"><h4>采集<em>INGEST</em></h4><p>Amazon Kinesis · Amazon MSK · AWS DMS · AWS Glue</p></div></div>
+    <div class="sp-slab orange"><i data-lucide="hard-drive"></i><div class="sp-tag"><h4>存储<em>STORAGE</em></h4><p>Amazon S3 · Amazon S3 Tables · Apache Iceberg</p></div></div>
+    <div class="sp-slab"><i data-lucide="cpu"></i><div class="sp-tag"><h4>计算<em>COMPUTE</em></h4><p>Amazon EMR · AWS Glue · Amazon Athena · Amazon Redshift</p></div></div>
+    <div class="sp-slab pink"><i data-lucide="sparkles"></i><div class="sp-tag"><h4>服务<em>SERVE</em></h4><p>Amazon QuickSight · SageMaker Unified Studio · Amazon Bedrock</p></div></div>
+    <div class="sp-plane-tag"><span class="lv">Governance</span><h4>治理平面</h4><p>AWS Lake Formation · Amazon DataZone</p></div>
+  </div>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 3 · ICEBERG — metadata tree, query planning prunes to the files it needs ============ -->
+<section class="slide b3" data-label="Table Format" data-thumb="var(--sp-thumb)" data-world="2.9,-2.75,-72" aria-label="Apache Iceberg 表格式">
+  <div class="sp-frame"></div>
+  <div class="sp-stage d3">
+    <div class="L sp-head"><span class="eyebrow rv">Open Table Format</span>
+      <h2 class="sp-h2 rv" style="--d:.1">Apache Iceberg：<br><span class="grad">一份数据，所有引擎</span></h2>
+      <p class="sp-desc rv" style="--d:.25"><b>Amazon S3 Tables</b> 提供托管的 Iceberg 表：自动压缩与快照清理，查询只读取真正需要的文件。</p>
+      <div class="sp-chips rv" style="--d:.4"><span class="sp-chip2"><i data-lucide="lock"></i>ACID 事务</span><span class="sp-chip2"><i data-lucide="history"></i>时间旅行</span><span class="sp-chip2"><i data-lucide="git-branch"></i>Schema 演进</span><span class="sp-chip2"><i data-lucide="filter"></i>隐藏分区</span></div>
+    </div>
+  </div>
+  <div class="sp-graph" data-hot="cat meta ml m1 f2 f3 | cat meta ml m2 f4 f5 | cat meta ml m0 f0 f1">
+    <div class="sp-node accent" data-id="cat" data-at="72,21" data-z="-.42" data-lv="0"><h4><i data-lucide="database"></i>S3 Tables 表桶</h4><p>Catalog · 指向当前元数据</p></div>
+    <div class="sp-node" data-id="meta" data-link="cat" data-at="72,35" data-z="-.32" data-lv="1"><h4><i data-lucide="file-json"></i>metadata.json</h4><p>Schema · 分区规范 · 快照列表</p></div>
+    <div class="sp-node" data-id="ml" data-link="meta" data-at="72,49" data-z="-.22" data-lv="2"><h4><i data-lucide="list-tree"></i>manifest list</h4><p>快照 #42 → 3 个 manifest</p></div>
+    <div class="sp-node" data-id="m0" data-link="ml" data-at="57.5,64.5" data-z="-.11" data-lv="3"><h4><i data-lucide="file-text"></i>manifest A</h4><p>dt = '10-21'</p></div>
+    <div class="sp-node" data-id="m1" data-link="ml" data-at="72,64.5" data-z="-.11" data-lv="3"><h4><i data-lucide="file-text"></i>manifest B</h4><p>dt = '10-22'</p></div>
+    <div class="sp-node" data-id="m2" data-link="ml" data-at="86.5,64.5" data-z="-.11" data-lv="3"><h4><i data-lucide="file-text"></i>manifest C</h4><p>dt = '10-23'</p></div>
+    <div class="sp-node small" data-id="f0" data-link="m0" data-at="53.5,80" data-z="0" data-lv="4"><h4><i data-lucide="file"></i>parquet</h4></div>
+    <div class="sp-node small" data-id="f1" data-link="m0" data-at="60.9,80" data-z="0" data-lv="4"><h4><i data-lucide="file"></i>parquet</h4></div>
+    <div class="sp-node small" data-id="f2" data-link="m1" data-at="68.3,80" data-z="0" data-lv="4"><h4><i data-lucide="file"></i>parquet</h4></div>
+    <div class="sp-node small" data-id="f3" data-link="m1" data-at="75.7,80" data-z="0" data-lv="4"><h4><i data-lucide="file"></i>parquet</h4></div>
+    <div class="sp-node small" data-id="f4" data-link="m2" data-at="83.1,80" data-z="0" data-lv="4"><h4><i data-lucide="file"></i>parquet</h4></div>
+    <div class="sp-node small" data-id="f5" data-link="m2" data-at="90.5,80" data-z="0" data-lv="4"><h4><i data-lucide="file"></i>parquet</h4></div>
+    <div class="sp-graph-cap" data-at="72,87.5"><p>WHERE dt = '10-22'　→　仅扫描 <b>2 / 6</b> 个数据文件</p><p>WHERE dt = '10-23'　→　仅扫描 <b>2 / 6</b> 个数据文件</p><p>WHERE dt = '10-21'　→　仅扫描 <b>2 / 6</b> 个数据文件</p></div>
+  </div>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 4 · MEDALLION — records fall through Bronze → Silver → Gold ============ -->
+<section class="slide b4" data-label="Medallion" data-thumb="var(--sp-thumb)" data-world="2.7,-4.75,-14" aria-label="Medallion 分层">
+  <div class="sp-frame"></div>
+  <div class="sp-stage d3">
+    <div class="L sp-head"><span class="eyebrow rv">Medallion Architecture</span>
+      <h2 class="sp-h2 rv" style="--d:.1">Bronze → Silver → Gold<br><span class="grad">数据逐层提纯</span></h2></div>
+  </div>
+  <div class="sp-tiers" data-tray-x="31" data-row-x="52" data-y="39,81" data-pass=".55,.4">
+    <div class="sp-tier bronze"><span class="tier">BRONZE</span><h4>原始层</h4><p>Kinesis / DMS 原样落地为 Iceberg 表，保留全量历史，随时可回放。</p><p class="rows"><span class="count" data-count="12.4" data-decimals="1" data-delay=".4">12.4</span> 亿行 / 天</p></div>
+    <div class="sp-tier silver"><span class="tier">SILVER</span><h4>清洗层</h4><p>AWS Glue / EMR Spark 去重、标准化、关联，形成可信明细。</p><p class="rows"><span class="count" data-count="3.1" data-decimals="1" data-delay=".6">3.1</span> 亿行 / 天</p></div>
+    <div class="sp-tier gold"><span class="tier">GOLD</span><h4>业务层</h4><p>面向 Redshift、QuickSight 与 Bedrock 的聚合指标与特征。</p><p class="rows"><span class="count" data-count="8600" data-sep data-delay=".8">8,600</span> 万行 / 天</p></div>
+  </div>
+  <p class="L sp-note">示例数据，仅供演示</p>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 5 · QUERY ENGINES — convex fan, the spotlight steps through each ============ -->
+<section class="slide b5" data-label="Query Engines" data-thumb="var(--sp-thumb)" data-world="1.1,-5.95,30" aria-label="查询引擎选型">
+  <div class="sp-frame"></div>
+  <div class="sp-stage d3">
+    <div class="L sp-head"><span class="eyebrow rv">Query Engines</span>
+      <h2 class="sp-h2 rv" style="--d:.1">Athena、Redshift 还是 EMR？<br><span class="grad">按场景选引擎</span></h2></div>
+    <div class="L ins"><p class="rv" style="--d:1.2"><i data-lucide="share-2"></i>三种引擎共享同一份 Iceberg 数据：按场景选引擎，而不是复制数据</p></div>
+  </div>
+  <div class="sp-fan" data-at="50,57" data-shape="convex" data-focus="3.2">
+    <div class="sp-card eng" style="--eg:linear-gradient(135deg,#60a5fa,#1d4ed8)">
+      <div class="top"><div class="ei"><i data-lucide="search"></i></div><div><h3>Amazon Athena</h3><p class="et">Serverless 交互式查询</p></div></div>
+      <p class="use">即席分析与数据探索，直接查询 S3 上的 Iceberg 表，按扫描量计费，零运维。</p>
+      <div class="m"><span>启动速度</span><span class="sp-meter" data-v="5"><b></b><b></b><b></b><b></b><b></b></span></div>
+      <div class="m"><span>高并发 BI</span><span class="sp-meter" data-v="3"><b></b><b></b><b></b><b></b><b></b></span></div>
+      <div class="m"><span>处理灵活性</span><span class="sp-meter" data-v="3"><b></b><b></b><b></b><b></b><b></b></span></div></div>
+    <div class="sp-card eng" style="--eg:linear-gradient(135deg,#a78bfa,#6d28d9)">
+      <div class="top"><div class="ei"><i data-lucide="layout-dashboard"></i></div><div><h3>Amazon Redshift</h3><p class="et">云数据仓库</p></div></div>
+      <p class="use">高并发 BI 报表、复杂多表 Join 与亚秒级仪表盘，可直接读取 Lakehouse 中的表。</p>
+      <div class="m"><span>启动速度</span><span class="sp-meter" data-v="4"><b></b><b></b><b></b><b></b><b></b></span></div>
+      <div class="m"><span>高并发 BI</span><span class="sp-meter" data-v="5"><b></b><b></b><b></b><b></b><b></b></span></div>
+      <div class="m"><span>处理灵活性</span><span class="sp-meter" data-v="3"><b></b><b></b><b></b><b></b><b></b></span></div></div>
+    <div class="sp-card eng" style="--eg:linear-gradient(135deg,#ffb347,#c2410c)">
+      <div class="top"><div class="ei"><i data-lucide="server-cog"></i></div><div><h3>Amazon EMR</h3><p class="et">托管 Spark / Hadoop</p></div></div>
+      <p class="use">大规模 ETL、特征工程与自定义框架，Serverless 或集群模式按需弹性。</p>
+      <div class="m"><span>启动速度</span><span class="sp-meter" data-v="3"><b></b><b></b><b></b><b></b><b></b></span></div>
+      <div class="m"><span>高并发 BI</span><span class="sp-meter" data-v="2"><b></b><b></b><b></b><b></b><b></b></span></div>
+      <div class="m"><span>处理灵活性</span><span class="sp-meter" data-v="5"><b></b><b></b><b></b><b></b><b></b></span></div></div>
+  </div>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 6 · BENCHMARK — grey "before" towers, short Lakehouse bars land beside them ============ -->
+<section class="slide b6" data-label="Benchmark" data-thumb="var(--sp-thumb)" data-world="-.55,-7.6,10" aria-label="性能基准">
+  <div class="sp-frame"></div>
+  <div class="sp-stage d3">
+    <div class="L sp-head"><span class="eyebrow rv">Benchmark</span>
+      <h2 class="sp-h2 rv" style="--d:.1">TPC-DS 类查询耗时：<span class="grad">平均提速 4.3x</span></h2>
+      <p class="legend rv" style="--d:.25"><span><i style="background:#6b7280"></i>自建 Hadoop（Hive on YARN）</span><span><i style="background:linear-gradient(135deg,#a78bfa,#e879f9)"></i>Lakehouse（Iceberg + Athena / Redshift）</span></p></div>
+  </div>
+  <div class="sp-pillars compact" data-depth=".3" data-width=".062,.11" data-max="340">
+    <div class="sp-pillar ghost" data-v="120" data-x="13.2" data-delay=".25"><div class="sp-plab"><p class="v"><span class="count" data-count="120" data-delay=".1">120</span>s</p></div></div>
+    <div class="sp-pillar magenta" data-v="30" data-x="20.8" data-delay="1.15" data-ease="back"><div class="sp-plab"><p class="v"><span class="count" data-count="30" data-delay="1">30</span>s</p><h4>扫描聚合</h4><p class="sp-delta up"><i data-lucide="zap"></i>提速 4.0x</p></div></div>
+    <div class="sp-pillar ghost" data-v="340" data-x="35.2" data-delay=".38"><div class="sp-plab"><p class="v"><span class="count" data-count="340" data-delay=".2">340</span>s</p></div></div>
+    <div class="sp-pillar magenta" data-v="85" data-x="42.8" data-delay="1.28" data-ease="back"><div class="sp-plab"><p class="v"><span class="count" data-count="85" data-delay="1.1">85</span>s</p><h4>多表 Join</h4><p class="sp-delta up"><i data-lucide="zap"></i>提速 4.0x</p></div></div>
+    <div class="sp-pillar ghost" data-v="96" data-x="57.2" data-delay=".51"><div class="sp-plab"><p class="v"><span class="count" data-count="96" data-delay=".3">96</span>s</p></div></div>
+    <div class="sp-pillar magenta" data-v="24" data-x="64.8" data-delay="1.41" data-ease="back"><div class="sp-plab"><p class="v"><span class="count" data-count="24" data-delay="1.2">24</span>s</p><h4>窗口分析</h4><p class="sp-delta up"><i data-lucide="zap"></i>提速 4.0x</p></div></div>
+    <div class="sp-pillar ghost" data-v="18" data-x="79.2" data-delay=".64"><div class="sp-plab"><p class="v"><span class="count" data-count="18" data-delay=".4">18</span>s</p></div></div>
+    <div class="sp-pillar magenta" data-v="3.4" data-x="86.8" data-delay="1.54" data-ease="back"><div class="sp-plab"><p class="v"><span class="count" data-count="3.4" data-decimals="1" data-delay="1.3">3.4</span>s</p><h4>即席点查</h4><p class="sp-delta up"><i data-lucide="zap"></i>提速 5.3x</p></div></div>
+  </div>
+  <p class="L sp-note">示例数据，仅供演示</p>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 7 · MIGRATION — the camera itself travels station to station ============ -->
+<section class="slide b7" data-label="Migration" data-thumb="var(--sp-thumb)" data-world="-1.5,-9.6,-18" aria-label="迁移路径">
+  <div class="sp-frame"></div>
+  <div class="sp-stage d3">
+    <div class="L sp-head"><span class="eyebrow rv">Migration Path</span>
+      <h2 class="sp-h2 rv" style="--d:.1">从自建 Hadoop 到 <span class="grad">Lakehouse</span></h2></div>
+  </div>
+  <div class="sp-runway" data-path="20,80,0 80,60,-.48" data-grow="1.25" data-tour>
+    <div class="sp-step sp-card old"><p class="no">NOW · 现状</p><h3>自建 Hadoop</h3><p class="wh">存算耦合，扩容以周计</p><p>HDFS + YARN 集群，资源利用率低，版本升级与运维人力负担重。</p>
+      <div class="sp-chips"><span class="sp-chip2">HDFS</span><span class="sp-chip2">Hive</span><span class="sp-chip2">YARN</span></div></div>
+    <div class="sp-step sp-card"><p class="no">PHASE 1 · 第 1–3 月</p><h3>Amazon EMR</h3><p class="wh">平迁：存算分离</p><p>Spark / Hive 作业平迁，数据迁至 Amazon S3；计算按需弹性，Spot 实例降本。</p>
+      <div class="sp-chips"><span class="sp-chip2">Amazon EMR</span><span class="sp-chip2">Amazon S3</span><span class="sp-chip2">AWS DMS</span></div></div>
+    <div class="sp-step sp-card goal"><p class="no">PHASE 2 · 第 4–6 月</p><h3>Lakehouse</h3><p class="wh">目标：开放、统一、可治理</p><p>Iceberg + S3 Tables 统一表格式，Athena / Redshift / EMR 共享数据，Lake Formation 统一治理。</p>
+      <div class="sp-chips"><span class="sp-chip2">S3 Tables</span><span class="sp-chip2">Apache Iceberg</span><span class="sp-chip2">Lake Formation</span></div></div>
+  </div>
+  <p class="L sp-note">示例周期，仅供演示</p>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+<!-- ============ 8 · CLOSING — takeaways fly up out of the depth ============ -->
+<section class="slide b8" data-label="Closing" data-thumb="var(--sp-thumb)" data-world="-.9,-11.9,0" data-env="scroll:.16 warp:.55" aria-label="结尾">
+  <div class="sp-frame"></div>
+  <div class="sp-stage center d3">
+    <div class="L"><h2 class="big2"><span data-split="chars" style="--d:.15">数据就位，</span><span class="grad rv-mask" style="--d:.75">AI 才能就位。</span></h2></div>
+    <div class="L"><p class="sub2 rv" style="--d:1.15">开放格式 · 统一治理 · 按需计算 —— 从今天开始构建你的 Lakehouse</p></div>
+    <div class="takes d3">
+      <p class="take sp-rise" data-delay=".9"><i data-lucide="layers"></i>Apache Iceberg 开放表格式</p>
+      <p class="take sp-rise" data-delay="1.04"><i data-lucide="shield-check"></i>AWS Lake Formation 统一治理</p>
+      <p class="take sp-rise" data-delay="1.18"><i data-lucide="cpu"></i>引擎按场景选择</p>
+    </div>
+    <div class="sp-rise" data-delay="1.35"><p class="sig"><span class="grad">Now go build.</span></p></div>
+  </div>
+  <p class="L sp-foot">© 2026, Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+</section>
+
+</div></div>
+
+<script>
+/* === STAGE ENGINE JS (engine/stage-engine.js) === */
+/* ===========================================================
+   STAGE ENGINE — window.Stage   (inline verbatim at the END of <body>)
+   Stacked slides + per-slide hooks + transitions + overview + lightbox.
+   See engine/ENGINE.md for the authoring contract.
+   =========================================================== */
+(function () {
+'use strict';
+if (window.Stage && window.Stage.version) return;
+var D = document, body = D.body, html = D.documentElement;
+var mq = matchMedia('(prefers-reduced-motion: reduce)');
+var REDUCED = mq.matches;
+var slides = [], N = 0, cur = -1, gen = 0, booted = false, frozen = false, pending = null;
+var HOOKS = {}, changeFns = [], transitionFn = null, tctx = null, waits = [];
+var opts = { keys: true, wheel: true, touch: true, hash: true, clickToAdvance: false };
+var noop = function () {};
+var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+var easeOut = function (t) { return 1 - Math.pow(1 - t, 4); };
+function $$(sel, root) { return Array.prototype.slice.call((root || D).querySelectorAll(sel)); }
+var STATE_CLS = ['is-active', 'is-entering', 'is-leaving', 'stage-in', 'stage-out', 'stage-reset'];
+function st(s) { return s.__stage || (s.__stage = {}); }
+function typing(t) { return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); }
+function hooksOf(s) { return (s && HOOKS[s.dataset.scene]) || []; }
+function safe(fn, self, args) { try { return fn.apply(self, args); } catch (e) { console.error('[Stage]', e); } }
+function cssMs(name, el) {
+  var v = getComputedStyle(el || body).getPropertyValue(name).trim();
+  return v ? parseFloat(v) * (/ms$/.test(v) ? 1 : 1000) : 700;
+}
+
+/* === RAF LOOP — one shared loop, paused while the tab is hidden === */
+var loops = new Set(), rafId = 0, lastT = 0;
+function frame(now) {
+  rafId = 0;
+  var dt = lastT ? Math.min(0.1, (now - lastT) / 1000) : 0.016; lastT = now;
+  loops.forEach(function (l) { if (safe(l, null, [now, dt]) === false) loops.delete(l); });
+  schedule();
+}
+function schedule() { if (!rafId && loops.size && !D.hidden) rafId = requestAnimationFrame(frame); }
+function addLoop(fn) { loops.add(fn); schedule(); return function () { loops.delete(fn); }; }
+D.addEventListener('visibilitychange', function () {
+  if (D.hidden) { cancelAnimationFrame(rafId); rafId = 0; } else { lastT = 0; schedule(); }
+});
+
+/* === CTX — handed to hooks; everything it starts dies when the slide is left === */
+function makeCtx(base) {
+  var alive = true, stops = [];
+  var ctx = Object.assign({ reduced: REDUCED, frozen: frozen }, base);
+  ctx.alive = function () { return alive; };
+  // await ctx.wait(ms): resolves only if still alive (otherwise never — the async fn just stops)
+  ctx.wait = function (ms) {
+    return new Promise(function (res) {
+      if (!alive) return;
+      var t = setTimeout(function () { if (alive) res(); }, ms || 0);
+      stops.push(function () { clearTimeout(t); });
+    });
+  };
+  // ctx.raf(fn(now, dt, elapsedMs)) — return false to stop; auto-stopped on leave
+  ctx.raf = function (fn) {
+    if (!alive) return noop;
+    var t0 = -1, stop = addLoop(function (now, dt) {
+      if (!alive) return false;
+      if (t0 < 0) t0 = now;
+      return fn(now, dt, now - t0);
+    });
+    stops.push(stop); return stop;
+  };
+  // ctx.tween({from, to, dur, delay, ease, on}) → Promise (resolves at the end, only if alive)
+  ctx.tween = function (o) {
+    o = Object.assign({ from: 0, to: 1, dur: 1000, delay: 0, ease: easeOut }, o);
+    return new Promise(function (res) {
+      if (!alive) return;
+      if (REDUCED) { o.on && o.on(o.to, 1); return res(); }
+      var t0 = performance.now() + o.delay;
+      ctx.raf(function (now) {
+        if (now < t0) return;
+        var p = Math.min(1, (now - t0) / o.dur);
+        o.on && o.on(o.from + (o.to - o.from) * o.ease(p), p);
+        if (p >= 1) { res(); return false; }
+      });
+    });
+  };
+  // ctx.on(target, type, fn, opts) — listener removed on leave
+  ctx.on = function (t, type, fn, o) {
+    t.addEventListener(type, fn, o);
+    stops.push(function () { t.removeEventListener(type, fn, o); });
+  };
+  ctx.cleanup = function (fn) { if (alive) stops.push(fn); else fn(); };   // run on leave / interrupt
+  ctx._kill = function () { alive = false; stops.splice(0).forEach(function (f) { f(); }); };
+  return ctx;
+}
+
+/* === FX — count-up, text split === */
+function fmtCount(el, v) {
+  var dec = +el.dataset.decimals || 0, s = v.toFixed(dec);
+  if (el.hasAttribute('data-sep')) s = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  el.textContent = s;
+}
+// .count[data-count][data-decimals][data-delay(s)][data-dur(s)][data-ease="linear"] — HTML text must already be the final value
+function countUp(root, ctx) {
+  $$('.count[data-count]', root).forEach(function (el) {
+    var to = +el.dataset.count, from = +(el.dataset.from || 0);
+    if (!ctx || ctx.reduced || ctx.frozen || !ctx.alive()) return fmtCount(el, to);
+    fmtCount(el, from);
+    ctx.tween({ from: from, to: to, dur: (+el.dataset.dur || 1.6) * 1000,
+      delay: (+el.dataset.delay || 0) * 1000 + cssMs('--rv-base', el),
+      ease: el.dataset.ease === 'linear' ? function (t) { return t; } : easeOut,
+      on: function (v) { fmtCount(el, v); } });
+  });
+}
+function finalCounts(root) { $$('.count[data-count]', root).forEach(function (el) { fmtCount(el, +el.dataset.count); }); }
+
+var SPLIT = new Map();   // el → { html, label }
+function isClipText(el) {
+  var cs = getComputedStyle(el);
+  return cs.webkitBackgroundClip === 'text' || cs.backgroundClip === 'text';
+}
+/* CJK: no spaces, so cut per ideograph (words mode: Intl.Segmenter words). Closing punctuation is glued to
+   the previous piece and opening brackets to the next one, so no line starts with ，。」 or ends with 「（ */
+var CJK = /[\u2E80-\u303F\u3040-\u30FF\u3100-\u31FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]|[\uD840-\uD87F][\uDC00-\uDFFF]/;
+var OPEN = /^[「『（《〈【〔〖〘“‘［｛＜｟｢]+$/;
+var CLOSE = /^[，。、：；！？」』）》〉】〕〗〙…—–’”・ー々〜～\u3001-\u3003\uFF01-\uFF07\uFF09-\uFF0F\uFF1A\uFF1B\uFF1D-\uFF20\uFF3D-\uFF40\uFF5D-\uFF61\uFF63-\uFF65]+$/;
+var SEG = (function () { try { return new Intl.Segmenter('zh', { granularity: 'word' }); } catch (e) { return null; } })();
+function cjkUnits(w, mode) {
+  var raw = [];
+  if (mode !== 'chars' && SEG) Array.from(SEG.segment(w)).forEach(function (x) { raw.push(x.segment); });
+  else Array.from(w).forEach(function (ch) {              // per ideograph; keep Latin/digit runs together
+    var k = raw.length - 1;
+    if (k >= 0 && !CJK.test(ch) && !CJK.test(raw[k]) && !OPEN.test(ch) && !CLOSE.test(ch) && !CLOSE.test(raw[k])) raw[k] += ch;
+    else raw.push(ch);
+  });
+  var out = [], open = '';
+  raw.forEach(function (t) {
+    if (OPEN.test(t)) open += t;
+    else if (CLOSE.test(t) && out.length && !open) out[out.length - 1] += t;
+    else { out.push(open + t); open = ''; }
+  });
+  if (open) out.push(open);
+  return out;
+}
+// split(el, 'words'|'chars') — idempotent; gradient-clipped runs stay ONE piece (.sp-unit)
+function split(el, mode) {
+  if (!el || SPLIT.has(el)) return el;
+  mode = mode || el.dataset.split || 'words';
+  if (isClipText(el)) return el;                       // refuse: the clip would break
+  var rec = { html: el.innerHTML, mode: mode, label: !el.hasAttribute('aria-label') }, i = 0;
+  if (mode === 'chars' && rec.label) el.setAttribute('aria-label', el.textContent.trim().replace(/\s+/g, ' '));
+  var piece = function (cls, txt) {
+    var s = D.createElement('span'); s.className = cls; s.style.setProperty('--i', i++);
+    if (txt != null) s.textContent = txt; return s;
+  };
+  (function walk(node) {
+    Array.prototype.slice.call(node.childNodes).forEach(function (c) {
+      if (c.nodeType === 1) {
+        if (c.tagName === 'BR') return;                  // keep line breaks as real breaks
+        if (/^(SVG|IMG|I)$/i.test(c.tagName) || isClipText(c)) { var u = piece('sp sp-unit'); c.replaceWith(u); u.appendChild(c); }
+        else walk(c);
+        return;
+      }
+      if (c.nodeType !== 3 || !c.data.trim()) return;
+      var frag = D.createDocumentFragment();
+      c.data.split(/(\s+)/).forEach(function (w) {
+        if (!w) return;
+        if (/^\s+$/.test(w)) return frag.appendChild(D.createTextNode(' '));
+        (CJK.test(w) ? cjkUnits(w, mode) : [w]).forEach(function (u) {
+          // chars mode: a Latin run becomes a nowrap word of char pieces; a CJK unit is one piece (breakable)
+          if (mode !== 'chars' || (CJK.test(u) && !/[A-Za-z0-9]{2}/.test(u))) return frag.appendChild(piece('sp', u));
+          var ww = D.createElement('span'); ww.className = 'sp-w';
+          Array.from(u).forEach(function (ch) { ww.appendChild(piece('sp', ch)); });
+          frag.appendChild(ww);
+        });
+      });
+      c.replaceWith(frag);
+    });
+  })(el);
+  SPLIT.set(el, rec);
+  return el;
+}
+function unsplit(el) {
+  var rec = SPLIT.get(el); if (!rec) return el;
+  el.innerHTML = rec.html; if (rec.label) el.removeAttribute('aria-label');
+  SPLIT.delete(el); return el;
+}
+// → [{el, mode}] so callers can re-split later
+function unsplitAll() { var out = []; SPLIT.forEach(function (r, el) { out.push({ el: el, mode: r.mode }); unsplit(el); }); return out; }
+
+// final state for a slide or an overview clone: .is-final + counters + hook.final()
+function finalize(s, i) {
+  s.classList.add('is-final');
+  finalCounts(s);
+  var src = i != null ? slides[i] : s;
+  hooksOf(src).forEach(function (h) { h.final && safe(h.final, h, [s, { index: i != null ? i : slides.indexOf(s), clone: s !== src }]); });
+}
+
+/* === LIFECYCLE === */
+function enterSlide(s, i, prev, dir) {
+  var S = st(s);
+  if (S.ctx) S.ctx._kill();
+  if (S.lctx) S.lctx._kill();
+  $$('[data-split]', s).forEach(function (el) { if (!frozen) split(el); });
+  // commit the pre-reveal state with transitions off, then flip to active → reveals replay
+  s.classList.add('stage-reset');
+  s.classList.remove('is-active', 'is-leaving', 'stage-out');
+  void s.offsetWidth;
+  s.classList.remove('stage-reset');
+  s.classList.add('is-active');
+  s.classList.toggle('is-final', REDUCED || frozen);
+  var ctx = S.ctx = makeCtx({ slide: s, index: i, prev: prev, dir: dir });
+  if (frozen) return finalize(s);
+  countUp(s, ctx);
+  hooksOf(s).forEach(function (h) { h.enter && safe(h.enter, h, [s, ctx]); });
+}
+function leaveSlide(s, i, next, dir) {
+  var S = st(s);
+  if (S.ctx) { S.ctx._kill(); S.ctx = null; }
+  var lctx = S.lctx = makeCtx({ slide: s, index: i, next: next, dir: dir });
+  s.classList.remove('is-active', 'is-entering', 'stage-in');
+  s.classList.add('is-leaving');
+  hooksOf(s).forEach(function (h) { h.leave && safe(h.leave, h, [s, lctx]); });
+}
+function settleOut(s) {
+  var S = st(s);
+  if (S.lctx) { S.lctx._kill(); S.lctx = null; }
+  if (S.ctx) { S.ctx._kill(); S.ctx = null; }
+  STATE_CLS.forEach(function (c) { s.classList.remove(c); });
+  if (!REDUCED) s.classList.remove('is-final');
+}
+
+// default: cross-dissolve with depth; incoming reveals overlap the dissolve
+function defaultTransition(from, to, t) {
+  from.classList.add('stage-out'); to.classList.add('stage-in');
+  t.enter();
+  return t.wait(t.duration);
+}
+
+/* === NAVIGATION === */
+function go(n, o) {
+  o = o || {};
+  if (!booted) { pending = n; return; }
+  n = clamp(Math.round(+n) || 0, 0, N - 1);
+  if (n === cur && !o.force) return;
+  var prev = cur, from = prev >= 0 && prev !== n ? slides[prev] : null, to = slides[n];
+  var dir = n >= prev ? 'fwd' : 'back', my = ++gen;
+  if (tctx) { tctx._kill(); tctx = null; }        // interrupt a running transition
+  // settle anything a previous (interrupted) transition left behind
+  slides.forEach(function (s, k) { if (k !== n && s !== from) settleOut(s); });
+  if (from) from.classList.remove('stage-in', 'is-entering');
+  cur = n;
+  body.dataset.dir = dir;
+  if (from) leaveSlide(from, prev, n, dir);
+  chrome();
+  if (opts.hash && !o.boot) try { history.replaceState(null, '', '#' + (n + 1)); } catch (e) {}
+  if (n !== prev) changeFns.forEach(function (fn) { safe(fn, null, [n, prev, dir, to]); });
+
+  var entered = false;
+  var enter = function () {
+    if (entered || my !== gen) return;
+    entered = true; to.classList.remove('is-entering');
+    enterSlide(to, n, prev, dir);
+  };
+  var finish = function () {
+    if (my !== gen) return;
+    enter();
+    slides.forEach(function (s, k) { if (k !== n) settleOut(s); });
+    to.classList.remove('stage-in', 'is-entering');
+    body.classList.remove('stage-busy');
+  };
+  if (!from || REDUCED || frozen || o.instant) return finish();
+  body.classList.add('stage-busy');
+  to.classList.add('is-entering');
+  var t = tctx = makeCtx({ from: from, to: to, index: n, prev: prev, dir: dir, duration: cssMs('--stage-dur') });
+  t.enter = enter;
+  var p = safe(transitionFn || defaultTransition, null, [from, to, t]);
+  Promise.resolve(p).then(function () { if (t === tctx) { t._kill(); finish(); } },
+              function (e) { console.error('[Stage]', e); if (t === tctx) finish(); });
+}
+function next() { go(cur + 1); }
+function prev() { go(cur - 1); }
+
+/* === CHROME — .progress-bar · .page-number · .nav-dots · .slide-index · [data-stage-label] === */
+var dotsEl = null;
+function chrome() {
+  $$('.progress-bar').forEach(function (b) { b.style.setProperty('--stage-progress', N > 1 ? cur / (N - 1) : 1); });
+  $$('.page-number').forEach(function (p) { p.textContent = (cur + 1) + ' / ' + N; });
+  $$('.slide-index').forEach(function (el) {
+    var s = el.closest('.slide'), k = s ? slides.indexOf(s) : cur;
+    if (k >= 0) el.textContent = pad(k + 1) + ' / ' + pad(N);
+  });
+  $$('[data-stage-label]').forEach(function (el) { el.textContent = slides[cur].dataset.label || ''; });
+  if (dotsEl) $$('button', dotsEl).forEach(function (b, k) {
+    b.classList.toggle('on', k === cur); b.classList.toggle('done', k < cur);
+    b.setAttribute('aria-current', k === cur ? 'step' : 'false');
+  });
+}
+
+/* === OVERVIEW (Esc / O) — live-DOM clones in final state === */
+var ov = { isOpen: false, focus: 0, el: null, grid: null };
+function ovBuild() {
+  if (!ov.el) {
+    ov.el = D.createElement('div'); ov.el.className = 'stage-ov';
+    ov.el.setAttribute('role', 'dialog'); ov.el.setAttribute('aria-label', 'Slide overview'); ov.el.setAttribute('aria-hidden', 'true');
+    ov.el.innerHTML = '<div class="stage-ov-hint">Click a slide or press <kbd>Esc</kbd> to close</div><div class="stage-ov-grid"></div>';
+    ov.grid = ov.el.lastChild;
+    ov.el.addEventListener('click', function (e) { if (e.target === ov.el || e.target === ov.grid) ovClose(); });
+    body.appendChild(ov.el);
+  }
+  ov.grid.innerHTML = '';
+  var W = innerWidth, H = innerHeight;
+  slides.forEach(function (s, i) {
+    var card = D.createElement('button'); card.type = 'button'; card.className = 'stage-ov-card';
+    card.setAttribute('aria-label', 'Go to slide ' + (i + 1) + (s.dataset.label ? ': ' + s.dataset.label : ''));
+    if (s.dataset.thumb) card.style.background = s.dataset.thumb;
+    var thumb = D.createElement('div'); thumb.className = 'stage-ov-thumb';
+    var c = s.cloneNode(true);
+    STATE_CLS.forEach(function (k) { c.classList.remove(k); });
+    c.classList.add('is-active');
+    $$('script', c).forEach(function (x) { x.remove(); });
+    $$('[contenteditable]', c).forEach(function (x) { x.removeAttribute('contenteditable'); });
+    var cc = $$('canvas', c);
+    $$('canvas', s).forEach(function (lv, k) {
+      try {
+        var img = D.createElement('img'); img.src = lv.toDataURL('image/png');
+        img.style.cssText = 'display:block;width:' + lv.offsetWidth + 'px;height:' + lv.offsetHeight + 'px';
+        img.className = lv.className; cc[k].replaceWith(img);
+      } catch (e) { /* tainted canvas — leave blank */ }
+    });
+    ['transform', 'transform-origin', 'visibility', 'opacity', 'filter', 'left', 'top'].forEach(function (p) { c.style.removeProperty(p); });
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    c.setAttribute('aria-hidden', 'true'); c.inert = true;
+    finalize(c, i);
+    thumb.appendChild(c);
+    var num = D.createElement('span'); num.className = 'stage-ov-num';
+    num.innerHTML = (i + 1) + ' / ' + N + (s.dataset.label ? '<em></em>' : '');
+    if (s.dataset.label) num.lastChild.textContent = s.dataset.label;
+    card.appendChild(thumb); card.appendChild(num);
+    card.addEventListener('click', function () { ovJump(i); });
+    card.addEventListener('focus', function () { ov.focus = i; });
+    ov.grid.appendChild(card);
+  });
+}
+function ovScale() {
+  if (!ov.grid) return;
+  $$('.stage-ov-card', ov.grid).forEach(function (card) {
+    var c = card.firstChild.firstChild, w = parseFloat(c.style.width), h = parseFloat(c.style.height);
+    var k = Math.min(card.clientWidth / w, card.clientHeight / h);
+    c.style.transform = 'scale(' + k + ')';
+    c.style.left = (card.clientWidth - w * k) / 2 + 'px'; c.style.top = (card.clientHeight - h * k) / 2 + 'px';
+  });
+}
+function ovOpen() {
+  if (ov.isOpen || !booted) return;
+  ovBuild();
+  ov.isOpen = true; ov.focus = cur;
+  ov.el.classList.add('active'); ov.el.setAttribute('aria-hidden', 'false');
+  body.classList.add('stage-ov-open');
+  ovScale();
+  var card = ov.grid.children[cur];
+  card.classList.add('current'); card.focus({ preventScroll: true }); card.scrollIntoView({ block: 'nearest' });
+}
+function ovClose() {
+  if (!ov.isOpen) return;
+  ov.isOpen = false;
+  ov.el.classList.remove('active'); ov.el.setAttribute('aria-hidden', 'true');
+  body.classList.remove('stage-ov-open');
+  if (ov.el.contains(D.activeElement)) D.activeElement.blur();
+  setTimeout(function () { if (!ov.isOpen) ov.grid.innerHTML = ''; }, 300);   // free the clones
+}
+function ovJump(i) { ovClose(); go(i); }
+function ovCols() {
+  var cards = ov.grid.children, c = 1;
+  while (c < cards.length && cards[c].offsetTop === cards[0].offsetTop) c++;
+  return c;
+}
+function ovKey(e) {
+  var k = e.key, n = ov.focus, last = N - 1, cols = ovCols();
+  if (k === 'ArrowRight') n++; else if (k === 'ArrowLeft') n--;
+  else if (k === 'ArrowDown') n += cols; else if (k === 'ArrowUp') n -= cols;
+  else if (k === 'Home') n = 0; else if (k === 'End') n = last;
+  else if (k === 'Enter' || k === ' ') { e.preventDefault(); return ovJump(ov.focus); }
+  else if (k === 'o' || k === 'O') { e.preventDefault(); return ovClose(); }
+  else return;
+  e.preventDefault();
+  ov.focus = clamp(n, 0, last); ov.grid.children[ov.focus].focus();
+}
+
+/* === LIGHTBOX — img[data-zoom] anywhere, or any .slide img outside [data-no-zoom] === */
+var lb = { isOpen: false, el: null };
+function lbOpen(src, alt) {
+  if (!lb.el) {
+    lb.el = D.createElement('div'); lb.el.className = 'stage-lb';
+    lb.el.setAttribute('role', 'dialog'); lb.el.setAttribute('aria-label', 'Image viewer');
+    lb.el.innerHTML = '<button class="stage-lb-close" aria-label="Close">&times;</button><img alt=""><span class="stage-lb-hint">Click anywhere or press Esc to close</span>';
+    lb.el.addEventListener('click', lbClose);
+    body.appendChild(lb.el);
+  }
+  var img = lb.el.querySelector('img'); img.src = src; img.alt = alt || '';
+  lb.el.classList.add('active'); lb.isOpen = true;
+}
+function lbClose() { if (lb.el) lb.el.classList.remove('active'); lb.isOpen = false; }
+D.addEventListener('click', function (e) {
+  var img = e.target.closest && e.target.closest('img');
+  if (!img || frozen || ov.isOpen || lb.isOpen) return;
+  if (!img.hasAttribute('data-zoom') && (!img.closest('.slide') || img.closest('[data-no-zoom]'))) return;
+  e.preventDefault(); e.stopPropagation();
+  lbOpen(img.dataset.zoom || img.currentSrc || img.src, img.alt);
+}, true);
+
+/* === INPUT — keys · wheel · touch · hash · click (all no-op under overlays / editor) === */
+var NEXT = ['ArrowRight', 'ArrowDown', 'PageDown', ' '], PREV = ['ArrowLeft', 'ArrowUp', 'PageUp'];
+addEventListener('keydown', function (e) {
+  if (!booted) return;
+  var k = e.key;
+  if (k === 'Escape') {        // priority: lightbox > overview (if open) > editor > open overview
+    if (lb.isOpen) lbClose();
+    else if (ov.isOpen) ovClose();
+    else { if (frozen || typing(e.target)) return; ovOpen(); }
+    e.preventDefault(); e.stopImmediatePropagation(); return;
+  }
+  if (lb.isOpen) { e.preventDefault(); return; }
+  if (ov.isOpen) return ovKey(e);
+  if (frozen || !opts.keys || typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (k === 'o' || k === 'O') { e.preventDefault(); return ovOpen(); }
+  if (k === ' ' && e.shiftKey) { e.preventDefault(); return prev(); }
+  if (NEXT.indexOf(k) >= 0) { e.preventDefault(); next(); }
+  else if (PREV.indexOf(k) >= 0) { e.preventDefault(); prev(); }
+  else if (k === 'Home') { e.preventDefault(); go(0); }
+  else if (k === 'End') { e.preventDefault(); go(N - 1); }
+}, true);
+
+// one slide per gesture: lock after a step, and treat a continuous trackpad-inertia stream as the same gesture
+var wLock = 0, wLast = 0, wStream = false;
+function scroller(t) {          // an element inside the slide that can actually scroll keeps the wheel
+  for (; t && t.nodeType === 1 && !t.classList.contains('slide'); t = t.parentElement)
+    if (t.scrollHeight > t.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(t).overflowY)) return true;
+  return false;
+}
+addEventListener('wheel', function (e) {
+  if (!booted || ov.isOpen || lb.isOpen || frozen || !opts.wheel || e.ctrlKey || scroller(e.target)) return;
+  e.preventDefault();
+  var now = performance.now(), gap = now - wLast; wLast = now;
+  if (now < wLock) { wStream = true; return; }
+  if (wStream && gap < 160) return;
+  wStream = false;
+  var d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (e.deltaMode === 1) d *= 16;
+  if (Math.abs(d) < 6) return;
+  wLock = now + 850;
+  if (d > 0) next(); else prev();
+}, { passive: false });
+
+var tch = null;
+addEventListener('touchstart', function (e) {
+  tch = (e.touches.length === 1 && !typing(e.target)) ? [e.touches[0].clientX, e.touches[0].clientY] : null;
+}, { passive: true });
+addEventListener('touchend', function (e) {
+  if (!tch || ov.isOpen || lb.isOpen || frozen || !opts.touch) return;
+  var t = e.changedTouches[0], dx = t.clientX - tch[0], dy = t.clientY - tch[1]; tch = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 45) return;
+  if ((Math.abs(dx) > Math.abs(dy) ? dx : dy) < 0) next(); else prev();
+}, { passive: true });
+
+D.addEventListener('click', function (e) {
+  if (!opts.clickToAdvance || frozen || ov.isOpen || lb.isOpen || e.button !== 0) return;
+  if (!e.target.closest('.slide') || e.target.closest('a,button,input,textarea,select,label,img,[data-no-advance]')) return;
+  next();
+});
+
+function hashIndex() { var h = parseInt((location.hash || '').slice(1), 10); return h >= 1 && h <= N ? h - 1 : -1; }
+addEventListener('hashchange', function () { var h = hashIndex(); if (opts.hash && h >= 0 && h !== cur) go(h); });
+
+/* === REDUCED MOTION / PRINT === */
+function applyReduced() {
+  REDUCED = mq.matches; html.classList.toggle('stage-reduced', REDUCED);
+  slides.forEach(function (s, k) { if (REDUCED) s.classList.add('is-final'); else if (k !== cur || !frozen) s.classList.remove('is-final'); });
+}
+mq.addEventListener && mq.addEventListener('change', applyReduced);
+addEventListener('beforeprint', function () { unsplitAll(); slides.forEach(function (s, k) { finalize(s, k); }); });
+addEventListener('afterprint', function () { if (booted) enterSlide(slides[cur], cur, cur, 'fwd'); slides.forEach(function (s, k) { if (k !== cur) settleOut(s); }); });
+
+/* === FREEZE (editor) — current slide final, split text restored, input off === */
+function freeze() {
+  if (frozen || !booted) return;
+  frozen = true; body.classList.add('stage-frozen');
+  if (tctx) { tctx._kill(); tctx = null; }
+  go(cur, { force: true, instant: true });      // settles any transition, applies finals
+  unsplitAll();
+}
+function thaw() {
+  if (!frozen) return;
+  frozen = false; body.classList.remove('stage-frozen');
+  go(cur, { force: true, instant: true });       // replay the current slide
+}
+
+/* === HOOK REGISTRATION (also drains window.STAGE_HOOKS queue) === */
+function hook(key, h) {
+  (HOOKS[key] || (HOOKS[key] = [])).push(h);
+  var s = slides[cur];
+  if (booted && s && s.dataset.scene === key && st(s).ctx) {     // registered late: run for the live slide
+    if (frozen) h.final && safe(h.final, h, [s, { index: cur }]);
+    else h.enter && safe(h.enter, h, [s, st(s).ctx]);
+  }
+}
+var q = window.STAGE_HOOKS;
+window.STAGE_HOOKS = { push: function () { Array.prototype.forEach.call(arguments, function (a) { hook(a[0], a[1]); }); } };
+if (Array.isArray(q)) q.forEach(function (a) { hook(a[0], a[1]); });
+
+/* === BOOT === */
+function boot() {
+  slides = $$('.slide').filter(function (s) { return !s.closest('.stage-ov'); });
+  N = slides.length;
+  if (!N) return console.warn('[Stage] no .slide elements');
+  slides.forEach(function (s) {
+    for (var p = s.parentElement; p && p !== body; p = p.parentElement) p.classList.add('stage-root');
+    if (s.dataset.thumb) s.style.setProperty('--stage-thumb', s.dataset.thumb);
+  });
+  dotsEl = D.querySelector('.nav-dots');
+  if (dotsEl && !dotsEl.children.length) slides.forEach(function (s, i) {
+    var b = D.createElement('button'); b.type = 'button';
+    b.setAttribute('aria-label', 'Slide ' + (i + 1) + (s.dataset.label ? ': ' + s.dataset.label : ''));
+    b.addEventListener('click', function () { go(i); }); dotsEl.appendChild(b);
+  });
+  booted = true;
+  applyReduced();
+  var h = hashIndex();
+  go(pending != null ? pending : h >= 0 ? h : 0, { force: true, boot: true });
+}
+function start() {
+  var cap = new Promise(function (r) { setTimeout(r, 2500); });
+  Promise.race([Promise.all(waits).catch(noop), cap]).then(boot);
+}
+if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
+
+/* === PUBLIC API === */
+window.Stage = {
+  version: '1.0',
+  go: function (n, o) { go(n, o); }, next: next, prev: prev,
+  get index() { return cur; }, get count() { return N; }, get slides() { return slides.slice(); },
+  get current() { return slides[cur]; }, get reduced() { return REDUCED; }, get frozen() { return frozen; },
+  get busy() { return body.classList.contains('stage-busy'); },
+  hook: hook,
+  onChange: function (fn) { changeFns.push(fn); if (booted && cur >= 0) safe(fn, null, [cur, -1, 'fwd', slides[cur]]); },
+  setTransition: function (fn) { transitionFn = fn || null; }, dissolve: defaultTransition,
+  raf: addLoop,
+  waitFor: function (p) { waits.push(Promise.resolve(p)); },
+  freeze: freeze, thaw: thaw,
+  overview: { open: ovOpen, close: ovClose, toggle: function () { ov.isOpen ? ovClose() : ovOpen(); }, get isOpen() { return ov.isOpen; } },
+  lightbox: { open: lbOpen, close: lbClose, get isOpen() { return lb.isOpen; } },
+  fx: { countUp: countUp, split: split, unsplit: unsplit, unsplitAll: unsplitAll, finalize: finalize, easeOut: easeOut },
+  opts: opts
+};
+addEventListener('resize', function () { if (ov.isOpen) { ovBuild(); ovScale(); ov.grid.children[cur].classList.add('current'); } });
+})();
+
+</script>
+<script>
+/* === INLINE EDITOR JS (engine/inline-editor.js) === */
+/* ===========================================================
+   INLINE EDITOR + SAVE-TO-FILE  (opt-in only; inline AFTER stage-engine.js)
+   E = edit · Esc = save & exit · Ctrl/Cmd+S = write back into index.html
+   Builds its own UI. Edits text elements inside .slide:
+   h1–h4, p, li, span.edit, [data-edit]  (skip a subtree with [data-no-edit]).
+   Rules kept from html-template.md:
+   - JS hover hotzone with 400ms grace (never a CSS ~ hover chain)
+   - showOpenFilePicker (NEVER showSaveFilePicker), handle kept in IndexedDB
+   - read the file BEFORE createWritable() (it truncates), abort if < 50 chars
+     or no .slide in the picked file; DOMParser diff-and-patch only
+   - never write runtime artifacts: split spans, is-* and stage-* classes,
+     contenteditable/spellcheck, rendered Lucide SVGs
+   =========================================================== */
+(function () {
+'use strict';
+var D = document, body = D.body, Stage = window.Stage;
+if (!Stage) return console.warn('[editor] load stage-engine.js first');
+var SEL = 'h1,h2,h3,h4,p,li,span.edit,[data-edit]';
+var STORE = 'stage-edit:' + location.pathname;
+var norm = function (t) { return (t || '').replace(/\s+/g, ' ').trim(); };
+var ICON = {
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>'
+};
+
+/* === CLEAN SERIALIZATION — what gets compared / stored / written === */
+function clean(el) {
+    var c = el.cloneNode(true);
+    c.querySelectorAll('svg[data-lucide]').forEach(function (svg) {         // rendered icon → source tag
+        var i = D.createElement('i'); i.setAttribute('data-lucide', svg.getAttribute('data-lucide'));
+        var keep = (svg.getAttribute('class') || '').split(/\s+/).filter(function (k) { return k && !/^lucide/.test(k); });
+        if (keep.length) i.className = keep.join(' ');
+        svg.replaceWith(i);
+    });
+    c.querySelectorAll('*').forEach(function (n) {
+        n.removeAttribute('contenteditable'); n.removeAttribute('spellcheck');
+        if (n.classList.length) {
+            Array.prototype.slice.call(n.classList).forEach(function (k) { if (/^(is|stage)-/.test(k)) n.classList.remove(k); });
+            if (!n.classList.length) n.removeAttribute('class');
+        }
+    });
+    return c.innerHTML;
+}
+
+/* === RECORDS — indexed on the pristine DOM, before the engine boots === */
+// key s{slide}_e{element} uses the SAME indexing on the parsed file (querySelectorAll order)
+var recs = [], byKey = {};
+Array.prototype.filter.call(D.querySelectorAll('.slide'), function (s) { return !s.closest('.stage-ov'); })
+.forEach(function (s, si) {
+    s.querySelectorAll(SEL).forEach(function (el, ei) {
+        if (el.closest('[data-no-edit], .slide-index, [data-stage-label]') || (el.parentElement && el.parentElement.closest(SEL) &&
+            s.contains(el.parentElement.closest(SEL)))) return;                // top-most editable only
+        var r = { key: 's' + si + '_e' + ei, si: si, ei: ei, el: el, text: norm(el.textContent), base: clean(el) };
+        recs.push(r); byKey[r.key] = r;
+    });
+});
+var fp = (function (str) {                        // fingerprint of the file's text → ignore stale storage
+    var h = 5381; for (var i = 0; i < str.length; i++) h = (h * 33 ^ str.charCodeAt(i)) >>> 0; return h.toString(36);
+})(recs.map(function (r) { return r.text; }).join('|'));
+
+// restore localStorage edits (before the engine splits anything)
+try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved && saved.fp === fp) Object.keys(saved.edits || {}).forEach(function (k) { if (byKey[k]) byKey[k].el.innerHTML = saved.edits[k]; });
+} catch (e) {}
+
+// snapshot changed elements (clean HTML). Split text is restored first, re-split afterwards.
+function changes() {
+    var resplit = Stage.frozen ? [] : Stage.fx.unsplitAll(), out = {};
+    recs.forEach(function (r) { var h = clean(r.el); if (h !== r.base) out[r.key] = h; });
+    resplit.forEach(function (x) { Stage.fx.split(x.el, x.mode); });
+    return out;
+}
+function saveLocal() {
+    var ch = changes();
+    try {
+        if (Object.keys(ch).length) localStorage.setItem(STORE, JSON.stringify({ fp: fp, edits: ch }));
+        else localStorage.removeItem(STORE);
+    } catch (e) {}
+    return ch;
+}
+
+/* === UI === */
+function mk(tag, cls, htmlStr, parent) { var e = D.createElement(tag); e.className = cls; if (htmlStr) e.innerHTML = htmlStr; (parent || body).appendChild(e); return e; }
+var hotzone = mk('div', 'edit-hotzone');
+var toggleBtn = mk('button', 'edit-toggle', ICON.edit + '<span>Edit</span>');
+toggleBtn.title = 'Edit mode (E)'; toggleBtn.type = 'button';
+var saveBtn = mk('button', 'edit-save-file', ICON.save + '<span>Save to file</span>');
+saveBtn.title = 'Save to file (Ctrl/Cmd+S)'; saveBtn.type = 'button';
+var bar = mk('div', 'edit-bar');
+bar.innerHTML = '<button type="button" data-a="prev" aria-label="Previous slide">&larr;</button><span class="edit-pos"></span>' +
+    '<button type="button" data-a="next" aria-label="Next slide">&rarr;</button><button type="button" data-a="ov">Overview</button>' +
+    '<button type="button" data-a="done">Done</button>';
+var toast = mk('div', 'edit-toast'); toast.setAttribute('role', 'status'); toast.setAttribute('aria-live', 'polite');
+var pos = bar.querySelector('.edit-pos');
+Stage.onChange(function (i) { pos.textContent = (i + 1) + ' / ' + Stage.count; });
+bar.addEventListener('click', function (e) {
+    var a = e.target.closest('button'); a = a && a.dataset.a;
+    if (a === 'prev') Stage.prev(); else if (a === 'next') Stage.next();
+    else if (a === 'ov') Stage.overview.open(); else if (a === 'done') editor.toggle();
+});
+
+function showToast(msg, isError) {
+    toast.textContent = msg; toast.classList.toggle('error', !!isError); toast.classList.add('show');
+    clearTimeout(showToast.t); showToast.t = setTimeout(function () { toast.classList.remove('show'); }, 2600);
+}
+
+/* === EDITOR === */
+var editor = window.__editor = {
+    isActive: false,
+    editableSelector: SEL,
+    toggle: function () { editor.isActive ? editor.exit() : editor.enter(); },
+    enter: function () {
+        if (editor.isActive) return;
+        Stage.freeze();                                   // current slide final, split text restored, nav off
+        recs.forEach(function (r) { r.el.setAttribute('contenteditable', 'true'); r.el.setAttribute('spellcheck', 'false'); });
+        editor.isActive = true;
+        body.classList.add('editing-active'); toggleBtn.classList.add('active', 'show');
+        pos.textContent = (Stage.index + 1) + ' / ' + Stage.count;
+    },
+    exit: function () {
+        if (!editor.isActive) return;
+        if (D.activeElement && D.activeElement.isContentEditable) D.activeElement.blur();
+        recs.forEach(function (r) { r.el.removeAttribute('contenteditable'); r.el.removeAttribute('spellcheck'); });
+        var n = Object.keys(saveLocal()).length;
+        editor.isActive = false;
+        body.classList.remove('editing-active'); toggleBtn.classList.remove('active', 'show');
+        Stage.thaw();
+        if (n) showToast(n + ' edit' + (n > 1 ? 's' : '') + ' kept in this browser · Ctrl/Cmd+S writes the file');
+    },
+    saveToFile: saveToFile,
+    showToast: showToast
+};
+
+/* === WIRING — click, 400ms hover grace, keys === */
+toggleBtn.addEventListener('click', editor.toggle);
+hotzone.addEventListener('click', editor.toggle);
+saveBtn.addEventListener('click', saveToFile);
+var hideT = null;
+function hideLater() { clearTimeout(hideT); hideT = setTimeout(function () { if (!editor.isActive) toggleBtn.classList.remove('show'); }, 400); }
+hotzone.addEventListener('mouseenter', function () { clearTimeout(hideT); toggleBtn.classList.add('show'); });
+hotzone.addEventListener('mouseleave', hideLater);
+toggleBtn.addEventListener('mouseenter', function () { clearTimeout(hideT); });
+toggleBtn.addEventListener('mouseleave', hideLater);
+
+D.addEventListener('keydown', function (e) {
+    var t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); return saveToFile(); }
+    if (Stage.overview.isOpen || Stage.lightbox.isOpen) return;    // engine already handled Esc for overlays
+    if (e.key === 'Escape' && editor.isActive) { e.preventDefault(); return editor.exit(); }
+    if ((e.key === 'e' || e.key === 'E') && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); editor.toggle(); }
+});
+
+/* === SAVE TO FILE (File System Access API, Chromium desktop) === */
+var HANDLE_DB = 'slide-editor', HANDLE_STORE = 'handles', HANDLE_KEY = 'html:' + location.pathname;
+function openHandleDB() {
+    return new Promise(function (resolve, reject) {
+        var req = indexedDB.open(HANDLE_DB, 1);
+        req.onupgradeneeded = function () { req.result.createObjectStore(HANDLE_STORE); };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error); };
+    });
+}
+function idb(mode, fn) {
+    return openHandleDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(HANDLE_STORE, mode), req = fn(tx.objectStore(HANDLE_STORE));
+            tx.oncomplete = function () { resolve(req && req.result); };
+            tx.onerror = function () { reject(tx.error); };
+        });
+    });
+}
+var getSavedHandle = function () { return idb('readonly', function (s) { return s.get(HANDLE_KEY); }); };
+var setSavedHandle = function (h) { return idb('readwrite', function (s) { return s.put(h, HANDLE_KEY); }); };
+var clearSavedHandle = function () { return idb('readwrite', function (s) { return s.delete(HANDLE_KEY); }); };
+
+// a writable handle to the EXISTING index.html (showOpenFilePicker never truncates)
+async function ensureHandle() {
+    if (!('showOpenFilePicker' in window)) throw new Error('Browser does not support File System Access API. Use Chrome or Edge.');
+    var handle = await getSavedHandle().catch(function () { return null; });
+    if (handle) {
+        if (await handle.queryPermission({ mode: 'readwrite' }) === 'granted') return handle;
+        if (await handle.requestPermission({ mode: 'readwrite' }) === 'granted') return handle;
+        await clearSavedHandle();                               // permission revoked → re-pick
+    }
+    var picked = (await window.showOpenFilePicker({ multiple: false, types: [{ description: 'HTML', accept: { 'text/html': ['.html', '.htm'] } }] }))[0];
+    if (await picked.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Write permission denied.');
+    await setSavedHandle(picked);
+    return picked;
+}
+
+async function saveToFile() {
+    var live = changes();                                       // clean HTML of changed elements only
+    if (!Object.keys(live).length) return showToast('No changes to save');
+    var handle;
+    try { handle = await ensureHandle(); }
+    catch (e) { if (e.name !== 'AbortError') showToast(e.message, true); return; }
+    try {
+        // CRITICAL: read BEFORE createWritable() — createWritable() truncates the file.
+        var originalHtml = await (await handle.getFile()).text();
+        if (!originalHtml || originalHtml.length < 50) throw new Error('Source file is empty or too small — aborting to avoid data loss. Pick the correct index.html again.');
+        var doc = new DOMParser().parseFromString(originalHtml, 'text/html');
+        var parsed = doc.querySelectorAll('.slide');
+        if (!parsed.length) throw new Error('No .slide elements found in picked file — wrong file?');
+        var done = [], skipped = 0;
+        Object.keys(live).forEach(function (k) {
+            var r = byKey[k], ps = parsed[r.si], pel = ps && ps.querySelectorAll(SEL)[r.ei];
+            // identity check: the file's element must still hold the text we loaded
+            if (!pel || norm(pel.textContent) !== r.text) { skipped++; return; }
+            pel.innerHTML = live[k]; done.push(k);
+        });
+        if (!done.length) throw new Error('Picked file does not match this deck — nothing written.');
+        var writable = await handle.createWritable();
+        await writable.write('<!DOCTYPE html>\n' + doc.documentElement.outerHTML);
+        await writable.close();
+        done.forEach(function (k) { var r = byKey[k]; r.base = live[k]; r.text = norm(r.el.textContent); });   // file = new baseline
+        saveLocal();                                            // keeps only edits that were skipped
+        showToast('Saved to ' + handle.name + (skipped ? ' · ' + skipped + ' element(s) skipped (file changed)' : ''), !!skipped);
+    } catch (e) {
+        console.error(e);
+        showToast('Save failed: ' + e.message, true);
+    }
+}
+})();
+
+</script>
+<script>
+/* === FLAVOR KIT JS (flavors/spatial/kit.js) === */
+/* ===========================================================
+   SPATIAL KIT — window.Spatial   (inline verbatim AFTER stage-engine.js [+ inline-editor.js])
+   - World: every .sp-world > .slide is a panel. Placement = data-world="x,z,yaw"
+     (x/z in viewport-widths, yaw in deg) or an automatic winding path.
+   - Camera flight = Stage.setTransition: pull back, turn, land (overshoot + settle).
+     data-fly="dive" → bigger pull-back + dive (the wow slide).
+   - Env: fixed canvas .sp-env draws the grid floor / horizon / dust with the SAME
+     matrix as the world. Per slide: data-env="scroll:.05 warp:.55".
+   - Components (.sp-gate .sp-cubes .sp-fan .sp-pillars .sp-stack .sp-runway
+     .sp-chip .sp-graph .sp-tiers .sp-rise) are built + laid out from data-attributes
+     and choreographed automatically on every entry. Final states live in kit.css.
+   =========================================================== */
+(function () {
+'use strict';
+var Stage = window.Stage;
+if (!Stage) return console.warn('[Spatial] load stage-engine.js first');
+var D = document, root = D.documentElement;
+var $ = function (s, r) { return (r || D).querySelector(s); };
+var $$ = function (s, r) { return Array.prototype.slice.call((r || D).querySelectorAll(s)); };
+var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; }, c01 = function (v) { return clamp(v, 0, 1); };
+var lerp = function (a, b, t) { return a + (b - a) * t; };
+var smooth = function (a, b, v) { var t = c01((v - a) / (b - a)); return t * t * (3 - 2 * t); };
+var eOut = function (t) { return 1 - Math.pow(1 - t, 3); }, eOut5 = function (t) { return 1 - Math.pow(1 - t, 5); };
+var eIO = function (t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+var eBack = function (s) { return function (t) { return 1 + (s + 1) * Math.pow(t - 1, 3) + s * Math.pow(t - 1, 2); }; };
+var eFly = function (t) {          // in-out with a small anticipation + overshoot → "lands and settles"
+  var c1 = .55, c2 = c1 * 1.525;
+  return t < .5 ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2 : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+};
+var f1 = function (v) { return (+v).toFixed(1); };
+var px = function (v) { return Math.round(v) + 'px'; };
+var nums = function (s) { return String(s || '').split(/[\s,]+/).filter(Boolean).map(Number); };
+var setv = function (el, k, v) { el.style.setProperty(k, v); };
+
+var vp = $('.sp-vp'), world = $('.sp-world'), envBox = $('.sp-env');
+if (!world) return console.warn('[Spatial] no .sp-world');
+var panels = $$('.sp-world > .slide'), N = panels.length;
+var canvas = envBox && (envBox.querySelector('canvas') || envBox.appendChild(D.createElement('canvas')));
+var g2 = canvas && canvas.getContext('2d');
+var reduced = function () { return Stage.reduced; };
+
+/* === 1. DIMENSIONS — live viewport, or 1600×900 while printing === */
+var DM = {};
+function dims(w, h) {
+  var o = { W: w, H: h, CX: Math.floor(w / 2), CY: Math.floor(h / 2) };
+  o.P = Math.round(Math.max(w * .95, h * 1.55)); o.OY = Math.round(h * .18); o.FLOOR = h - o.CY;
+  return o;
+}
+/* screen point (px) at depth z → slide-local coords (inverse of the CSS perspective projection) */
+function place(sx, sy, z, d) {
+  d = d || DM; var s = d.P / (d.P - z);
+  return { x: (sx - d.CX) / s, y: d.OY + (sy - d.CY - d.OY) / s, z: z, s: s };
+}
+
+/* === 2. WORLD PLACEMENT === */
+var AUTO = [[0, 0, 0], [1.6, -.75, -36], [2.75, -2.3, -66], [2.45, -4.35, -8], [.85, -5.5, 32], [-.7, -7.8, 6], [-1.5, -9.6, -18], [-.9, -11.9, 0]];
+var pos = [], cfg = [];
+function slideCfg(s, k) {
+  var w = nums(s.dataset.world), a = AUTO[k % AUTO.length], lap = Math.floor(k / AUTO.length);
+  var env = {}; String(s.dataset.env || '').split(/\s+/).forEach(function (kv) { var p = kv.split(':'); if (p[1] != null) env[p[0]] = +p[1]; });
+  return { x: w.length ? w[0] : a[0] + lap * -1.2, z: w.length ? w[1] : a[1] + lap * -12.4, ry: w.length ? (w[2] || 0) : a[2],
+           dive: s.dataset.fly === 'dive', scroll: env.scroll || 0, warp: env.warp || 0 };
+}
+function placePanels() {
+  panels.forEach(function (p, i) {
+    var c = cfg[i];
+    pos[i] = { x: Math.round(c.x * DM.W), y: 0, z: Math.round(c.z * DM.W), ry: c.ry };
+    p.style.width = DM.W + 'px'; p.style.height = DM.H + 'px';
+    p.style.left = -DM.CX + 'px'; p.style.top = -DM.CY + 'px'; p.style.transformOrigin = DM.CX + 'px ' + DM.CY + 'px';
+    p.style.transform = 'translate3d(' + pos[i].x + 'px,0,' + pos[i].z + 'px) rotateY(' + pos[i].ry + 'deg)';
+  });
+}
+
+/* === 3. CAMERA === */
+var cam = { x: 0, y: 0, z: 0, ry: 0, back: 0 };
+var camAdd = { x: 0, y: 0, z: 0 };            // in-slide camera travel (sp-runway[data-tour])
+var tilt = { x: 0, y: 0, tx: 0, ty: 0 };
+var M = new DOMMatrix(), lastT = '';
+function camMatrix() {
+  return new DOMMatrix().translateSelf(0, 0, -cam.back)
+    .rotateAxisAngleSelf(1, 0, 0, tilt.x).rotateAxisAngleSelf(0, 1, 0, tilt.y - cam.ry)
+    .translateSelf(-(cam.x + camAdd.x), -(cam.y + camAdd.y), -(cam.z + camAdd.z));
+}
+function camAt(i) { return { x: pos[i].x, y: 0, z: pos[i].z, ry: pos[i].ry, back: 0 }; }
+function foldAdd() { cam.x += camAdd.x; cam.y += camAdd.y; cam.z += camAdd.z; camAdd.x = camAdd.y = camAdd.z = 0; }
+function snap(i) { flight = null; camAdd.x = camAdd.y = camAdd.z = 0; Object.assign(cam, camAt(i)); pf.fill(0); pf[i] = 1; kick(); }
+
+/* === 4. FLIGHT (the transition) === */
+var flight = null, landAt = 0;            // landAt: performance.now() when the current panel's camera lands
+var pf = new Float32Array(N), last = { fade: [], fr: [], vis: [] };
+function startFlight(i, o) {
+  foldAdd();
+  var from = o.from || Object.assign({}, cam), to = camAt(i), c = cfg[i];
+  var dist = Math.hypot(to.x - from.x, to.z - from.z, (to.ry - from.ry) / 90 * DM.W);
+  var dur = o.dur || clamp(1100 + dist / DM.W * 200, 1200, 1900) + (c.dive ? 450 : 0);
+  var Dk = o.D != null ? o.D : (DM.W * .22 + dist * .3) * (c.dive ? 2.2 : 1);
+  var at = o.at != null ? o.at : c.dive ? .28 : .45;
+  flight = { from: from, to: to, t0: performance.now(), dur: dur, D: Dk, i: i, at: at, landed: false,
+             onLand: o.onLand, onDone: o.onDone, alive: o.alive || function () { return true; } };
+  landAt = flight.t0 + dur * at;
+  kick();
+}
+function stepFlight(now) {
+  var f = flight; if (!f) return;
+  if (!f.alive()) { flight = null; return; }           // interrupted: freeze the camera where it is
+  var t = c01((now - f.t0) / f.dur), e = eFly(t);
+  cam.x = lerp(f.from.x, f.to.x, e); cam.z = lerp(f.from.z, f.to.z, e); cam.ry = lerp(f.from.ry, f.to.ry, e);
+  cam.y = lerp(f.from.y, f.to.y, eIO(t));
+  cam.back = lerp(f.from.back, 0, eIO(t)) + f.D * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.04)), 1.4);
+  if (!f.landed && t >= f.at) { f.landed = true; f.onLand && f.onLand(); }
+  if (t >= 1) { Object.assign(cam, f.to); flight = null; f.onDone && f.onDone(); }
+}
+Stage.setTransition(function (from, to, t) {
+  resetSlide(to);
+  return new Promise(function (res) {
+    startFlight(t.index, { onLand: t.enter, onDone: res, alive: t.alive });
+  });
+});
+var bootDone = false;
+Stage.onChange(function (to, from) {
+  if (from === -1 && !bootDone) {                       // boot: establishing shot (start high and far back)
+    bootDone = true;
+    if (reduced()) return snap(to);
+    var p = camAt(to);
+    root.style.setProperty('--rv-base', '1.25s');       // hold the first reveals until the camera arrives
+    setTimeout(function () { root.style.removeProperty('--rv-base'); }, 2600);
+    startFlight(to, { from: { x: p.x - DM.W * .35, y: -DM.H * .55, z: p.z, ry: p.ry + 14, back: DM.W * 2.6 }, dur: 2600, D: 0, at: .42 });
+    return;
+  }
+  // instant moves (reduced motion, editor, Stage.go(n,{instant})) never call the transition → snap
+  Promise.resolve().then(function () { if (!flight || flight.i !== to) snap(to); });
+});
+var arrival = function () { return Math.max(0, landAt - performance.now()); };
+
+/* === 5. PER-FRAME PANEL FADE (leaves read --fade, frames read --fr) === */
+function updatePanels(dt) {
+  var cur = Stage.index, now = performance.now();
+  var ft = flight ? c01((now - flight.t0) / flight.dur) : 1, amb = flight ? Math.pow(Math.sin(Math.PI * ft), .6) : 0, W = DM.W;
+  for (var i = 0; i < N; i++) {
+    var p = pos[i], qz = M.m13 * p.x + M.m33 * p.z + M.m43, qx = M.m11 * p.x + M.m31 * p.z + M.m41;
+    var depth = DM.P - qz, d = Math.hypot(qx, depth);
+    var target = i === cur ? (flight && flight.i === i ? smooth(flight.at - .12, Math.min(.96, flight.at + .42), ft) : 1) : 0;
+    pf[i] = i === cur ? target : Math.max(0, pf[i] - dt / .55);
+    var near = smooth(W * .12, W * .45, depth), rest = i === cur && !flight;
+    var a = amb * .32 * c01(1.35 - d / (W * 4.2)) * near, inFront = depth > 30 ? 1 : 0;
+    var fade = rest ? pf[i] : Math.max(pf[i], a) * inFront;
+    var fr = rest ? pf[i] : Math.max(i === cur ? pf[i] : 0, (.16 + .3 * amb) * c01(1.2 - d / (W * 5.5)) * near) * inFront;
+    // reduced motion: every slide is .is-final (content forced visible) → show only the current panel
+    var vis = (fade > .004 || (fr > .004 && !reduced())) ? 'visible' : 'hidden';
+    var fs = fade.toFixed(3), frs = fr.toFixed(3), st = panels[i].style;
+    if (fs !== last.fade[i]) { st.setProperty('--fade', fs); last.fade[i] = fs; }
+    if (frs !== last.fr[i]) { st.setProperty('--fr', frs); last.fr[i] = frs; }
+    if (vis !== last.vis[i]) { st.visibility = vis; last.vis[i] = vis; }
+  }
+}
+
+/* === 6. ENVIRONMENT — grid floor, horizon, dust (shared with the thumbnail renderer) === */
+var dust = null, ND = 0, scroll = 0, envScroll = 0, envWarp = 0, BUCKETS = 14;
+function initDust() {
+  ND = DM.W < 900 ? 140 : 220; dust = new Float32Array(ND * 5);
+  for (var k = 0; k < ND; k++) {
+    dust[k * 5] = (Math.random() * 2 - 1) * DM.W * 2.4; dust[k * 5 + 1] = -DM.H * .9 + Math.random() * (DM.H * .9 + DM.FLOOR - 10);
+    dust[k * 5 + 2] = (Math.random() * 2 - 1) * DM.W * 2.4; dust[k * 5 + 3] = Math.random() * 6.283; dust[k * 5 + 4] = .4 + Math.random() * .9;
+  }
+}
+function drawEnv(g, d, m, dt, now, withDust) {
+  var W = d.W, H = d.H, P = d.P, OY = d.OY, FL = d.FLOOR, G = W * .14, near = 18;
+  g.clearRect(0, 0, W, H);
+  var inv = m.inverse(), eye = inv.transformPoint(new DOMPoint(0, OY, P)), ahead = inv.transformPoint(new DOMPoint(0, OY, P - 1000));
+  var fx = ahead.x - eye.x, fz = ahead.z - eye.z, fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+  var tc = function (x, y, z) { return [m.m11 * x + m.m21 * y + m.m31 * z + m.m41, m.m12 * x + m.m22 * y + m.m32 * z + m.m42, m.m13 * x + m.m23 * y + m.m33 * z + m.m43]; };
+  var scr = function (q) { var s = P / (P - q[2]); return [d.CX + q[0] * s, d.CY + OY + (q[1] - OY) * s, s]; };
+  var hz = scr(tc(eye.x + fx * 1e6, FL, eye.z + fz * 1e6)), hy = hz[1], hx = hz[0], gr;
+  g.globalCompositeOperation = 'source-over';
+  gr = g.createLinearGradient(0, hy - H * .32, 0, hy);
+  gr.addColorStop(0, 'rgba(139,92,246,0)'); gr.addColorStop(.75, 'rgba(139,92,246,.10)'); gr.addColorStop(1, 'rgba(217,70,239,.26)');
+  g.fillStyle = gr; g.fillRect(0, hy - H * .32, W, H * .32);
+  gr = g.createLinearGradient(0, hy, 0, H);
+  gr.addColorStop(0, 'rgba(91,33,182,.42)'); gr.addColorStop(.25, 'rgba(46,16,101,.22)'); gr.addColorStop(1, 'rgba(8,4,16,0)');
+  g.fillStyle = gr; g.fillRect(0, hy, W, H - hy);
+  // grid — segments bucketed by distance → 14 strokes instead of ~1000
+  var paths = [], b; for (b = 0; b < BUCKETS; b++) paths.push(new Path2D());
+  var R = G * 30, SEG = 9;
+  var seg = function (x1, z1, x2, z2) {
+    for (var s = 0; s < SEG; s++) {
+      var ax = lerp(x1, x2, s / SEG), az = lerp(z1, z2, s / SEG), bx = lerp(x1, x2, (s + 1) / SEG), bz = lerp(z1, z2, (s + 1) / SEG);
+      var dm = Math.hypot((ax + bx) / 2 - eye.x, (az + bz) / 2 - eye.z); if (dm > R) continue;
+      var qa = tc(ax, FL, az), qb = tc(bx, FL, bz), la = P - near - qa[2], lb = P - near - qb[2], k;
+      if (la <= 0 && lb <= 0) continue;
+      if (la <= 0) { k = la / (la - lb); qa = [lerp(qa[0], qb[0], k), lerp(qa[1], qb[1], k), lerp(qa[2], qb[2], k) - .01]; }
+      else if (lb <= 0) { k = la / (la - lb); qb = [lerp(qa[0], qb[0], k), lerp(qa[1], qb[1], k), lerp(qa[2], qb[2], k) - .01]; }
+      var A = scr(qa), B = scr(qb), bi = Math.min(BUCKETS - 1, Math.floor(dm / R * BUCKETS));
+      paths[bi].moveTo(A[0], A[1]); paths[bi].lineTo(B[0], B[1]);
+    }
+  };
+  var off = ((scroll % G) + G) % G, gx0 = Math.floor((eye.x - R) / G) * G, gz0 = Math.floor((eye.z - R) / G) * G, n = Math.ceil(2 * R / G) + 1, k2;
+  for (k2 = 0; k2 <= n; k2++) seg(eye.x - R, gz0 + k2 * G + off, eye.x + R, gz0 + k2 * G + off);
+  for (k2 = 0; k2 <= n; k2++) seg(gx0 + k2 * G, eye.z - R, gx0 + k2 * G, eye.z + R);
+  g.globalCompositeOperation = 'lighter'; g.lineWidth = 1;
+  for (b = 0; b < BUCKETS; b++) {
+    var t = b / (BUCKETS - 1), a = .62 * Math.pow(1 - t, 1.7) * (b === 0 ? .8 : 1); if (a < .01) continue;
+    g.strokeStyle = 'rgba(' + Math.round(lerp(167, 232, t)) + ',' + Math.round(lerp(139, 121, t)) + ',' + Math.round(lerp(250, 249, t)) + ',' + a.toFixed(3) + ')';
+    g.stroke(paths[b]);
+  }
+  // horizon line + bloom
+  gr = g.createLinearGradient(0, 0, W, 0);
+  gr.addColorStop(0, 'rgba(139,92,246,0)'); gr.addColorStop(.2, 'rgba(139,92,246,.75)'); gr.addColorStop(.5, 'rgba(240,171,252,1)');
+  gr.addColorStop(.8, 'rgba(217,70,239,.75)'); gr.addColorStop(1, 'rgba(217,70,239,0)');
+  g.fillStyle = gr; g.fillRect(0, hy - .75, W, 1.5); g.globalAlpha = .35; g.fillRect(0, hy - 3, W, 6); g.globalAlpha = 1;
+  var rg = g.createRadialGradient(hx, hy, 0, hx, hy, W * .42);
+  rg.addColorStop(0, 'rgba(232,121,249,.30)'); rg.addColorStop(.4, 'rgba(139,92,246,.10)'); rg.addColorStop(1, 'rgba(139,92,246,0)');
+  g.save(); g.translate(hx, hy); g.scale(1, .28); g.translate(-hx, -hy); g.fillStyle = rg; g.fillRect(hx - W * .42, hy - W * .42, W * .84, W * .84); g.restore();
+  if (withDust && dust) {
+    var BX = W * 2.4, live = !reduced();
+    for (var j = 0; j < ND; j++) {
+      var o = j * 5;
+      if (live) {
+        dust[o] += Math.sin(now * .00011 + dust[o + 3]) * 6 * dt; dust[o + 1] -= 5 * dt * dust[o + 4]; dust[o + 2] += envWarp * W * dt;
+        if (dust[o + 1] < -H * .95) dust[o + 1] = FL - 10;
+      }
+      var dx = dust[o] - eye.x; dx = ((dx + BX) % (2 * BX) + 2 * BX) % (2 * BX) - BX;
+      var dz = dust[o + 2] - eye.z; dz = ((dz + BX) % (2 * BX) + 2 * BX) % (2 * BX) - BX;
+      var wx = eye.x + dx, wz = eye.z + dz, wy = dust[o + 1], q = tc(wx, wy, wz), depth = P - q[2];
+      if (depth < 40) continue;
+      var A2 = scr(q), fog = c01(1 - Math.hypot(dx, dz) / BX) * smooth(40, W * .25, depth);
+      var al = fog * (.55 + .45 * Math.sin(now * .002 * dust[o + 4] + dust[o + 3])) * .8; if (al < .02) continue;
+      var rr = clamp(A2[2] * 2.2 * dust[o + 4], .5, 3.4);
+      g.fillStyle = j % 5 === 0 ? 'rgba(255,190,120,' + al.toFixed(3) + ')' : 'rgba(240,220,255,' + al.toFixed(3) + ')';
+      if (envWarp > .05) {
+        var B2 = scr(tc(wx, wy, wz - envWarp * W * .12));
+        g.strokeStyle = g.fillStyle; g.lineWidth = rr * .8; g.beginPath(); g.moveTo(A2[0], A2[1]); g.lineTo(B2[0], B2[1]); g.stroke();
+      } else g.fillRect(A2[0] - rr / 2, A2[1] - rr / 2, rr, rr);
+    }
+  }
+  g.globalCompositeOperation = 'source-over';
+  return { eye: eye, fx: fx, fz: fz };
+}
+/* the floor rendered once from a resting camera → --sp-thumb (overview cards + print pages) */
+function renderThumb() {
+  try {
+    var d = dims(1600, 900), c = D.createElement('canvas'); c.width = 1600; c.height = 900;
+    var g = c.getContext('2d');
+    var bg = g.createLinearGradient(0, 0, 0, 900);
+    bg.addColorStop(0, '#040009'); bg.addColorStop(.52, '#0B0015'); bg.addColorStop(.68, '#120327'); bg.addColorStop(1, '#0A0A0A');
+    var sc = scroll; scroll = 0;
+    var layer = D.createElement('canvas'); layer.width = 1600; layer.height = 900;
+    drawEnv(layer.getContext('2d'), d, new DOMMatrix(), 0, 0, false);
+    scroll = sc;
+    g.fillStyle = bg; g.fillRect(0, 0, 1600, 900); g.drawImage(layer, 0, 0);
+    root.style.setProperty('--sp-thumb', 'url("' + c.toDataURL('image/jpeg', .84) + '") center / 100% 100% no-repeat, #0A0A0A');
+  } catch (e) { /* keep the CSS gradient fallback */ }
+}
+
+/* === 7. HUD MINIMAP (.sp-map svg) — top-down: travel direction → right === */
+var map = $('.sp-map'), mapCam = null, mapRects = [], mapS = 1, mapO = [0, 0], NS = 'http://www.w3.org/2000/svg';
+function mapInit() {
+  if (!map) return;
+  var xs = cfg.map(function (c) { return c.x; }), zs = cfg.map(function (c) { return c.z; });
+  var x0 = Math.min.apply(0, xs), x1 = Math.max.apply(0, xs), z0 = Math.min.apply(0, zs), z1 = Math.max.apply(0, zs);
+  map.setAttribute('viewBox', '0 0 100 64'); map.innerHTML = '';
+  mapS = Math.min(84 / ((z1 - z0) || 1), 48 / ((x1 - x0) || 1)); mapO = [50 + (z0 + z1) / 2 * mapS, 32 - (x0 + x1) / 2 * mapS];
+  var mp = function (x, z) { return [mapO[0] - z * mapS, mapO[1] + x * mapS]; };
+  var pl = D.createElementNS(NS, 'polyline');
+  pl.setAttribute('points', cfg.map(function (c) { return mp(c.x, c.z).join(','); }).join(' '));
+  pl.setAttribute('style', 'fill:none;stroke:rgba(167,139,250,.35);stroke-width:1;stroke-dasharray:2 2'); map.appendChild(pl);
+  mapRects = cfg.map(function (c) {
+    var p = mp(c.x, c.z), r = D.createElementNS(NS, 'rect');
+    r.setAttribute('x', -5); r.setAttribute('y', -1.2); r.setAttribute('width', 10); r.setAttribute('height', 2.4); r.setAttribute('rx', 1);
+    r.setAttribute('transform', 'translate(' + p[0] + ',' + p[1] + ') rotate(' + (90 - c.ry) + ')'); map.appendChild(r); return r;
+  });
+  mapCam = D.createElementNS(NS, 'g');
+  mapCam.innerHTML = '<path d="M0,-5 L3.2,3 L0,1.4 L-3.2,3 Z" fill="#FF9900"/><circle r="7" fill="none" stroke="rgba(255,153,0,.35)"/>';
+  map.appendChild(mapCam);
+}
+function mapDraw(v) {
+  if (!mapCam) return;
+  var x = mapO[0] - v.eye.z / DM.W * mapS, y = mapO[1] + v.eye.x / DM.W * mapS, a = Math.atan2(-v.fz, -v.fx) * 180 / Math.PI;
+  mapCam.setAttribute('transform', 'translate(' + f1(x) + ',' + f1(y) + ') rotate(' + f1(a) + ')');
+  mapRects.forEach(function (r, k) { r.style.fill = k === Stage.index ? '#e879f9' : 'rgba(255,255,255,.28)'; });
+}
+
+/* === 8. MAIN LOOP (Stage.raf — paused while the tab is hidden) === */
+var stopLoop = null, still = 0;
+function frame(now, dt) {
+  stepFlight(now);
+  if (Stage.frozen) { camAdd.x *= .85; camAdd.y *= .85; camAdd.z *= .85; }
+  tilt.x += (tilt.tx - tilt.x) * .06; tilt.y += (tilt.ty - tilt.y) * .06;
+  if (Math.abs(tilt.tx - tilt.x) < .002) tilt.x = tilt.tx;
+  if (Math.abs(tilt.ty - tilt.y) < .002) tilt.y = tilt.ty;
+  M = camMatrix();
+  var ts = M.toString(); if (ts !== lastT) { world.style.transform = ts; lastT = ts; }
+  updatePanels(dt);
+  var c = cfg[Stage.index] || {};
+  envScroll += ((c.scroll || 0) - envScroll) * .03; envWarp += ((c.warp || 0) - envWarp) * .03;
+  if (!reduced()) scroll += envScroll * DM.W * dt;
+  if (g2) mapDraw(drawEnv(g2, DM, M, dt, now, true));
+  if (reduced() && !flight) { if (++still > 3) { stopLoop = null; return false; } } else still = 0;
+}
+function kick() { still = 0; if (!stopLoop) stopLoop = Stage.raf(function (n, d) { return frame(n, d); }); }
+
+/* === 9. COMPONENTS — { sel, build(el), layout(el, slide), reset(el), enter(el, ctx, slide), final(el) } ===
+   build runs once at load; layout on boot / resize / print; reset + enter on every entry.
+   Everything visual is expressed as CSS vars, so .slide.is-final (kit.css) can force the end state. */
+var C = {};
+var mk = function (cls, parent, tag) { var e = D.createElement(tag || 'div'); if (cls) e.className = cls; if (parent) parent.appendChild(e); return e; };
+var at = function (el, def) { var a = nums(el.dataset.at); return a.length ? a : def; };
+var num = function (el, k, def) { var v = parseFloat(el.dataset[k]); return isNaN(v) ? def : v; };
+var put3 = function (el, p) { setv(el, '--tx', f1(p.x) + 'px'); setv(el, '--ty', f1(p.y) + 'px'); setv(el, '--tz', f1(p.z) + 'px'); };
+function strip(e, a, b) {                     // a 3D strip from a to b (element laid along +x, origin left-middle)
+  var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L = Math.hypot(dx, dy, dz) || 1;
+  e.style.width = px(L);
+  e.style.transform = 'translate3d(' + f1(a.x) + 'px,' + f1(a.y) + 'px,' + f1(a.z) + 'px) rotateY(' + (Math.atan2(-dz, dx) * 180 / Math.PI).toFixed(2) + 'deg) rotateZ(' + (Math.asin(dy / L) * 180 / Math.PI).toFixed(2) + 'deg)';
+}
+function eTween(ctx, el, o) {                 // tween an element's --e (entry) var
+  return ctx.tween({ from: o.from != null ? o.from : 0, to: 1, dur: o.dur || 900, delay: o.delay || 0, ease: o.ease || eOut5,
+    on: function (v) { setv(el, '--e', v.toFixed(4)); } });
+}
+function headBottom(slide) {                  // layout px of the slide heading's bottom edge (for fitting tall objects)
+  var h = slide.querySelector('.sp-head');
+  return h ? h.offsetTop + h.offsetHeight : DM.H * .28;
+}
+
+/* --- sp-gate: neon light-gate on the floor --- */
+C.gate = { sel: '.sp-gate',
+  build: function (el) { ['g-floor', 'g-refl', 'g-fill', 'g-glow', 'g-ring', 'g-ticks'].forEach(function (c) { var d = mk(c, el); if (c === 'g-refl') mk('', d, 'i'); }); },
+  layout: function (el) {
+    var Zp = Math.round(DM.W * num(el, 'depth', 1.25)), s = DM.P / (DM.P + Zp), Ds = DM.H * num(el, 'size', .74), Dh = Ds / s;
+    setv(el, '--gz', -Zp + 'px'); setv(el, '--gy', f1(DM.FLOOR - Dh / 2) + 'px'); setv(el, '--gk', (1 / s).toFixed(4));
+    setv(el, '--D', Math.round(Ds) + 'px'); setv(el, '--Dw', Math.round(Ds * num(el, 'ratio', 1.32)) + 'px'); setv(el, '--lw0', Math.max(2, Math.round(Ds * .011)) + 'px');
+  },
+  reset: function (el) { setv(el, '--e', 0); setv(el, '--pw', 0); },
+  enter: function (el, ctx) {
+    var pw = 0;
+    eTween(ctx, el, { dur: 2000 });
+    ctx.tween({ delay: 250, dur: 1400, ease: eOut, on: function (v) { pw = v; } });
+    ctx.raf(function (now, dt, ms) {
+      var t = ms / 1000;
+      setv(el, '--pw', (pw * (.86 + .14 * Math.sin(t * 1.6))).toFixed(3));
+      setv(el, '--ga', (t * 24).toFixed(1) + 'deg'); setv(el, '--ta', (-t * 5).toFixed(1) + 'deg');
+    });
+  } };
+
+/* --- sp-cubes: nested wireframe cubes --- */
+C.cubes = { sel: '.sp-cubes',
+  build: function (el) { mk('core', el); ['c0', 'c1'].forEach(function (c) { var q = mk('sp-cube ' + c, el); for (var k = 0; k < 6; k++) mk('', q, 'i'); }); },
+  layout: function (el) { var a = at(el, [50, 42]); el.style.left = a[0] + '%'; el.style.top = a[1] + '%'; setv(el, '--cz', num(el, 'depth', -640) + 'px'); },
+  reset: function (el) { setv(el, '--e', 0); },
+  enter: function (el, ctx) { eTween(ctx, el, { dur: 2200 }); ctx.raf(function (n, d, ms) { setv(el, '--t', (ms / 1000).toFixed(3)); }); } };
+
+/* --- sp-fan: concave (agenda) / convex (comparison) arc of cards --- */
+C.fan = { sel: '.sp-fan',
+  build: function (el) {
+    $$('.sp-mono', el).forEach(function (m) { if (!m.querySelector('.sp-mono-face')) m.insertBefore(mk('sp-mono-face L'), m.firstChild); });
+  },
+  layout: function (el) {
+    var a = at(el, [50, 60]), items = Array.prototype.slice.call(el.children), n = items.length, convex = el.dataset.shape === 'convex';
+    el.style.left = a[0] + '%'; setv(el, '--fy', f1(a[1] / 100 * DM.H) + 'px');
+    items.forEach(function (it, k) {
+      var o = k - (n - 1) / 2, x, z, ry, ryin;
+      if (convex) {
+        var R = DM.W * .62, ang = o * num(el, 'spread', 27), r = ang * Math.PI / 180;
+        x = R * Math.sin(r); z = R * Math.cos(r) - R; ry = ang; ryin = (ang >= 0 ? 80 : -80);
+      } else {
+        var cw = it.offsetWidth || DM.W * .18, sp = cw * num(el, 'gap', 1.13);
+        x = o * sp; z = o * o * cw * .16 - cw * .1; ry = -o * num(el, 'spread', 13); ryin = x > 0 ? 35 : -35;
+      }
+      setv(it, '--tx', f1(x) + 'px'); setv(it, '--tz', f1(z) + 'px'); setv(it, '--ry', ry.toFixed(2) + 'deg'); setv(it, '--ryin', ryin + 'deg');
+      // projected 2D placement relative to the fan origin (print / flat fallback)
+      var fx = a[0] / 100 * DM.W - DM.CX, fy = a[1] / 100 * DM.H - DM.CY, s = DM.P / (DM.P - z);
+      setv(it, '--sx', f1((fx + x) * s - fx) + 'px'); setv(it, '--sy', f1(DM.OY + (fy - DM.OY) * s - fy) + 'px'); setv(it, '--ss', s.toFixed(4));
+    });
+  },
+  meters: function (el, lit) { $$('.sp-meter[data-v]', el).forEach(function (m) { var v = +m.dataset.v; $$('b', m).forEach(function (b, j) { b.classList.toggle('on', j < Math.round(v * lit)); }); }); },
+  reset: function (el) {
+    Array.prototype.forEach.call(el.children, function (it) { setv(it, '--e', 0); setv(it, '--dim', 1); setv(it, '--push', '0px'); setv(it, '--bob', '0px'); it.classList.remove('sp-focus'); });
+    this.meters(el, 0);
+  },
+  enter: function (el, ctx) {
+    var self = this, items = Array.prototype.slice.call(el.children), convex = el.dataset.shape === 'convex', focusS = num(el, 'focus', 0);
+    items.forEach(function (it, k) { eTween(ctx, it, { delay: 120 + k * 135, dur: convex ? 1300 : 1500, ease: eBack(convex ? .8 : .9) }); });
+    ctx.tween({ delay: 700, dur: 900, on: function (v) { self.meters(el, v); } });
+    var cur = items.map(function () { return { push: 0, dim: 1 }; }), f = -1;
+    ctx.raf(function (now, dt, ms) {
+      var t = ms / 1000;
+      if (!convex && t > 2.2) items.forEach(function (it, k) { setv(it, '--bob', f1(Math.sin(t * 1.1 + k * 1.3) * 5) + 'px'); });
+      if (focusS && t > 1.6) {
+        var nf = Math.floor((t - 1.6) / focusS) % items.length;
+        if (nf !== f) { f = nf; items.forEach(function (it, k) { it.classList.toggle('sp-focus', k === f); }); }
+        items.forEach(function (it, k) {
+          var c = cur[k]; c.push += ((k === f ? 90 : 0) - c.push) * .08; c.dim += ((k === f ? 1 : .62) - c.dim) * .08;
+          setv(it, '--push', f1(c.push) + 'px'); setv(it, '--dim', c.dim.toFixed(3));
+        });
+      }
+    });
+  },
+  final: function (el) { this.meters(el, 1); } };
+
+/* --- sp-pillars: 3D bars rising from the floor --- */
+C.pillars = { sel: '.sp-pillars',
+  build: function (el) {
+    $$('.sp-pillar', el).forEach(function (p) {
+      var frag = D.createDocumentFragment();
+      ['back', 'sl', 'sr', 'front', 'top'].forEach(function (f) { mk('fc ' + f, frag); }); mk('sp-pool', frag);
+      p.insertBefore(frag, p.firstChild);
+    });
+  },
+  layout: function (el, slide) {
+    var Zd = Math.round(DM.W * num(el, 'depth', .3)), s = DM.P / (DM.P + Zd), wd = nums(el.dataset.width || '.1,.18');
+    var pw = Math.round(Math.min(DM.W * wd[0], DM.H * wd[1])), ps = $$('.sp-pillar', el), n = ps.length;
+    setv(el, '--pz', -Zd + 'px');
+    var by = DM.CY + DM.OY + (DM.FLOOR - DM.OY) * s, hb = headBottom(slide) + DM.H * .03;
+    var labH = Math.max.apply(0, ps.map(function (p) { var l = p.querySelector('.sp-plab'); return l ? l.offsetHeight : 0; }).concat([0])) + DM.H * .02;
+    var hmax = Math.max(DM.H * .12, (by - hb) / s - labH), vmax = num(el, 'max', Math.max.apply(0, ps.map(function (p) { return +p.dataset.v || 1; })));
+    ps.forEach(function (p, k) {
+      var xp = p.dataset.x != null ? +p.dataset.x : (n > 1 ? 17 + 66 * k / (n - 1) : 50);
+      setv(p, '--px', Math.round((xp / 100 * DM.W - DM.CX) / s) + 'px'); setv(p, '--pw', pw + 'px'); setv(p, '--pd', pw + 'px');
+      setv(p, '--ph', Math.max(4, hmax * (+p.dataset.v || 1) / vmax).toFixed(1) + 'px');
+    });
+  },
+  reset: function (el) { $$('.sp-pillar', el).forEach(function (p) { setv(p, '--e', 0); }); },
+  enter: function (el, ctx) {
+    $$('.sp-pillar', el).forEach(function (p, k) {
+      var dl = p.dataset.delay != null ? +p.dataset.delay * 1000 : 350 + k * 150, back = p.dataset.ease === 'back';
+      eTween(ctx, p, { delay: dl, dur: back ? 900 : 1700, ease: back ? eBack(1.2) : eOut5 });
+    });
+  } };
+
+/* --- sp-stack: exploded iso layer stack, billboard labels, optional cutting plane + flow --- */
+C.stack = { sel: '.sp-stack',
+  build: function (el) {
+    var iso = mk('sp-iso'), slabs = $$(':scope > .sp-slab', el), ptag = $(':scope > .sp-plane-tag', el);
+    slabs.forEach(function (sl, k) {
+      setv(sl, '--k', k);
+      var icon = sl.querySelector(':scope > i, :scope > svg'), tag = sl.querySelector(':scope > .sp-tag'), frag = D.createDocumentFragment();
+      mk('glow', frag); ['n', 'e', 'w', 's'].forEach(function (f) { mk('fs ' + f, frag); });
+      var ft = mk('ft', frag); if (icon) ft.appendChild(icon);
+      if (tag) { var an = mk('sp-anchor', frag); an.appendChild(tag); }
+      sl.appendChild(frag); iso.appendChild(sl);
+    });
+    if (ptag) { mk('sp-plane', iso); var pa = mk('sp-plane-anchor', iso); pa.appendChild(ptag); }
+    el.__flows = []; for (var f = 0; f < num(el, 'flow', 0); f++) el.__flows.push({ e: mk('sp-flow', iso), x: Math.random() - .5, y: Math.random() - .5, ph: Math.random(), sp: .22 + Math.random() * .16 });
+    el.appendChild(iso); el.__iso = iso; setv(iso, '--n', slabs.length);
+  },
+  layout: function (el) {
+    var a = at(el, [61, 57]), sz = num(el, 'size', .27), s = Math.min(DM.H * sz, DM.W * sz * .7), iso = el.__iso;
+    el.style.left = a[0] + '%'; el.style.top = a[1] + '%';
+    el.__g = { open: s * num(el, 'gap', .4), shut: s * .08, home: num(el, 'rz', -42), s: s };
+    setv(iso, '--s', f1(s) + 'px'); setv(iso, '--t', f1(s * num(el, 'thick', .085)) + 'px');
+    setv(iso, '--gap', f1(el.__g.open) + 'px'); setv(iso, '--gap-open', f1(el.__g.open) + 'px');
+    setv(iso, '--rz-home', el.__g.home + 'deg'); setv(iso, '--rz', el.__g.home + 'deg');
+    (el.__flows || []).forEach(function (f) { f.px = f.x * s * .8; f.py = f.y * s * .8; });
+  },
+  reset: function (el) {
+    var iso = el.__iso, G = el.__g;
+    setv(iso, '--gap', f1(G.shut) + 'px'); setv(iso, '--rz', (G.home - num(el, 'spin', 36)) + 'deg');
+    $$('.sp-slab', iso).forEach(function (sl, k) { setv(sl, '--e', 0); setv(sl, '--drop', (900 + k * 240) + 'px'); });
+    $$('.sp-tag, .sp-plane, .sp-plane-tag', iso).forEach(function (t) { setv(t, '--e', 0); });
+    (el.__flows || []).forEach(function (f) { setv(f.e, '--o', 0); });
+  },
+  enter: function (el, ctx) {
+    var iso = el.__iso, G = el.__g, n = +iso.style.getPropertyValue('--n'), spin = num(el, 'spin', 36), orbit = num(el, 'orbit', 4), osp = num(el, 'orbit-speed', .45);
+    var rz0 = G.home - spin, gap = G.shut, flowOn = false;
+    ctx.tween({ dur: spin > 60 ? 2600 : 2000, ease: eOut5, from: rz0, to: G.home, on: function (v) { setv(iso, '--rz', v.toFixed(2) + 'deg'); } });
+    $$('.sp-slab', iso).forEach(function (sl, k) {
+      var d0 = 900 + k * 240;
+      ctx.tween({ delay: 60 + k * 140, dur: 850, ease: eBack(.6), on: function (v) { setv(sl, '--drop', f1(d0 * (1 - v)) + 'px'); } });
+      eTween(ctx, sl, { delay: 60 + k * 140, dur: 400, ease: eOut });
+    });
+    ctx.tween({ delay: 900, dur: 1000, ease: eBack(1.1), from: G.shut, to: G.open, on: function (v) { gap = v; setv(iso, '--gap', f1(v) + 'px'); } });
+    $$('.sp-tag', iso).forEach(function (t, k) { eTween(ctx, t, { delay: 1050 + k * 100, dur: 550, ease: eOut }); });
+    $$('.sp-plane', iso).forEach(function (p) { eTween(ctx, p, { delay: 1350, dur: 700, ease: eOut }); });
+    $$('.sp-plane-tag', iso).forEach(function (p) { eTween(ctx, p, { delay: 1600, dur: 600, ease: eOut }).then(function () { flowOn = true; }); });
+    if (!$('.sp-plane-tag', iso)) ctx.wait(1900).then(function () { flowOn = true; });
+    ctx.raf(function (now, dt, ms) {
+      var t = ms / 1000; if (t < 2.4) return;
+      var u = t - 2.4, gg = G.open * (1 + Math.sin(u * 1.2) * .035);
+      setv(iso, '--rz', (G.home + Math.sin(u * osp) * orbit).toFixed(2) + 'deg'); setv(iso, '--gap', f1(gg) + 'px');
+      if (!flowOn) return;
+      var tt = +iso.style.getPropertyValue('--t').replace('px', '') || 0, base = -(n - 1) * gg / 2 - tt / 2 - G.s * .04;
+      (el.__flows || []).forEach(function (f) {
+        var p = (t * f.sp + f.ph) % 1;
+        f.e.style.transform = 'translate3d(' + f1(f.px) + 'px,' + f1(f.py) + 'px,' + f1(base + p * (n - 1) * gg + tt) + 'px)';
+        setv(f.e, '--o', (Math.sin(p * Math.PI) * .95).toFixed(3));
+      });
+    });
+  } };
+
+/* --- sp-runway: steps on a rising 3D path, light pulse; data-tour = camera visits each stop --- */
+C.runway = { sel: '.sp-runway',
+  build: function (el) {
+    var steps = $$(':scope > .sp-step', el), n = steps.length, frag = D.createDocumentFragment();
+    el.__segs = []; el.__nodes = []; el.__stems = [];
+    for (var k = 0; k <= n; k++) { var sg = mk('sp-seg', frag); mk('', sg, 'i'); el.__segs.push(sg); }
+    el.__segs[0].classList.add('fade-in'); el.__segs[n].classList.add('fade-out');
+    steps.forEach(function () { el.__nodes.push(mk('sp-rnode', frag)); el.__stems.push(mk('sp-stem', frag)); });
+    el.__pulse = mk('sp-pulse', frag);
+    el.insertBefore(frag, el.firstChild); el.__steps = steps;
+  },
+  layout: function (el) {
+    var p = nums(el.dataset.path || '13,71,.03 87,40,-.27'), steps = el.__steps, n = steps.length, grow = num(el, 'grow', 1), stem = DM.H * num(el, 'stem', .045);
+    var pts = steps.map(function (s, k) {
+      var f = n > 1 ? k / (n - 1) : 0;
+      return place(lerp(p[0], p[3], f) / 100 * DM.W, lerp(p[1], p[4], f) / 100 * DM.H, Math.round(lerp(p[2], p[5], f) * DM.W));
+    });
+    var a = pts[0], b = pts[1] || pts[0], y = pts[n - 1], x = pts[n - 2] || pts[n - 1];
+    var path = [{ x: a.x + (a.x - b.x) * 1.4, y: a.y + (a.y - b.y) * 1.4, z: a.z + (a.z - b.z) * 1.4 }].concat(pts, [{ x: y.x + (y.x - x.x) * 1.6, y: y.y + (y.y - x.y) * 1.6, z: y.z + (y.z - x.z) * 1.6 }]);
+    el.__path = path;
+    el.__segs.forEach(function (sg, k) { strip(sg, path[k], path[k + 1]); });
+    pts.forEach(function (q, k) {
+      el.__nodes[k].style.transform = 'translate3d(' + f1(q.x) + 'px,' + f1(q.y) + 'px,' + q.z + 'px)';
+      el.__stems[k].style.height = px(stem); el.__stems[k].style.transform = 'translate3d(' + f1(q.x) + 'px,' + f1(q.y - stem) + 'px,' + q.z + 'px)';
+      put3(steps[k], { x: q.x, y: q.y - stem, z: q.z }); setv(steps[k], '--k', lerp(1, grow, n > 1 ? k / (n - 1) : 0).toFixed(3));
+    });
+    if (el.hasAttribute('data-tour')) {        // camera offsets (world space) that frame each stop front-on
+      var slide = el.closest('.slide'), i = panels.indexOf(slide), rot = new DOMMatrix().rotateAxisAngleSelf(0, 1, 0, pos[i] ? pos[i].ry : 0);
+      el.__focus = pts.map(function (q, k) {
+        var kk = lerp(1, grow, n > 1 ? k / (n - 1) : 0), ch = steps[k].offsetHeight * kk, zp = DM.P * (1 - kk / 1.08), s = DM.P / (DM.P - zp);
+        var w = rot.transformPoint(new DOMPoint(q.x, q.y - stem - ch / 2 - DM.OY * (1 - 1 / s), q.z - zp));
+        return { x: w.x, y: w.y, z: w.z };
+      });
+    }
+  },
+  fill: function (el, p) { el.__segs.forEach(function (sg, k) { setv(sg, '--fill', c01(p - k + 1).toFixed(3)); }); },
+  along: function (el, p) {
+    var P = el.__path, k = clamp(Math.floor(p), 0, P.length - 2), u = p - k, a = P[k], b = P[k + 1];
+    el.__pulse.style.transform = 'translate3d(' + f1(a.x + (b.x - a.x) * u) + 'px,' + f1(a.y + (b.y - a.y) * u) + 'px,' + f1(a.z + (b.z - a.z) * u) + 'px)';
+  },
+  reset: function (el) { this.fill(el, 0); el.__steps.forEach(function (s) { setv(s, '--e', 0); }); el.__nodes.forEach(function (n) { n.classList.remove('hit'); }); setv(el.__pulse, '--o', 0); },
+  enter: function (el, ctx) {
+    var self = this, n = el.__steps.length, shown = -1, tour = el.hasAttribute('data-tour');
+    ctx.tween({ delay: 100, dur: 300, on: function (v) { setv(el.__pulse, '--o', v.toFixed(3)); } });
+    ctx.tween({ delay: 100, dur: num(el, 'dur', 1.7) * 1000, ease: eIO, from: 0, to: n, on: function (p) {
+      self.fill(el, p + 1); self.along(el, p + 1);
+      while (shown < n - 1 && p >= shown + 1 - .02) { shown++; el.__nodes[shown].classList.add('hit'); eTween(ctx, el.__steps[shown], { dur: 700, ease: eBack(.7) }); }
+    } }).then(function () { self.fill(el, n + 2); if (!tour) loop(); });
+    // camera tour: plays ONCE (overlapping the path fill), then holds on the pulled-back overview
+    if (tour) ctx.wait(600).then(function () {
+      var F = el.__focus, Z = { x: 0, y: 0, z: 0 }, legs = [], chain = Promise.resolve();
+      legs.push([Z, F[0], 650]); for (var k = 1; k < F.length; k++) legs.push([F[k - 1], F[k], 800]); legs.push([F[F.length - 1], Z, 900]);
+      legs.forEach(function (L, k) {
+        chain = chain.then(function () { return ctx.tween({ dur: L[2], ease: eIO, on: function (v) {
+          camAdd.x = lerp(L[0].x, L[1].x, v); camAdd.y = lerp(L[0].y, L[1].y, v); camAdd.z = lerp(L[0].z, L[1].z, v); } }); })
+          .then(function () { return k < legs.length - 1 ? ctx.wait(450) : null; });
+      });
+      chain.then(function () { camAdd.x = camAdd.y = camAdd.z = 0; loop(); });
+    });
+    ctx.cleanup(function () { if (Stage.frozen) camAdd.x = camAdd.y = camAdd.z = 0; });
+    function loop() {
+      ctx.raf(function (now, dt, ms) {
+        var f = (ms / 1000 * .3) % 1; self.along(el, f * (el.__path.length - 1)); setv(el.__pulse, '--o', (Math.sin(f * Math.PI) * .9).toFixed(3));
+      });
+    }
+  } };
+
+/* --- sp-chip: product reveal — the chip dives out of the dark, flash, slow spin --- */
+C.chip = { sel: '.sp-chip',
+  build: function (el) {
+    mk('rays', el); mk('aura', el); mk('sp-flash', el);
+    var b = mk('body', el); mk('cbot', b); ['n', 'e', 'w', 's'].forEach(function (f) { mk('cs ' + f, b); });
+    var top = mk('ctop', b), die = mk('die', top), cores = mk('cores', die);
+    for (var k = 0; k < 16; k++) mk('', cores, 'b');
+    mk('nm', die).textContent = el.dataset.name || 'AWS'; mk('spec', top);
+  },
+  layout: function (el) { var a = at(el, [30, 46]); el.style.left = a[0] + '%'; el.style.top = a[1] + '%'; },
+  reset: function (el) { setv(el, '--e', 0); setv(el, '--fl', 0); setv(el, '--spin', '0deg'); },
+  enter: function (el, ctx) {
+    var spin = 0;
+    eTween(ctx, el, { dur: 1900 });
+    ctx.tween({ delay: 900, dur: 1100, ease: function (t) { return t; }, on: function (v) {
+      setv(el, '--fl', (v < .12 ? v / .12 : Math.pow(1 - (v - .12) / .88, 2)).toFixed(3)); setv(el, '--fls', (.6 + v * 1.4).toFixed(3)); } });
+    ctx.raf(function (now, dt) {
+      spin += dt * 11;
+      var rz = spin + (1 - (+el.style.getPropertyValue('--e') || 0)) * -300;
+      setv(el, '--spin', spin.toFixed(2) + 'deg'); setv(el, '--bob', f1(Math.sin(now / 900) * 6) + 'px');
+      setv(el, '--sx', f1(Math.sin(rz * Math.PI / 180) * 55) + '%'); setv(el, '--rr', (now / 220 % 360).toFixed(1) + 'deg');
+    });
+  } };
+
+/* --- sp-graph: depth graph; query highlight cycles through data-hot sets --- */
+C.graph = { sel: '.sp-graph',
+  build: function (el) {
+    var nodes = $$(':scope > .sp-node', el), byId = {}, frag = D.createDocumentFragment();
+    nodes.forEach(function (n) { byId[n.dataset.id] = n; });
+    el.__edges = nodes.filter(function (n) { return n.dataset.link && byId[n.dataset.link]; }).map(function (n) {
+      var e = mk('sp-edge', frag); mk('', e, 'i'); return { e: e, from: byId[n.dataset.link], to: n };
+    });
+    el.__pulse = mk('sp-pulse', frag); el.insertBefore(frag, el.firstChild);
+    el.__nodes = nodes; el.__byId = byId;
+    el.__hot = String(el.dataset.hot || '').split('|').map(function (s) { return s.trim().split(/\s+/).filter(Boolean); }).filter(function (a) { return a.length; });
+  },
+  layout: function (el) {
+    el.__pts = new Map();
+    el.__nodes.forEach(function (n) { var a = at(n, [50, 50]), p = place(a[0] / 100 * DM.W, a[1] / 100 * DM.H, Math.round(num(n, 'z', 0) * DM.W)); el.__pts.set(n, p); put3(n, p); });
+    el.__edges.forEach(function (E) { strip(E.e, el.__pts.get(E.from), el.__pts.get(E.to)); });
+    $$('.sp-graph-cap', el).forEach(function (c) { var a = at(c, [72, 87]); put3(c, place(a[0] / 100 * DM.W, a[1] / 100 * DM.H, 0)); });
+  },
+  hot: function (el, k) {
+    var set = el.__hot[k]; if (!set) return;
+    var keep = new Set(set);
+    el.__nodes.forEach(function (n) { var on = keep.has(n.dataset.id); n.classList.toggle('sp-dim', !on); n.classList.toggle('sp-hot', on && !!n.dataset.link); });
+    el.__edges.forEach(function (E) { E.e.classList.toggle('sp-dim', !keep.has(E.to.dataset.id)); });
+    $$('.sp-graph-cap > *', el).forEach(function (c, j) { c.classList.toggle('on', j === k); });
+  },
+  reset: function (el) {
+    el.__nodes.forEach(function (n) { setv(n, '--e', 0); n.classList.remove('sp-dim', 'sp-hot'); });
+    el.__edges.forEach(function (E) { setv(E.e, '--fill', 0); E.e.classList.remove('sp-dim'); });
+    $$('.sp-graph-cap', el).forEach(function (c) { setv(c, '--e', 0); }); setv(el.__pulse, '--o', 0);
+  },
+  enter: function (el, ctx) {
+    var self = this, lv = function (n) { return num(n, 'lv', 0); };
+    el.__nodes.forEach(function (n) { eTween(ctx, n, { delay: 150 + lv(n) * 170, dur: 450, ease: eOut }); });
+    el.__edges.forEach(function (E) { ctx.tween({ delay: 230 + (lv(E.to) - 1) * 170, dur: 380, ease: eOut, on: function (v) { setv(E.e, '--fill', v.toFixed(3)); } }); });
+    if (!el.__hot.length) return;
+    var maxLv = Math.max.apply(0, el.__nodes.map(lv));
+    ctx.wait(400 + maxLv * 170).then(function () {
+      $$('.sp-graph-cap', el).forEach(function (c) { eTween(ctx, c, { dur: 500, ease: eOut }); });
+      var cyc = -1, chain = [];
+      ctx.raf(function (now, dt, ms) {
+        var t = ms / 1000, c = Math.floor(t / 3.6), f = (t % 3.6) / 1.5;
+        if (c !== cyc) {
+          cyc = c; var k = c % el.__hot.length; self.hot(el, k);
+          chain = el.__hot[k].map(function (id) { return el.__pts.get(el.__byId[id]); }).filter(Boolean);
+          chain = chain.filter(function (p, j) { return j === 0 || p.z >= chain[j - 1].z - 1; });
+        }
+        if (f < 1 && chain.length > 1) {
+          var q = f * (chain.length - 1), j = Math.min(chain.length - 2, Math.floor(q)), u = q - j, a = chain[j], b = chain[j + 1];
+          el.__pulse.style.transform = 'translate3d(' + f1(lerp(a.x, b.x, u)) + 'px,' + f1(lerp(a.y, b.y, u)) + 'px,' + f1(lerp(a.z, b.z, u)) + 'px)';
+          setv(el.__pulse, '--o', (Math.sin(f * Math.PI) * .95).toFixed(3));
+        } else setv(el.__pulse, '--o', 0);
+      });
+    });
+  },
+  final: function (el) {          // clone-safe: rebuild the first hot set from attributes
+    var set = String(el.dataset.hot || '').split('|')[0].trim().split(/\s+/).filter(Boolean); if (!set.length) return;
+    var keep = new Set(set);
+    $$(':scope > .sp-node', el).forEach(function (n) { var on = keep.has(n.dataset.id); n.classList.toggle('sp-dim', !on); n.classList.toggle('sp-hot', on && !!n.dataset.link); });
+  } };
+
+/* --- sp-tiers: tilted trays; records fall through, fewer and purer each tier --- */
+C.tiers = { sel: '.sp-tiers',
+  build: function (el) {
+    var tiers = $$(':scope > .sp-tier', el), frag = D.createDocumentFragment();
+    el.__trays = tiers.map(function (t) {
+      var col = (t.className.match(/\b(bronze|silver|gold)\b/) || [''])[0];
+      var tr = mk('sp-tray ' + col, frag); ['tw', 'te', 'tf', 'tt'].forEach(function (f) { mk(f, tr, 'i'); });
+      var top = tr.lastChild; tr.__rips = [0, 1, 2, 3, 4].map(function () { return mk('sp-rip', top); });
+      return tr;
+    });
+    el.__drops = []; for (var k = 0; k < 18; k++) el.__drops.push({ e: mk('sp-drop', frag), on: false });
+    el.insertBefore(frag, el.firstChild); el.__tiers = tiers;
+  },
+  layout: function (el) {
+    var tx = num(el, 'trayX', 31), rx = num(el, 'rowX', 52), ys = nums(el.dataset.y || '39,81'), n = el.__tiers.length;
+    el.__tw = Math.min(DM.W * .3, DM.H * .52); el.__tz = -Math.round(DM.W * .08);
+    el.__ty = el.__trays.map(function (tr, k) {
+      var sy = lerp(ys[0], ys[1], n > 1 ? k / (n - 1) : 0) / 100 * DM.H, p = place(tx / 100 * DM.W, sy, el.__tz);
+      put3(tr, p); setv(tr, '--tw', px(el.__tw)); setv(tr, '--td', px(el.__tw * .62)); setv(tr, '--th', px(el.__tw * .035));
+      put3(el.__tiers[k], place(rx / 100 * DM.W, sy, 0));
+      tr.__mc = getComputedStyle(el.__tiers[k]).getPropertyValue('--mc').trim() || '#fff';
+      return p.y;
+    });
+  },
+  reset: function (el) {
+    el.__trays.concat(el.__tiers).forEach(function (t) { setv(t, '--e', 0); });
+    el.__drops.forEach(function (d) { d.on = false; setv(d.e, '--o', 0); });
+  },
+  enter: function (el, ctx) {
+    var pass = nums(el.dataset.pass || '.55,.4').concat([0]), acc = 0;
+    el.__trays.forEach(function (t, k) { eTween(ctx, t, { delay: 100 + k * 160, dur: 600, ease: eOut }); });
+    el.__tiers.forEach(function (t, k) { eTween(ctx, t, { delay: 300 + k * 160, dur: 600, ease: eOut }); });
+    var ripple = function (k, x) {
+      var r = el.__trays[k].__rips.find(function (e) { return !e.__busy; }) || el.__trays[k].__rips[0]; r.__busy = true;
+      r.style.left = (50 + x / el.__tw * 100).toFixed(1) + '%'; r.style.top = '50%';
+      var an = r.animate([{ transform: 'scale(.2)', opacity: .95 }, { transform: 'scale(1.8)', opacity: 0 }], { duration: 900, easing: 'cubic-bezier(.16,1,.3,1)' });
+      an.onfinish = function () { r.__busy = false; }; ctx.cleanup(function () { an.cancel(); r.__busy = false; });
+    };
+    ctx.wait(700).then(function () {
+      ctx.raf(function (now, dt) {
+        var g = DM.H * 2.4, ty = el.__ty; acc += dt;
+        if (acc > .16) { acc = 0; var d0 = el.__drops.find(function (d) { return !d.on; });
+          if (d0) Object.assign(d0, { on: true, st: 0, x: (Math.random() - .5) * el.__tw * .72, y: ty[0] - DM.H * .3, vy: DM.H * .2 }); }
+        el.__drops.forEach(function (d) {
+          if (!d.on) return;
+          d.vy += g * dt; d.y += d.vy * dt;
+          if (d.y >= ty[d.st]) {
+            ripple(d.st, d.x);
+            if (Math.random() < pass[d.st] && d.st < ty.length - 1) { d.st++; d.vy *= .3; } else { d.on = false; setv(d.e, '--o', 0); return; }
+          }
+          setv(d.e, '--dc', el.__trays[d.st].__mc); setv(d.e, '--o', 1);
+          d.e.style.transform = 'translate3d(' + f1(d.x) + 'px,' + f1(d.y) + 'px,' + el.__tz + 'px)';
+        });
+      });
+    });
+  } };
+
+/* --- sp-rise: a leaf flies up out of the depth (data-delay seconds after landing) --- */
+C.rise = { sel: '.sp-rise',
+  reset: function (el) { setv(el, '--e', 0); },
+  enter: function (el, ctx) { eTween(ctx, el, { delay: num(el, 'delay', .6) * 1000, dur: 1500 }); } };
+
+/* === 10. SLIDE WIRING — one kit hook per scene; layout pass; print / resize === */
+function compsIn(slide) {
+  var out = []; Object.keys(C).forEach(function (k) { $$(C[k].sel, slide).forEach(function (el) { out.push([C[k], el]); }); }); return out;
+}
+function resetSlide(slide) { compsIn(slide).forEach(function (c) { c[0].reset && c[0].reset(c[1]); }); slide.__spReset = true; }
+var KIT = {
+  enter: function (slide, ctx) {
+    if (ctx.reduced) return;
+    if (!slide.__spReset) resetSlide(slide);
+    slide.__spReset = false;
+    var wait = arrival(), list = compsIn(slide);
+    (wait > 30 ? ctx.wait(wait) : Promise.resolve()).then(function () {
+      list.forEach(function (c) { c[0].enter && c[0].enter(c[1], ctx, slide); });
+    });
+  },
+  final: function (slide, info) {
+    // overview clone: the engine scales it from its top-left; drop the panel's world transform-origin
+    if (info && info.clone) slide.style.transformOrigin = '0 0';
+    compsIn(slide).forEach(function (c) { c[0].final && c[0].final(c[1]); });
+  }
+};
+function layoutAll(d) {
+  DM = d; placePanels();
+  root.style.setProperty('--sp-P', DM.P + 'px'); root.style.setProperty('--sp-OY', DM.OY + 'px');
+  if (vp) { vp.style.perspective = DM.P + 'px'; vp.style.perspectiveOrigin = DM.CX + 'px ' + (DM.CY + DM.OY) + 'px'; }
+  world.style.left = DM.CX + 'px'; world.style.top = DM.CY + 'px';
+  panels.forEach(function (s) { compsIn(s).forEach(function (c) { c[0].layout && c[0].layout(c[1], s); }); });
+}
+function liveLayout() {
+  layoutAll(dims(innerWidth, innerHeight));
+  if (canvas) { var dpr = Math.min(2, devicePixelRatio || 1); canvas.width = Math.round(DM.W * dpr); canvas.height = Math.round(DM.H * dpr); g2.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  initDust(); mapInit();
+}
+
+/* build components now (after the editor indexed the pristine DOM, before the engine boots) */
+cfg = panels.map(slideCfg);
+panels.forEach(function (s) {           // .sp-cam: one 3D wrapper per slide (see kit.css § 5)
+  if (s.firstElementChild && s.firstElementChild.classList.contains('sp-cam')) return;
+  var cam = mk('sp-cam'); while (s.firstChild) cam.appendChild(s.firstChild); s.appendChild(cam);
+});
+panels.forEach(function (s, k) {
+  if (!s.dataset.scene) s.dataset.scene = 'sp-' + (k + 1);
+  compsIn(s).forEach(function (c) { c[0].build && c[0].build(c[1]); });
+});
+var scenes = {}; panels.forEach(function (s) { scenes[s.dataset.scene] = 1; });
+Object.keys(scenes).forEach(function (k) { Stage.hook(k, KIT); });
+if (window.lucide) lucide.createIcons();
+Stage.waitFor(D.fonts ? D.fonts.ready : null);
+liveLayout(); renderThumb();
+D.fonts && D.fonts.ready.then(function () { liveLayout(); });
+
+var rzT = 0;
+addEventListener('resize', function () {
+  clearTimeout(rzT);
+  rzT = setTimeout(function () { liveLayout(); if (Stage.index >= 0) snap(Stage.index); }, 120);
+});
+var printMQ = matchMedia('print');
+function toPrint(on) { if (on) layoutAll(dims(1600, 900)); else { liveLayout(); if (Stage.index >= 0) snap(Stage.index); } }
+printMQ.addEventListener && printMQ.addEventListener('change', function (e) { toPrint(e.matches); });
+addEventListener('beforeprint', function () { toPrint(true); });
+addEventListener('afterprint', function () { toPrint(false); });
+
+/* pointer tilt — capped, eased, part of the one loop */
+addEventListener('pointermove', function (e) {
+  if (e.pointerType === 'touch' || reduced() || Stage.frozen) return;
+  tilt.ty = (e.clientX / DM.W - .5) * 3.2; tilt.tx = -(e.clientY / DM.H - .5) * 2.2; kick();
+});
+D.addEventListener('pointerleave', function () { tilt.tx = tilt.ty = 0; });
+kick();
+
+/* === 11. PUBLIC API === */
+window.Spatial = {
+  version: '1.0', components: C, camAdd: camAdd, get cam() { return cam; }, get dims() { return DM; },
+  place: place, strip: strip, eTween: eTween, arrival: arrival, layout: liveLayout,
+  ease: { out: eOut, out5: eOut5, inOut: eIO, back: eBack, fly: eFly },
+  /* register a new component: Spatial.component('name', { sel, build, layout, reset, enter, final }) — call before boot */
+  component: function (name, def) { C[name] = def; panels.forEach(function (s) { $$(def.sel, s).forEach(function (el) { def.build && def.build(el); def.layout && def.layout(el, s); }); }); }
+};
+})();
+
+</script>
+<script>
+/* === DECK GLUE === */
+// All slides use declarative kit components (flavors/spatial/README.md); no deck-specific hooks needed.
+
+</script>
+</body>
+</html>

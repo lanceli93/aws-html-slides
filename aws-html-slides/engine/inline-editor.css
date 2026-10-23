@@ -1,0 +1,56 @@
+/* ===========================================================
+   INLINE EDITOR — CSS  (opt-in only; paste after stage-engine.css)
+   Visibility of the toggle is controlled by JS classes only —
+   do NOT use a CSS `~` sibling hover chain (pointer-events:none breaks it).
+   =========================================================== */
+.edit-hotzone {
+    position: fixed; top: 0; left: 0; width: 80px; height: 80px;
+    z-index: 10000; cursor: pointer;
+}
+.edit-toggle, .edit-save-file, .edit-bar button {
+    font: 500 .8rem/1 var(--font-body, system-ui, sans-serif);
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: none; border-radius: 6px; padding: 7px 11px;
+}
+.edit-toggle svg, .edit-save-file svg, .edit-bar svg { width: 16px; height: 16px; flex: none; }
+.edit-toggle {
+    position: fixed; top: clamp(12px, 2vh, 20px); left: clamp(12px, 1.6vw, 20px); z-index: 10001;
+    background: rgba(20, 14, 34, .85); color: #fff; border: 1px solid rgba(255,255,255,.18);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { background: var(--stage-accent, #8B5CF6); border-color: transparent; }
+.edit-save-file {
+    position: fixed; top: clamp(12px, 2vh, 20px); left: clamp(96px, 9vw, 112px); z-index: 10001;
+    background: var(--stage-accent, #8B5CF6); color: #fff;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+body.editing-active .edit-save-file { opacity: 1; pointer-events: auto; }
+
+/* slide navigation while editing (keys belong to the text cursor) */
+.edit-bar {
+    position: fixed; left: 50%; bottom: clamp(14px, 3vh, 28px); transform: translateX(-50%); z-index: 10001;
+    display: flex; gap: 6px; padding: 6px; border-radius: 10px;
+    background: rgba(12, 8, 22, .88); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(10px);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+body.editing-active .edit-bar { opacity: 1; pointer-events: auto; }
+.edit-bar button { background: rgba(255,255,255,.08); color: #fff; }
+.edit-bar button:hover { background: rgba(255,255,255,.16); }
+.edit-bar .edit-pos { align-self: center; padding: 0 8px; font: .8rem var(--font-body, system-ui, sans-serif);
+    color: rgba(255,255,255,.6); font-variant-numeric: tabular-nums; }
+
+/* editable affordance */
+body.editing-active [contenteditable="true"] { outline: 1px dashed rgba(167,139,250,.45); outline-offset: 4px; border-radius: 2px; cursor: text; }
+body.editing-active [contenteditable="true"]:hover { outline-color: rgba(232,121,249,.8); }
+body.editing-active [contenteditable="true"]:focus { outline: 2px solid var(--stage-accent, #8B5CF6); background: rgba(139,92,246,.06); }
+
+.edit-toast {
+    position: fixed; bottom: clamp(70px, 10vh, 96px); left: 50%; z-index: 10002;
+    transform: translateX(-50%) translateY(20px); padding: 10px 20px; border-radius: 6px;
+    background: rgba(0,0,0,.85); color: #fff; font: .85rem var(--font-body, system-ui, sans-serif);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .3s ease;
+}
+.edit-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.edit-toast.error { background: rgba(220, 38, 38, .92); }
+@media print { .edit-hotzone, .edit-toggle, .edit-save-file, .edit-bar, .edit-toast { display: none !important; } }

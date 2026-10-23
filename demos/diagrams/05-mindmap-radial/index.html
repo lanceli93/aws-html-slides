@@ -47,15 +47,15 @@
      with generous fallbacks so it renders anywhere.
      ============================================================ */
   :root {
-    --bg:      #0a0f1c;   /* deep navy base */
-    --text:    #e0e0ff;   /* node / body text */
-    --cyan:    #00ffcc;
-    --magenta: #ff00aa;
-    --blue:    #00aaff;
+    --bg:      #0A0A0A;   /* base near-black */
+    --text:    #FFFFFF;   /* node / body text */
+    --cyan:    #8B5CF6;
+    --magenta: #D946EF;
+    --blue:    #38BDF8;
     --amber:   #ffaa00;
     --violet:  #aa00ff;
     --redpink: #ff5555;
-    --center:  #b9fff0;   /* center capsule accent */
+    --center:  #E0D4FF;   /* center capsule accent */
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -66,7 +66,7 @@
     overflow: hidden;
     background: var(--bg);
     color: var(--text);
-    font-family: 'Clash Display', 'Satoshi', 'Avenir Next', 'PingFang SC', sans-serif;
+    font-family: 'Urbanist', 'Albert Sans', 'Avenir Next', 'PingFang SC', sans-serif;
   }
 
   /* ---------------- background: starfield dots + faint grid + glow orbs ----
@@ -77,11 +77,11 @@
     position: relative;
     display: flex; flex-direction: column;
     background:
-      radial-gradient(1.4px 1.4px at 12% 22%, rgba(224,224,255,0.55), transparent 60%),
-      radial-gradient(1.2px 1.2px at 78% 14%, rgba(0,255,204,0.45), transparent 60%),
-      radial-gradient(1.3px 1.3px at 63% 78%, rgba(255,0,170,0.40), transparent 60%),
-      radial-gradient(1.1px 1.1px at 32% 62%, rgba(0,170,255,0.42), transparent 60%),
-      radial-gradient(1.2px 1.2px at 88% 66%, rgba(224,224,255,0.35), transparent 60%),
+      radial-gradient(1.4px 1.4px at 12% 22%, rgba(255,255,255,0.55), transparent 60%),
+      radial-gradient(1.2px 1.2px at 78% 14%, rgba(139,92,246,0.45), transparent 60%),
+      radial-gradient(1.3px 1.3px at 63% 78%, rgba(217,70,239,0.40), transparent 60%),
+      radial-gradient(1.1px 1.1px at 32% 62%, rgba(56,189,248,0.42), transparent 60%),
+      radial-gradient(1.2px 1.2px at 88% 66%, rgba(255,255,255,0.35), transparent 60%),
       radial-gradient(1.1px 1.1px at 46% 30%, rgba(255,255,255,0.30), transparent 60%),
       linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px),
@@ -97,7 +97,7 @@
   }
   body::before {
     width: 46vw; height: 46vw; left: -12vw; top: -14vw;
-    background: radial-gradient(circle, rgba(0,255,204,0.16), transparent 68%);
+    background: radial-gradient(circle, rgba(139,92,246,0.16), transparent 68%);
     animation: orb 13s ease-in-out infinite;
   }
   body::after {
@@ -118,21 +118,21 @@
   }
   .eyebrow {
     font-size: clamp(10px, 1.15vw, 14px); letter-spacing: 0.4em; font-weight: 600;
-    text-transform: uppercase; color: rgba(224,224,255,0.62);
+    text-transform: uppercase; color: rgba(255,255,255,0.62);
   }
   .eyebrow .tick { color: var(--cyan); }
   h1 {
     margin-top: 0.7rem;
     font-size: clamp(26px, 4.2vw, 52px); line-height: 1.05; font-weight: 800;
     letter-spacing: 0.01em;
-    background: linear-gradient(100deg, #fff 0%, #b9fff0 32%, var(--magenta) 70%, var(--blue) 100%);
+    background: linear-gradient(100deg, #fff 0%, #E0D4FF 32%, var(--magenta) 70%, var(--blue) 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent; color: transparent;
-    filter: drop-shadow(0 3px 26px rgba(0,255,204,0.22));
+    filter: drop-shadow(0 3px 26px rgba(139,92,246,0.22));
   }
   .sub {
     margin-top: 0.7rem; font-size: clamp(12px, 1.5vw, 17px); font-weight: 400;
-    color: rgba(224,224,255,0.68); letter-spacing: 0.02em;
+    color: rgba(255,255,255,0.68); letter-spacing: 0.02em;
   }
 
   /* ---------------- SVG stage ---------------- */
@@ -159,7 +159,7 @@
 
   /* branch capsule */
   .cap rect {
-    fill: rgba(10,15,28,0.72); stroke: var(--bc); stroke-width: 2.5;
+    fill: rgba(10,10,10,0.72); stroke: var(--bc); stroke-width: 2.5;
     filter: drop-shadow(0 0 10px var(--bc));
   }
   .cap-t {
@@ -172,7 +172,7 @@
 
   /* leaf pill */
   .leaf rect {
-    fill: rgba(10,15,28,0.55); stroke: var(--bc); stroke-width: 1.6;
+    fill: rgba(10,10,10,0.55); stroke: var(--bc); stroke-width: 1.6;
     opacity: 0.92;
   }
   .leaf-t {
@@ -184,17 +184,17 @@
   #center rect {
     /* fully opaque: the six limbs terminate underneath this capsule — any
        translucency would let them ghost through the label text */
-    fill: #0d1322;
+    fill: #15101f;
     stroke: var(--center); stroke-width: 3;
-    filter: drop-shadow(0 0 20px rgba(0,255,204,0.55));
+    filter: drop-shadow(0 0 20px rgba(139,92,246,0.55));
   }
   #center .halo {
-    fill: rgba(0,255,204,0.10); stroke: none; filter: blur(2px);
+    fill: rgba(139,92,246,0.10); stroke: none; filter: blur(2px);
   }
   #center text {
     fill: #fff; font-size: 30px; font-weight: 800; letter-spacing: 0.02em;
     dominant-baseline: middle; text-anchor: middle;
-    filter: drop-shadow(0 0 12px rgba(0,255,204,0.6));
+    filter: drop-shadow(0 0 12px rgba(139,92,246,0.6));
   }
 
   /* ============================================================
@@ -280,20 +280,20 @@
   .caption {
     position: fixed; left: 26px; bottom: 20px; z-index: 3;
     font-size: clamp(10px, 1.1vw, 13px); letter-spacing: 0.06em;
-    color: rgba(224,224,255,0.5); pointer-events: none; max-width: 60vw;
+    color: rgba(255,255,255,0.5); pointer-events: none; max-width: 60vw;
   }
-  .caption b { color: rgba(224,224,255,0.78); font-weight: 600; }
+  .caption b { color: rgba(255,255,255,0.78); font-weight: 600; }
   #replay {
     position: fixed; right: 26px; bottom: 20px; z-index: 3;
     display: inline-flex; align-items: center; gap: 8px;
     padding: 9px 18px; border-radius: 999px;
-    background: rgba(10,15,28,0.6); color: var(--text);
-    border: 1.5px solid rgba(0,255,204,0.55);
+    background: rgba(10,10,10,0.6); color: var(--text);
+    border: 1.5px solid rgba(139,92,246,0.55);
     font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.06em;
     cursor: pointer; backdrop-filter: blur(6px);
     transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
   }
-  #replay:hover  { background: rgba(0,255,204,0.14); box-shadow: 0 0 18px rgba(0,255,204,0.4); }
+  #replay:hover  { background: rgba(139,92,246,0.14); box-shadow: 0 0 18px rgba(139,92,246,0.4); }
   #replay:active { transform: scale(0.96); }
   #replay svg { width: 15px; height: 15px; stroke: var(--cyan); fill: none;
                 stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -337,7 +337,7 @@
            ld / lld / cd / fd delay var to stagger the bloom.
            (Coordinates hand-placed and overlap-checked at 1400x760.)
            ================================================================= -->
-  <g class="branch" data-branch="1" style="--bc:#00ffcc;--drift:11s;--doff:-2s">
+  <g class="branch" data-branch="1" style="--bc:#8B5CF6;--drift:11s;--doff:-2s">
     <path class="limb" pathLength="1" d="M700,380 C620,300 480,220 417,150" style="--ld:0.25s"/>
     <path class="leaf-limb" pathLength="1" d="M345,150 C296,150 271,78 222,78" style="--lld:0.9s"/>
     <g class="leaf" style="--fd:1.08s">
@@ -355,7 +355,7 @@
       <text class="cap-t" x="323" y="150">白盒 / 黑盒</text>
     </g>
   </g>
-  <g class="branch" data-branch="2" style="--bc:#ff00aa;--drift:13s;--doff:-4s">
+  <g class="branch" data-branch="2" style="--bc:#D946EF;--drift:13s;--doff:-4s">
     <path class="limb" pathLength="1" d="M700,380 C560,350 440,405 325,380" style="--ld:0.35s"/>
     <path class="leaf-limb" pathLength="1" d="M258,380 C236,380 224,318 202,318" style="--lld:1.0s"/>
     <g class="leaf" style="--fd:1.18s">
@@ -373,7 +373,7 @@
       <text class="cap-t" x="211" y="380">数据即规格</text>
     </g>
   </g>
-  <g class="branch" data-branch="3" style="--bc:#00aaff;--drift:15s;--doff:-6s">
+  <g class="branch" data-branch="3" style="--bc:#38BDF8;--drift:15s;--doff:-6s">
     <path class="limb" pathLength="1" d="M700,380 C620,470 470,545 405,610" style="--ld:0.45s"/>
     <path class="leaf-limb" pathLength="1" d="M345,610 C291,610 263,548 209,548" style="--lld:1.1s"/>
     <g class="leaf" style="--fd:1.28s">

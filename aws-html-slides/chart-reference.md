@@ -231,15 +231,15 @@ options: {
 
 **IMPORTANT:** CSS variables (`var()`) don't work inside `<script>`. You must resolve theme colors as literal values when generating Chart.js config.
 
-Use the chart color variables from STYLE_PRESETS.md for each theme. When generating:
+Use the re:Invent chart palette from [design-system.md](design-system.md) §2 (`#8B5CF6, #D946EF, #FF9900, #38BDF8, #34D399, #F472B6`). When generating:
 
-1. Look up the chosen theme's `--chart-colors` palette
+1. Resolve the palette to literal values
 2. Assign colors to datasets in order: first dataset gets color 1, second gets color 2, etc.
 3. For `fill` backgrounds, add alpha: use `rgba()` with `0.1` opacity for line fills, `0.7` for bar charts
-4. Grid lines: dark themes → `rgba(255,255,255,0.05)`, light themes → `rgba(0,0,0,0.06)`
-5. Text (ticks, labels): dark themes → `rgba(255,255,255,0.4)`, light themes → `rgba(0,0,0,0.45)`
-6. Font family: use the theme's body font (resolved as string, e.g., `'Space Grotesk'`)
-7. Doughnut/pie border color: match the slide background color to create clean gaps
+4. Grid lines: `rgba(139,92,246,0.08)`
+5. Text (ticks, labels): `rgba(255,255,255,0.4)`
+6. Font family: `'Albert Sans', 'Noto Sans SC', sans-serif` (resolved as a string)
+7. Doughnut/pie border color: match the slide background (`#0A0A0A`) to create clean gaps
 
 ## Slide Layout Rules
 
@@ -251,4 +251,4 @@ Use the chart color variables from STYLE_PRESETS.md for each theme. When generat
 
 **Viewport constraint:** Chart containers must never exceed `50vh` height. Use the CSS classes above which enforce `clamp()` limits.
 
-**Animation:** Charts animate natively on render. Wrap the chart container in `.reveal` so it fades in when the slide becomes visible. No extra animation needed.
+**Animation:** create the chart in the slide's hook `enter` (so it animates on every entry), destroy it via `ctx.cleanup`, and render it with `animation:false` in `final(slide)` so the overview, print and reduced motion show the finished chart. See [html-template.md](html-template.md) §4. Wrap the chart card in `rv` so it rises in with the slide.
